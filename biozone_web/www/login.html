@@ -1,0 +1,302 @@
+<!DOCTYPE html><html dir="rtl" lang="ar" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>تسجيل الدخول - بيوزون</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#6c748b",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#008378",
+                        "on-secondary-fixed-variant": "#444749",
+                        "surface-dim": "#cbdbf5",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#3d4947",
+                        "on-primary-container": "#f4fffc",
+                        "outline": "#6d7a77",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#e0e3e5",
+                        "surface-bright": "#f8f9ff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "background": "#f8f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "primary-fixed": "#89f5e7",
+                        "inverse-primary": "#6bd8cb",
+                        "inverse-surface": "#213145",
+                        "surface-variant": "#d3e4fe",
+                        "outline-variant": "#bcc9c6",
+                        "on-tertiary-fixed": "#131b2e",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary": "#00685f",
+                        "tertiary-fixed": "#dae2fd",
+                        "surface-tint": "#006a61",
+                        "surface-container": "#e5eeff",
+                        "on-primary-fixed": "#00201d",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#191c1e",
+                        "surface-container-high": "#dce9ff",
+                        "tertiary": "#545c72",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-background": "#0b1c30",
+                        "secondary": "#5c5f61",
+                        "on-surface": "#0b1c30",
+                        "on-error-container": "#93000a",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-container": "#fefcff",
+                        "surface": "#f8f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "8px",
+                        "xs": "4px",
+                        "xl": "40px",
+                        "container-max": "1280px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "base": "4px",
+                        "gutter": "20px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Tajawal"],
+                        "body-lg": ["Tajawal"],
+                        "label-sm": ["Tajawal"],
+                        "title-md": ["Tajawal"],
+                        "body-md": ["Tajawal"],
+                        "headline-lg": ["Tajawal"],
+                        "headline-lg-mobile": ["Tajawal"],
+                        "label-md": ["Tajawal"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", { "lineHeight": "60px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Tajawal', sans-serif; }
+        .tab-active { border-bottom: 2px solid theme('colors.primary'); color: theme('colors.primary'); font-weight: 700; }
+        .tab-inactive { color: theme('colors.on-surface-variant'); border-bottom: 2px solid transparent; }
+    </style>
+</head>
+<body class="bg-surface min-h-screen flex items-center justify-center p-gutter">
+<main class="w-full max-w-[440px] bg-surface-container-lowest rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] border border-outline-variant/30 p-lg md:p-xl relative overflow-hidden">
+<!-- Header -->
+<header class="text-center mb-xl">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Biozone</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">بوابتك الرقمية للمستلزمات الطبية</p>
+</header>
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant/50 mb-lg">
+<button class="flex-1 py-sm font-title-md text-title-md tab-active transition-colors duration-200" id="tab-login" onclick="switchTab('login')">تسجيل الدخول</button>
+<button class="flex-1 py-sm font-title-md text-title-md tab-inactive transition-colors duration-200" id="tab-signup" onclick="switchTab('signup')">حساب جديد</button>
+</div>
+<!-- Forms Container -->
+<div class="relative min-h-[300px]" style="height: 336px;">
+<!-- Login Form -->
+<form class="flex flex-col gap-md transition-opacity duration-300 absolute inset-0 w-full" id="form-login">
+<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="login-error"></p>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="login-email">البريد الإلكتروني</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">mail</span>
+<input class="w-full pl-md pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" dir="ltr" id="login-email" placeholder="name@company.com" type="text">
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="login-password">كلمة المرور</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">lock</span>
+<input class="w-full pl-[48px] pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" dir="ltr" id="login-password" placeholder="••••••••" type="password">
+<button class="absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="togglePassword('login-password', this)" type="button">
+<span class="material-symbols-outlined text-[20px]">visibility_off</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between w-full">
+    <label class="flex items-center gap-sm cursor-pointer">
+        <input type="checkbox" id="login-remember" class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary">
+        <span class="font-label-md text-label-md text-on-surface-variant">تذكرني</span>
+    </label>
+    <a class="font-label-md text-label-md text-primary hover:underline" href="#">نسيت كلمة المرور؟</a>
+</div>
+<button class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98]" type="submit">
+                    تسجيل الدخول
+                </button>
+<p class="text-center font-body-md text-body-md text-on-surface-variant mt-sm">
+                    مستخدم جديد؟ <button class="text-primary font-bold hover:underline" onclick="switchTab('signup')" type="button">سجل حساب</button>
+</p>
+</form>
+<!-- Signup Form -->
+<form class="flex flex-col gap-md opacity-0 pointer-events-none transition-opacity duration-300 absolute inset-0 w-full" id="form-signup">
+<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="signup-error"></p>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="signup-name">الاسم الكامل</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">person</span>
+<input class="w-full pl-md pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" id="signup-name" placeholder="د. أحمد عبدالله" type="text">
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="signup-email">البريد الإلكتروني</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">mail</span>
+<input class="w-full pl-md pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" dir="ltr" id="signup-email" placeholder="name@company.com" type="email">
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="signup-phone">رقم الهاتف</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">phone</span>
+<input class="w-full pl-md pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" dir="ltr" id="signup-phone" placeholder="01X XXXX XXXX" type="tel">
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface" for="signup-password">كلمة المرور</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant">lock</span>
+<input class="w-full pl-[48px] pr-[48px] py-[12px] bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors font-body-md text-body-md text-on-surface rounded-xl" dir="ltr" id="signup-password" placeholder="••••••••" type="password">
+<button class="absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors" onclick="togglePassword('signup-password', this)" type="button">
+<span class="material-symbols-outlined text-[20px]">visibility_off</span>
+</button>
+</div>
+</div>
+<button class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98]" type="submit">
+                    إنشاء حساب
+                </button>
+<p class="text-center font-body-md text-body-md text-on-surface-variant mt-sm">
+                    لديك حساب بالفعل؟ <button class="text-primary font-bold hover:underline" onclick="switchTab('login')" type="button">تسجيل الدخول</button>
+</p>
+</form>
+</div>
+</main>
+<script>
+        function switchTab(tab) {
+            const loginForm = document.getElementById('form-login');
+            const signupForm = document.getElementById('form-signup');
+            const loginTab = document.getElementById('tab-login');
+            const signupTab = document.getElementById('tab-signup');
+            const container = loginForm.parentElement;
+
+            if (tab === 'login') {
+                loginTab.classList.replace('tab-inactive', 'tab-active');
+                signupTab.classList.replace('tab-active', 'tab-inactive');
+                
+                signupForm.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    loginForm.classList.remove('opacity-0', 'pointer-events-none');
+                    container.style.height = loginForm.scrollHeight + 'px';
+                }, 150);
+            } else {
+                signupTab.classList.replace('tab-inactive', 'tab-active');
+                loginTab.classList.replace('tab-active', 'tab-inactive');
+                
+                loginForm.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    signupForm.classList.remove('opacity-0', 'pointer-events-none');
+                    container.style.height = signupForm.scrollHeight + 'px';
+                }, 150);
+            }
+        }
+
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('.material-symbols-outlined');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility_off';
+            }
+        }
+        
+        // Init height
+        window.addEventListener('DOMContentLoaded', () => {
+             const loginForm = document.getElementById('form-login');
+             loginForm.parentElement.style.height = loginForm.scrollHeight + 'px';
+        });
+
+        function showError(elId, msg) {
+            const el = document.getElementById(elId);
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        async function callApi(method, payload) {
+            const res = await fetch(`/api/method/biozone_web.api.${method}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
+                    || data.exception || 'حدث خطأ، حاول مرة أخرى';
+                throw new Error(msg);
+            }
+            return data.message;
+        }
+
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.getElementById('login-error').classList.add('hidden');
+            try {
+                const result = await callApi('biozone_login', {
+                    usr: document.getElementById('login-email').value,
+                    pwd: document.getElementById('login-password').value,
+                    remember_me: document.getElementById('login-remember').checked ? 1 : 0
+                });
+                window.location.href = result.home_page || '/biozone-home';
+            } catch (err) {
+                showError('login-error', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
+            }
+        });
+
+        document.getElementById('form-signup').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.getElementById('signup-error').classList.add('hidden');
+            try {
+                const result = await callApi('biozone_sign_up', {
+                    email: document.getElementById('signup-email').value,
+                    full_name: document.getElementById('signup-name').value,
+                    phone: document.getElementById('signup-phone').value,
+                    pwd: document.getElementById('signup-password').value
+                });
+                window.location.href = result.home_page || '/biozone-home';
+            } catch (err) {
+                showError('signup-error', err.message || 'تعذر إنشاء الحساب، حاول مرة أخرى');
+            }
+        });
+    </script>
+
+
+</body></html>
