@@ -1,0 +1,40 @@
+{# Shared site header — included by biozone-home.html, catalog.html
+   (and cart.html once B4 exists). Uses the same Tailwind color/spacing
+   tokens already configured in catalog.html — do not rename those keys
+   without updating every page's <script id="tailwind-config"> block.
+   Pass `active_page` = "home" | "catalog" from each page's get_context
+   so the current section is highlighted. #}
+<header class="sticky top-0 z-50 w-full shadow-sm bg-surface">
+  <div class="flex flex-row-reverse justify-between items-center w-full px-md py-sm max-w-container-max mx-auto h-[72px]">
+    <div class="flex-shrink-0">
+      <a href="/biozone-home" class="text-2xl font-bold text-primary tracking-tight">Biozone</a>
+    </div>
+    <nav class="hidden md:flex gap-lg font-bold">
+      <a href="/biozone-home" class="pb-1 transition-colors {% if active_page == 'home' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-primary{% endif %}">الرئيسية</a>
+      <a href="/catalog" class="pb-1 transition-colors {% if active_page == 'catalog' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-primary{% endif %}">الكتالوج</a>
+    </nav>
+    <form method="get" action="/catalog" class="flex-grow max-w-2xl mx-lg hidden md:block relative">
+      {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+      <input class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base outline-none" placeholder="ابحث عن منتج..." type="text" name="q" value="{{ search_term or '' }}">
+      <button type="submit" class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary">
+        <span class="material-symbols-outlined">search</span>
+      </button>
+    </form>
+    <div class="flex items-center gap-sm">
+      {% if is_logged_in %}
+        <span class="hidden md:inline text-sm font-bold text-on-surface-variant">{{ user_full_name }}</span>
+        <a href="/logout" title="تسجيل خروج" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
+          <span class="material-symbols-outlined">logout</span>
+        </a>
+      {% else %}
+        <a href="/login" title="حسابي" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
+          <span class="material-symbols-outlined">person</span>
+        </a>
+      {% endif %}
+      <a href="/cart" title="السلة" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors relative flex items-center justify-center">
+        <span class="material-symbols-outlined">shopping_cart</span>
+        <span class="absolute top-0 right-0 bg-error text-on-error text-[10px] rounded-full h-4 w-4 flex items-center justify-center">0</span>
+      </a>
+    </div>
+  </div>
+</header>

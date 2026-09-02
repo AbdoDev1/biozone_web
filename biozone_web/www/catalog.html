@@ -44,37 +44,18 @@ tailwind.config = {
 </head>
 <body class="bg-surface text-on-surface">
 
-<!-- Top App Bar -->
-<header class="sticky top-0 z-50 w-full shadow-sm bg-surface">
-  <div class="flex flex-row-reverse justify-between items-center w-full px-md py-sm max-w-container-max mx-auto h-[72px]">
-    <div class="flex-shrink-0">
-<a href="/biozone-home" class="text-2xl font-bold text-primary tracking-tight">Biozone</a>
-    </div>
-    <form method="get" class="flex-grow max-w-2xl mx-lg hidden md:block relative">
-      {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
-      <input class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base outline-none" placeholder="ابحث عن دواء، منتج عناية..." type="text" name="q">
-      <button type="submit" class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary">
-        <span class="material-symbols-outlined">search</span>
-      </button>
-    </form>
-    <div class="flex items-center gap-sm">
-      <button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors relative">
-        <span class="material-symbols-outlined">shopping_cart</span>
-      </button>
-    </div>
-  </div>
-</header>
+{% include "biozone_web/templates/includes/site_header.html" %}
 
 <!-- Category Filter Bar -->
 <nav class="bg-surface-container-lowest border-b border-surface-variant sticky top-[72px] z-40">
   <div class="max-w-container-max mx-auto px-md py-3 overflow-x-auto no-scrollbar">
     <ul class="flex gap-sm items-center w-max min-w-full pb-1">
       <li>
-        <a href="/catalog" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if not selected_category %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">الكل</a>
+        <a href="/catalog{% if search_term %}?q={{ search_term }}{% endif %}" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if not selected_category %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">الكل</a>
       </li>
       {% for cat in categories %}
       <li>
-        <a href="/catalog?category={{ cat }}" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if selected_category == cat %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">{{ cat }}</a>
+        <a href="/catalog?category={{ cat }}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if selected_category == cat %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">{{ cat }}</a>
       </li>
       {% endfor %}
     </ul>
@@ -87,6 +68,13 @@ tailwind.config = {
     <h1 class="text-2xl md:text-4xl font-bold text-on-surface">{{ selected_category if selected_category else "كل المنتجات" }}</h1>
     <span class="text-base text-secondary whitespace-nowrap">{{ total_count_ar }} صنف</span>
   </div>
+
+  {% if search_term %}
+  <div class="mb-lg flex items-center gap-sm text-sm text-on-surface-variant">
+    <span>نتائج البحث عن "<span class="font-bold text-on-surface">{{ search_term }}</span>"</span>
+    <a href="/catalog{% if selected_category %}?category={{ selected_category }}{% endif %}" class="text-primary font-bold hover:underline">مسح البحث</a>
+  </div>
+  {% endif %}
 
   {% if items %}
   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-md md:gap-lg">
@@ -115,17 +103,19 @@ tailwind.config = {
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-xl text-on-surface-variant">لا يوجد أصناف </div>
+  <div class="text-center py-xl text-on-surface-variant">
+    {% if search_term %}مفيش نتائج لـ"{{ search_term }}"{% else %}لا يوجد أصناف{% endif %}
+  </div>
   {% endif %}
 
   <!-- Pagination -->
   <div class="mt-xl flex justify-center items-center gap-md pb-xl">
     {% if has_prev %}
-    <a href="/catalog?page={{ prev_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}" class="px-6 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container transition-all">السابق</a>
+    <a href="/catalog?page={{ prev_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-6 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container transition-all">السابق</a>
     {% endif %}
     <span class="text-sm text-secondary">صفحة {{ page }}</span>
     {% if has_next %}
-    <a href="/catalog?page={{ next_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}" class="px-8 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container hover:border-primary transition-all flex items-center gap-2">
+    <a href="/catalog?page={{ next_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-8 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container hover:border-primary transition-all flex items-center gap-2">
       التالي
       <span class="material-symbols-outlined text-[20px]">expand_more</span>
     </a>
@@ -133,16 +123,6 @@ tailwind.config = {
   </div>
 </main>
 
-<!-- Footer -->
-<footer class="w-full py-lg px-xl flex flex-col md:flex-row-reverse justify-between items-center max-w-container-max mx-auto border-t border-outline-variant bg-surface-container mt-auto">
-<div class="text-lg font-bold text-primary mb-4 md:mb-0">Biozone</div>
-  <div class="flex gap-md mb-4 md:mb-0 flex-wrap justify-center">
-    <a class="text-xs text-on-surface-variant hover:text-primary underline" href="#">عن بيوزون</a>
-    <a class="text-xs text-on-surface-variant hover:text-primary underline" href="#">سياسة الخصوصية</a>
-    <a class="text-xs text-on-surface-variant hover:text-primary underline" href="#">الشروط والأحكام</a>
-    <a class="text-xs text-on-surface-variant hover:text-primary underline" href="#">اتصل بنا</a>
-  </div>
-  <p class="text-sm text-on-surface-variant text-center md:text-right">جميع الحقوق محفوظة ل Biozone ٢٠٢٦</p>
-</footer>
+{% include "biozone_web/templates/includes/site_footer.html" %}
 
 </body></html>

@@ -1,10 +1,140 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html dir="rtl" lang="ar">
 <head>
-    <meta charset="UTF-8">
-    <title>Biozone</title>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Biozone - شريكك الموثوق للمستلزمات الطبية</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-high": "#dce9ff",
+        "surface-variant": "#d3e4fe",
+        "on-surface-variant": "#3d4947",
+        "secondary": "#5c5f61",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff"
+      },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
+      fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
 </head>
-<body>
-    <h1>{{ message }}</h1>
-</body>
-</html>
+<body class="bg-surface text-on-surface flex flex-col min-h-screen">
+
+{% include "biozone_web/templates/includes/site_header.html" %}
+
+<main class="flex-grow">
+  <!-- Hero -->
+  <section class="w-full bg-surface-container-low py-xl md:py-[80px]">
+    <div class="max-w-container-max mx-auto px-md flex flex-col items-center text-center gap-lg">
+      <h1 class="text-3xl md:text-5xl font-bold text-on-surface leading-tight">
+        شريكك الموثوق لتوريد <span class="text-primary">المستلزمات الطبية</span>
+      </h1>
+      <p class="text-base md:text-lg text-on-surface-variant max-w-xl">
+        نوفر أفضل المعدات والمستلزمات الطبية للصيدليات، المستشفيات، والعيادات بأسعار تنافسية وجودة معتمدة عالميًا.
+      </p>
+      <a href="/catalog" class="inline-flex items-center justify-center bg-primary text-on-primary font-bold rounded-full px-8 py-3 hover:bg-primary-container transition-colors shadow-sm">
+        تصفّح المنتجات
+      </a>
+    </div>
+  </section>
+
+  <!-- Trust strip -->
+  <section class="bg-surface-container-lowest border-y border-outline-variant py-lg">
+    <div class="max-w-container-max mx-auto px-md grid grid-cols-1 md:grid-cols-3 gap-lg text-center divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-outline-variant/30">
+      <div class="flex flex-col items-center gap-sm p-4">
+        <span class="material-symbols-outlined text-primary text-4xl mb-2">local_shipping</span>
+        <h3 class="font-bold text-on-surface">توصيل سريع</h3>
+        <p class="text-sm text-on-surface-variant">للصيدليات والمستشفيات</p>
+      </div>
+      <div class="flex flex-col items-center gap-sm p-4">
+        <span class="material-symbols-outlined text-primary text-4xl mb-2">verified</span>
+        <h3 class="font-bold text-on-surface">منتجات أصلية</h3>
+        <p class="text-sm text-on-surface-variant">ومعتمدة عالميًا ومحليًا</p>
+      </div>
+      <div class="flex flex-col items-center gap-sm p-4">
+        <span class="material-symbols-outlined text-primary text-4xl mb-2">payments</span>
+        <h3 class="font-bold text-on-surface">أسعار خاصة</h3>
+        <p class="text-sm text-on-surface-variant">بالجملة والعقود التجارية</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Top categories: real data pulled dynamically from ERPNext (top item
+       groups by product count) — not the decorative placeholder labels
+       from the Stitch mockup, since those don't match the real 55 groups. -->
+  {% if top_categories %}
+  <section class="py-xl max-w-container-max mx-auto px-md">
+    <h2 class="text-2xl font-bold text-on-surface mb-lg text-right">التصنيفات الرئيسية</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
+      {% for cat in top_categories %}
+      <a href="/catalog?category={{ cat.item_group }}" class="group bg-surface-container-lowest border border-outline-variant rounded-xl p-lg flex flex-col items-center justify-center text-center hover:shadow-md hover:border-primary transition-all">
+        <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center mb-md group-hover:bg-primary/10 transition-colors">
+          <span class="material-symbols-outlined text-primary text-3xl">medical_services</span>
+        </div>
+        <h3 class="font-bold text-on-surface">{{ cat.item_group }}</h3>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Featured products: real ERPNext items/prices, same query pattern as
+       /catalog. Uses the letter-avatar placeholder (no AI-generated stock
+       photos) to match the catalog's existing visual language. -->
+  {% if featured_items %}
+  <section class="py-xl bg-surface-container-low">
+    <div class="max-w-container-max mx-auto px-md">
+      <div class="flex justify-between items-center mb-lg">
+        <h2 class="text-2xl font-bold text-on-surface">منتجات مميزة</h2>
+        <a href="/catalog" class="text-primary font-bold hover:underline">عرض الكل</a>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
+        {% for item in featured_items %}
+        <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col">
+          <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
+            <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
+          </div>
+          <div class="p-3 flex flex-col flex-grow">
+            <span class="text-xs text-primary mb-0.5">{{ item.item_group }}</span>
+            <h3 class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px]">{{ item.item_name }}</h3>
+            <div class="mt-auto pt-2">
+              {% if item.price %}
+              <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م</span>
+              {% else %}
+              <span class="text-sm text-outline">السعر غير متاح</span>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</main>
+
+{% include "biozone_web/templates/includes/site_footer.html" %}
+
+</body></html>
