@@ -110,7 +110,7 @@
 <main class="w-full max-w-[440px] bg-surface-container-lowest rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] border border-outline-variant/30 p-lg md:p-xl relative overflow-hidden">
 <!-- Header -->
 <header class="text-center mb-xl">
-<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Biozone</h1>
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight"><a href="/biozone-home">Biozone</a></h1>
 <p class="font-body-md text-body-md text-on-surface-variant mt-xs">بوابتك الرقمية للمستلزمات الطبية</p>
 </header>
 <!-- Tabs -->
@@ -209,7 +209,7 @@
             if (tab === 'login') {
                 loginTab.classList.replace('tab-inactive', 'tab-active');
                 signupTab.classList.replace('tab-active', 'tab-inactive');
-                
+
                 signupForm.classList.add('opacity-0', 'pointer-events-none');
                 setTimeout(() => {
                     loginForm.classList.remove('opacity-0', 'pointer-events-none');
@@ -218,7 +218,7 @@
             } else {
                 signupTab.classList.replace('tab-inactive', 'tab-active');
                 loginTab.classList.replace('tab-active', 'tab-inactive');
-                
+
                 loginForm.classList.add('opacity-0', 'pointer-events-none');
                 setTimeout(() => {
                     signupForm.classList.remove('opacity-0', 'pointer-events-none');
@@ -230,7 +230,7 @@
         function togglePassword(inputId, btn) {
             const input = document.getElementById(inputId);
             const icon = btn.querySelector('.material-symbols-outlined');
-            
+
             if (input.type === 'password') {
                 input.type = 'text';
                 icon.textContent = 'visibility';
@@ -239,7 +239,7 @@
                 icon.textContent = 'visibility_off';
             }
         }
-        
+
         // Init height
         window.addEventListener('DOMContentLoaded', () => {
              const loginForm = document.getElementById('form-login');
@@ -330,6 +330,5 @@
             }
         });
     </script>
-
 
 </body></html>
