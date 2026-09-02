@@ -145,8 +145,9 @@
         <input type="checkbox" id="login-remember" class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary">
         <span class="font-label-md text-label-md text-on-surface-variant">تذكرني</span>
     </label>
-    <a class="font-label-md text-label-md text-primary hover:underline" href="#">نسيت كلمة المرور؟</a>
+    <button class="font-label-md text-label-md text-primary hover:underline" onclick="handleForgotPassword()" type="button">نسيت كلمة المرور؟</button>
 </div>
+<p class="hidden text-sm text-on-surface-variant bg-surface-variant/40 rounded-lg px-md py-sm" id="forgot-message"></p>
 <button class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98]" type="submit">
                     تسجيل الدخول
                 </button>
@@ -245,15 +246,42 @@
              loginForm.parentElement.style.height = loginForm.scrollHeight + 'px';
         });
 
+        // Recompute the sliding container's height so newly shown text
+        // (error or info messages) never gets clipped or hidden.
+        function recalcFormHeight(formId) {
+            const form = document.getElementById(formId);
+            form.parentElement.style.height = form.scrollHeight + 'px';
+        }
+
         function showError(elId, msg) {
             const el = document.getElementById(elId);
             el.textContent = msg;
             el.classList.remove('hidden');
-            // نعيد حساب ارتفاع الحاوية عشان رسالة الخطأ متدفنش باقي الفورم
             const activeForm = elId === 'login-error'
-                ? document.getElementById('form-login')
-                : document.getElementById('form-signup');
-            activeForm.parentElement.style.height = activeForm.scrollHeight + 'px';
+                ? 'form-login'
+                : 'form-signup';
+            recalcFormHeight(activeForm);
+        }
+
+        function showMessage(elId, msg) {
+            const el = document.getElementById(elId);
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            recalcFormHeight('form-login');
+        }
+
+        async function handleForgotPassword() {
+            const email = document.getElementById('login-email').value.trim();
+            if (!email) {
+                showError('login-error', 'يرجى إدخال بريدك الإلكتروني في الحقل أعلاه أولًا، ثم الضغط على «نسيت كلمة المرور؟»');
+                return;
+            }
+            try {
+                const result = await callApi('biozone_forgot_password', { email });
+                showMessage('forgot-message', result.message);
+            } catch (err) {
+                showError('login-error', err.message || 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
+            }
         }
 
         async function callApi(method, payload) {
