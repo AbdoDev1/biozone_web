@@ -60,3 +60,55 @@ def get_header_context():
 		"is_logged_in": is_logged_in,
 		"user_full_name": user_full_name,
 	}
+
+
+def get_or_create_customer_for_current_user():
+	"""يرجع اسم الـCustomer المرتبط بالمستخدم الحالي، وينشئ واحد جديد لو
+	مفيش. الربط بيتم بتسمية الـCustomer صراحة ببريد المستخدم نفسه
+	(name = email) بدل الاعتماد على منطق Frappe Webshop الجاهز (اللي
+	المشروع قرر الاستغناء عنه أصلًا) — بيدّي بحث مباشر وسريع من غير
+	حاجة لحقل مخصص إضافي.
+
+	⚠️ يحتاج تأكيد فعلي على السيرفر: customer_group وterritory
+	الافتراضيين هنا (get_default_customer_group/get_default_territory)
+	اتحطوا كـfallback معقول بس، لسه محتاج تتأكد إن القيمة اللي هترجع
+	مناسبة فعلًا لعميل جديد لسه مش مصنّف (B5 - التسعير حسب نوع الحساب -
+	هو اللي هيحل التصنيف الصحيح لاحقًا).
+	"""
+	user_email = frappe.session.user
+
+	if frappe.db.exists("Customer", user_email):
+		return user_email
+
+	full_name = frappe.db.get_value("User", user_email, "full_name") or user_email
+
+	customer = frappe.get_doc(
+		{
+			"doctype": "Customer",
+			"name": user_email,
+			"customer_name": full_name,
+			"customer_type": "Individual",
+			"customer_group": get_default_customer_group(),
+			"territory": get_default_territory(),
+		}
+	)
+	customer.insert(ignore_permissions=True)
+	return customer.name
+
+
+def get_default_customer_group():
+	return frappe.db.get_single_value("Selling Settings", "customer_group") or frappe.db.get_value(
+		"Customer Group", {"is_group": 0}, "name", order_by="creation asc"
+	)
+
+
+def get_default_territory():
+	return frappe.db.get_single_value("Selling Settings", "territory") or frappe.db.get_value(
+		"Territory", {"is_group": 0}, "name", order_by="creation asc"
+	)
+
+
+def get_default_company():
+	return frappe.defaults.get_global_default("company") or frappe.db.get_single_value(
+		"Global Defaults", "default_company"
+	)

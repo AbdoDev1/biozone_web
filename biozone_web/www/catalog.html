@@ -2,7 +2,7 @@
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
-<title>Biozone - المنتجات</title>
+<title>Biozone - المتجر</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -79,15 +79,31 @@ tailwind.config = {
           <span class="text-sm text-outline">السعر غير متاح</span>
           {% endif %}
         </div>
-        <button
-          class="mt-2 w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed add-to-cart-btn"
-          {% if not item.price %}disabled{% endif %}
-          onclick='addToCart({{ item.item_code|tojson }}, {{ item.item_name|tojson }}, {{ item.item_group|tojson }}, {{ item.price or 0 }}, this)'
-          type="button"
+        <div
+          class="mt-2 catalog-cart-control"
+          data-item-code="{{ item.item_code|e }}"
+          data-item-name="{{ item.item_name|e }}"
+          data-item-group="{{ item.item_group|e }}"
+          data-item-price="{{ item.price or 0 }}"
         >
-          <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-          أضف للسلة
-        </button>
+          <button
+            class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
+            {% if not item.price %}disabled{% endif %}
+            type="button"
+          >
+            <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+            أضف للسلة
+          </button>
+          <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
+            <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
+              <span class="material-symbols-outlined text-xl">add</span>
+            </button>
+            <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
+            <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
+              <span class="material-symbols-outlined text-xl">remove</span>
+            </button>
+          </div>
+        </div>
       </div>
     </article>
     {% endfor %}

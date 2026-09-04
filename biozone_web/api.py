@@ -82,6 +82,63 @@ def biozone_forgot_password(email: str):
 
 
 @frappe.whitelist(methods=["POST"])
+def biozone_confirm_order(items):
+	"""يحوّل محتوى السلة (localStorage عند العميل) إلى Sales Order حقيقي
+	في ERPNext باسم العميل الحالي — B4.
+
+	قرارين مهمين اتاخدوا هنا:
+	1) **السعر بيتحدد من السيرفر دايمًا، مش من اللي بعته العميل.** بنبعت
+	   item_code + qty بس لـERPNext، وهو اللي بيجيب الـrate الحقيقي من
+	   Item Price ويطبّق أي Pricing Rule (خصم حسب نوع الحساب) وقت
+	   الحفظ — عشان محدش يقدر يلاعب في السعر من متصفحه.
+	2) **الطلب بيتحفظ Draft (مش submit).** التأكيد النهائي (submit)
+	   هيبقى من واجهة الموظف (B6c) بعد المراجعة، مش أوتوماتيك لحظة ما
+	   العميل يضغط الزرار.
+	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("يجب تسجيل الدخول أولًا لتأكيد الطلب"), frappe.PermissionError)
+
+	if isinstance(items, str):
+		items = frappe.parse_json(items)
+
+	if not items:
+		frappe.throw(_("السلة فارغة"))
+
+	from biozone_web.utils import get_default_company, get_or_create_customer_for_current_user
+
+	so_items = []
+	for it in items:
+		item_code = (it.get("item_code") or "").strip()
+		qty = frappe.utils.flt(it.get("quantity"))
+
+		if not item_code or qty <= 0:
+			frappe.throw(_("بيانات صنف غير صحيحة في السلة"))
+
+		item = frappe.db.get_value("Item", item_code, ["disabled"], as_dict=True)
+		if not item or item.disabled:
+			frappe.throw(_("أحد الأصناف في السلة لم يعد متاحًا، يرجى تحديث السلة"))
+
+		so_items.append({"item_code": item_code, "qty": qty})
+
+	customer = get_or_create_customer_for_current_user()
+
+	so = frappe.get_doc(
+		{
+			"doctype": "Sales Order",
+			"customer": customer,
+			"company": get_default_company(),
+			"selling_price_list": "Standard Selling",
+			"delivery_date": frappe.utils.add_days(frappe.utils.nowdate(), 3),
+			"items": so_items,
+		}
+	)
+	so.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {"message": {"redirect": f"/order-confirmed?name={so.name}"}}
+
+
+@frappe.whitelist(methods=["POST"])
 def staff_save_item(
 	item_code: str | None,
 	new_item_code: str,

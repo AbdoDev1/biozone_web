@@ -1,0 +1,146 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>تم استلام طلبك بنجاح - Biozone</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-high": "#dce9ff",
+        "surface-variant": "#d3e4fe",
+        "on-surface-variant": "#3d4947",
+        "secondary": "#5c5f61",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff"
+      },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
+      fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
+</head>
+<body class="bg-surface text-on-surface">
+
+{% include "biozone_web/templates/includes/site_header.html" %}
+
+<main class="flex-1 flex items-center justify-center px-4 py-10 sm:py-16">
+  <div class="w-full max-w-[620px] mx-auto flex flex-col items-center">
+
+    <!-- أيقونة النجاح -->
+    <div class="relative mb-6">
+      <div class="w-24 h-24 rounded-full bg-surface-container-low border-8 border-surface-container-high/40 flex items-center justify-center text-primary shadow-sm">
+        <span class="material-symbols-outlined text-5xl text-primary">check_circle</span>
+      </div>
+    </div>
+
+    <!-- العنوان ورقم الطلب -->
+    <div class="text-center mb-8">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface mb-3 tracking-tight">
+        تم استلام طلبك بنجاح
+      </h1>
+
+      <div class="inline-flex items-center gap-2 bg-surface-container px-4 py-1.5 rounded-full border border-surface-variant mb-3">
+        <span class="text-xs text-on-surface-variant font-medium">رقم الطلب:</span>
+        <span class="font-mono text-sm font-bold text-primary tracking-wider" style="direction: ltr;">#{{ order_number }}</span>
+        <button class="text-outline hover:text-primary transition-colors pr-1" title="نسخ رقم الطلب" onclick="navigator.clipboard?.writeText({{ order_number|tojson }})" type="button">
+          <span class="material-symbols-outlined text-base">content_copy</span>
+        </button>
+      </div>
+
+      <p class="text-sm sm:text-base text-on-surface-variant max-w-md mx-auto leading-relaxed">
+        سيتواصل معك فريقنا لتأكيد تفاصيل الشحن والتسليم في أقرب وقت.
+      </p>
+    </div>
+
+    <!-- ملخص الطلب -->
+    <div class="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-5 sm:p-7 shadow-sm mb-8">
+      <div class="flex items-center justify-between pb-4 border-b border-outline-variant/30 mb-4">
+        <div class="flex items-center gap-2 text-on-surface">
+          <span class="material-symbols-outlined text-primary text-xl">receipt_long</span>
+          <h2 class="font-bold text-base sm:text-lg">ملخص المنتجات المطلوبة</h2>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 bg-surface-container-low text-primary rounded-md">{{ item_count }} أصناف</span>
+      </div>
+
+      <div class="divide-y divide-outline-variant/20">
+        {% for it in items %}
+        <div class="py-3.5 flex items-center justify-between gap-4">
+          <div class="flex-1">
+            <h3 class="text-sm font-semibold text-on-surface leading-snug">{{ it.item_name }}</h3>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-xs text-on-surface-variant">الكمية: <span class="font-bold text-on-surface">{{ it.qty|int }}</span></span>
+              <span class="text-xs text-outline">•</span>
+              <span class="text-xs text-outline">سعر الوحدة: {{ "%.2f"|format(it.rate) }} ج.م</span>
+            </div>
+          </div>
+          <div class="text-left font-bold text-sm sm:text-base text-on-surface whitespace-nowrap">
+            {{ "{:,.2f}".format(it.amount) }} <span class="text-xs font-normal text-on-surface-variant">ج.م</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 pt-4 border-t border-outline-variant/30 space-y-2">
+        <div class="flex items-center justify-between text-xs sm:text-sm text-on-surface-variant">
+          <span>المجموع الفرعي:</span>
+          <span>{{ "{:,.2f}".format(net_total) }} ج.م</span>
+        </div>
+        {% for tax in taxes %}
+        <div class="flex items-center justify-between text-xs sm:text-sm text-on-surface-variant">
+          <span>{{ tax.description }}:</span>
+          <span>{{ "{:,.2f}".format(tax.tax_amount) }} ج.م</span>
+        </div>
+        {% endfor %}
+
+        <div class="flex items-center justify-between pt-3 border-t border-dashed border-outline-variant/50 text-base sm:text-lg font-black text-on-surface">
+          <span>الإجمالي النهائي:</span>
+          <span class="text-primary text-xl font-bold">{{ "{:,.2f}".format(grand_total) }} <span class="text-sm font-medium text-on-surface-variant">ج.م</span></span>
+        </div>
+      </div>
+
+      <div class="mt-5 bg-surface-container-low rounded-xl p-3.5 flex items-start gap-3 border border-surface-container">
+        <span class="material-symbols-outlined text-primary text-xl mt-0.5 shrink-0">verified_user</span>
+        <div class="text-xs text-on-surface-variant leading-relaxed">
+          <span class="font-bold text-on-surface">إشعار الفاتورة الضريبية:</span> سيتم إصدار الفاتورة باسم المنشأة المسجلة مع إرسال مندوب التسليم.
+        </div>
+      </div>
+    </div>
+
+    <!-- الإجراءات -->
+    <div class="w-full flex flex-col sm:flex-row items-center gap-3.5">
+      <a
+        href="/biozone-home"
+        class="w-full py-3.5 px-6 rounded-full bg-primary hover:bg-primary-container text-on-primary font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all duration-200"
+      >
+        <span class="material-symbols-outlined text-xl">home</span>
+        <span>الرجوع للرئيسية</span>
+      </a>
+    </div>
+
+  </div>
+</main>
+
+{% include "biozone_web/templates/includes/site_footer.html" %}
+
+</body></html>

@@ -61,4 +61,98 @@
       toast.classList.remove('flex');
     }, 2000);
   }
+
+  // Stepper (+/-) controls for product cards in the store (/catalog),
+  // matching the same quantity-stepper style used on the /cart page
+  // itself. Each card starts as a plain "add to cart" button; once the
+  // item has a quantity in the cart it switches to a live +/- stepper
+  // reflecting that quantity, staying in sync with localStorage.
+  function getCartItemsList() {
+    try {
+      return JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCartItemsList(items) {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    const badge = document.getElementById('cart-count-badge');
+    if (badge) {
+      badge.textContent = items.reduce((sum, it) => sum + it.quantity, 0);
+    }
+  }
+
+  function renderCatalogCartControl(el) {
+    const itemCode = el.dataset.itemCode;
+    const items = getCartItemsList();
+    const existing = items.find((it) => it.item_code === itemCode);
+    const qty = existing ? existing.quantity : 0;
+    const addBtn = el.querySelector('.catalog-add-btn');
+    const stepper = el.querySelector('.catalog-stepper');
+    const qtyEl = el.querySelector('.catalog-qty');
+
+    if (qty > 0) {
+      if (addBtn) addBtn.classList.add('hidden');
+      if (stepper) {
+        stepper.classList.remove('hidden');
+        stepper.classList.add('flex');
+      }
+      if (qtyEl) qtyEl.textContent = qty;
+    } else {
+      if (addBtn) addBtn.classList.remove('hidden');
+      if (stepper) {
+        stepper.classList.add('hidden');
+        stepper.classList.remove('flex');
+      }
+    }
+  }
+
+  function changeCatalogCartQty(el, delta) {
+    const itemCode = el.dataset.itemCode;
+    const itemName = el.dataset.itemName;
+    const itemGroup = el.dataset.itemGroup;
+    const price = parseFloat(el.dataset.itemPrice) || 0;
+
+    let items = getCartItemsList();
+    const idx = items.findIndex((it) => it.item_code === itemCode);
+
+    if (idx === -1) {
+      if (delta > 0) {
+        items.push({
+          item_code: itemCode,
+          item_name: itemName,
+          item_group: itemGroup,
+          price: price,
+          image: '',
+          quantity: 1,
+        });
+        showCartToast(itemName + ' أُضيف إلى السلة');
+      }
+    } else {
+      items[idx].quantity += delta;
+      if (items[idx].quantity <= 0) {
+        items.splice(idx, 1);
+      }
+    }
+
+    saveCartItemsList(items);
+    renderCatalogCartControl(el);
+  }
+
+  function initCatalogCartControls() {
+    document.querySelectorAll('.catalog-cart-control').forEach((el) => {
+      renderCatalogCartControl(el);
+
+      const addBtn = el.querySelector('.catalog-add-btn');
+      const incBtn = el.querySelector('.catalog-increment');
+      const decBtn = el.querySelector('.catalog-decrement');
+
+      if (addBtn) addBtn.addEventListener('click', () => changeCatalogCartQty(el, 1));
+      if (incBtn) incBtn.addEventListener('click', () => changeCatalogCartQty(el, 1));
+      if (decBtn) decBtn.addEventListener('click', () => changeCatalogCartQty(el, -1));
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initCatalogCartControls);
 </script>
