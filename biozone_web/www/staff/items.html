@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الأصناف - بيوزون Biozone</title>
+<!-- Google Fonts: Tajawal -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              DEFAULT: '#00685f',
+              hover: '#00544d',
+              light: '#e6f3f2',
+              accent: '#008378',
+              50: '#f0f9f8',
+              100: '#d9f0ee',
+            },
+            darkNavy: '#0b1c30',
+            appBg: '#f8fafd',
+            surfaceMuted: '#f1f5f9',
+            borderSubtle: '#e2e8f0',
+          },
+          fontFamily: {
+            tajawal: ['Tajawal', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          boxShadow: {
+            subtle: '0 1px 3px 0 rgba(11, 28, 48, 0.04), 0 1px 2px -1px rgba(11, 28, 48, 0.04)',
+            card: '0 4px 6px -1px rgba(11, 28, 48, 0.03), 0 2px 4px -2px rgba(11, 28, 48, 0.03)',
+            drawer: '-8px 0 25px -5px rgba(11, 28, 48, 0.1), -2px 0 10px -6px rgba(11, 28, 48, 0.05)',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-typography">
+    body {
+      font-family: 'Tajawal', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-appBg text-darkNavy min-h-screen antialiased flex flex-col overflow-x-hidden">
+<!-- BEGIN: TopHeader -->
+<header class="bg-white border-b border-borderSubtle h-16 sticky top-0 z-30 flex items-center px-6 justify-between transition-all">
+<!-- User Info and Status (Right Side in RTL) -->
+<div class="flex items-center gap-4" data-purpose="user-status-container">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center font-bold text-sm">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-bold text-darkNavy leading-tight">{{ user_full_name }}</span>
+<span class="text-xs text-slate-500 font-medium">مسؤول المخزون</span>
+</div>
+</div>
+<div class="h-4 w-px bg-slate-200 mx-1"></div>
+<span class="text-xs text-slate-500 font-medium">{{ today_display }}</span>
+</div>
+<!-- Actions & Logout (Left Side in RTL) -->
+<div class="flex items-center gap-4" data-purpose="top-actions-container">
+<a href="/logout" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1.5 py-1.5 px-2 rounded-lg hover:bg-red-50">
+<svg class="w-4 h-4 text-slate-400 rotate-180" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>تسجيل خروج</span>
+</a>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: MainLayoutContainer -->
+<div class="flex flex-1 relative overflow-hidden">
+<!-- BEGIN: RightSidebar -->
+<aside class="w-64 bg-white border-l border-borderSubtle flex-shrink-0 flex flex-col justify-between p-4 z-20 min-h-[calc(100vh-4rem)]">
+<!-- Top Navigation Links -->
+<div class="space-y-6">
+<!-- Brand/System Monogram -->
+<div class="px-3 py-2 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-black text-base shadow-sm">
+            BZ
+          </div>
+<div class="flex flex-col">
+<span class="font-black text-sm tracking-wide text-darkNavy">بيوزون</span>
+<span class="text-[11px] text-slate-400">نظام إدارة المستودعات</span>
+</div>
+</div>
+<!-- Navigation Menu -->
+<nav aria-label="القائمة الرئيسية" class="space-y-1.5">
+<!-- 1. الرئيسية -->
+<a class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-darkNavy hover:bg-slate-50 font-semibold text-sm transition-all group" href="/staff/dashboard">
+<svg class="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>الرئيسية</span>
+</a>
+<!-- 2. الأصناف (Active Item) -->
+<a class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-primary text-white font-bold text-sm shadow-sm transition-all" href="/staff/items">
+<div class="flex items-center gap-3">
+<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>الأصناف</span>
+</div>
+<div class="w-1.5 h-1.5 rounded-full bg-white/80"></div>
+</a>
+<!-- 3. حركة المخزون -->
+<a class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-darkNavy hover:bg-slate-50 font-semibold text-sm transition-all group" href="/staff/stock">
+<svg class="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>حركة المخزون</span>
+</a>
+<!-- 4. تجهيز الطلبات -->
+<a class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-darkNavy hover:bg-slate-50 font-semibold text-sm transition-all group" href="/staff/orders">
+<div class="flex items-center gap-3">
+<svg class="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>تجهيز الطلبات</span>
+</div>
+<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200/60">قريبًا</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Sidebar Utility -->
+<div class="pt-4 border-t border-borderSubtle">
+<button class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-50 transition-colors">
+<span class="flex items-center gap-2">
+<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+            إعدادات النظام
+          </span>
+<span class="text-[10px] text-slate-400 font-mono">v1.4</span>
+</button>
+</div>
+</aside>
+<!-- END: RightSidebar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 p-8 overflow-y-auto bg-appBg">
+<div class="max-w-7xl mx-auto space-y-6">
+<!-- Top Header & Action Toolbar -->
+<section class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2" data-purpose="items-header-bar">
+<!-- Page Title -->
+<div>
+<h1 class="text-2xl font-black text-darkNavy tracking-tight">الأصناف</h1>
+<p class="text-xs text-slate-500 mt-1 font-medium">إدارة ومراقبة قائمة المنتجات الطبية والمستلزمات</p>
+</div>
+<!-- Action Toolbar (Search, Filter, Add Button) -->
+<form method="get" action="/staff/items" class="flex items-center flex-wrap gap-3" data-purpose="items-toolbar">
+<!-- Search Input -->
+<div class="relative w-72">
+<span class="absolute inset-y-0 right-0 flex items-center pr-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+<input name="q" value="{{ search_term or '' }}" class="w-full bg-white border border-borderSubtle text-sm rounded-xl pr-10 pl-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ابحث بالاسم أو الكود..." type="text"/>
+</div>
+<!-- Category Filter Dropdown -->
+<div class="relative">
+<select name="group" onchange="this.form.submit()" class="appearance-none bg-white border border-borderSubtle text-sm text-slate-700 font-medium rounded-xl pr-4 pl-9 py-2.5 hover:border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer">
+<option value="">المجموعة: الكل</option>
+{% for g in item_groups %}
+<option value="{{ g.name }}" {% if selected_group == g.name %}selected{% endif %}>{{ g.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+<!-- Brand Filter Dropdown -->
+<div class="relative">
+<select name="brand" onchange="this.form.submit()" class="appearance-none bg-white border border-borderSubtle text-sm text-slate-700 font-medium rounded-xl pr-4 pl-9 py-2.5 hover:border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer">
+<option value="">العلامة التجارية: الكل</option>
+{% for b in brands %}
+<option value="{{ b.name }}" {% if selected_brand == b.name %}selected{% endif %}>{{ b.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+<!-- Solid Teal Add Button -->
+<button type="submit" class="hidden"></button>
+</form>
+<button onclick="openItemPanel(null)" class="bg-primary hover:bg-primary-hover text-white text-sm font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+<span>إضافة صنف</span>
+</button>
+</div>
+</section>
+<!-- BEGIN: ItemsTableSection -->
+<section class="bg-white rounded-2xl border border-borderSubtle shadow-card overflow-hidden" data-purpose="items-table-wrapper">
+<div class="overflow-x-auto">
+<table class="w-full text-right border-collapse" id="items-management-table">
+<thead>
+<tr class="border-b border-borderSubtle bg-slate-50/70 text-slate-500 text-xs font-bold uppercase tracking-wider">
+<th class="py-4 px-6 text-right" scope="col">اسم الصنف</th>
+<th class="py-4 px-6 text-right" scope="col">الكود</th>
+<th class="py-4 px-6 text-right" scope="col">الكمية بالمخزون</th>
+<th class="py-4 px-6 text-right" scope="col">السعر</th>
+<th class="py-4 px-6 text-center" scope="col">الخصومات</th>
+<th class="py-4 px-6 text-center" scope="col">الحالة</th>
+<th class="py-4 px-6 text-center" scope="col">إجراءات</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-borderSubtle text-sm">
+{% for it in items %}
+<tr class="hover:bg-slate-50/60 transition-colors">
+<td class="py-4 px-6 font-bold text-darkNavy">
+                    {{ it.item_name }}
+                  </td>
+<td class="py-4 px-6 font-mono text-xs font-semibold text-slate-600">
+                    {{ it.item_code }}
+                  </td>
+<td class="py-4 px-6">
+<span class="font-bold text-darkNavy text-base block">{{ "{:,.0f}".format(it.stock_qty) }}</span>
+<span class="text-[11px] text-slate-400 font-medium">من المخزون الفعلي</span>
+</td>
+<td class="py-4 px-6 whitespace-nowrap"><span class="font-bold text-darkNavy text-sm">{% if it.price %}{{ "%.2f"|format(it.price) }} ج.م{% else %}—{% endif %}</span></td>
+<td class="py-4 px-6 text-center whitespace-nowrap">
+{% if it.discounts %}
+<div class="flex flex-wrap items-center justify-center gap-1 max-w-[140px] mx-auto">
+{% for d in it.discounts[:2] %}
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">{{ d.group }} -{{ d.percent|int }}%</span>
+{% endfor %}
+{% if it.discounts|length > 2 %}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500">+{{ it.discounts|length - 2 }}</span>
+{% endif %}
+</div>
+{% else %}
+<span class="text-slate-400 text-xs">—</span>
+{% endif %}
+</td>
+<td class="py-4 px-6 text-center whitespace-nowrap">
+{% if not it.disabled %}
+<span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold bg-primary-light text-primary border border-primary/20">
+                      نشط
+                    </span>
+{% else %}
+<span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                      متوقف
+                    </span>
+{% endif %}
+</td>
+<td class="py-4 px-6 text-center">
+<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "price": it.price, "disabled": it.disabled}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</td>
+</tr>
+{% else %}
+<tr><td colspan="7" class="py-8 text-center text-slate-400 text-sm">لا توجد أصناف مطابقة</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<!-- BEGIN: PaginationFooter -->
+<footer class="py-4 px-6 border-t border-borderSubtle flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" data-purpose="table-pagination">
+<span class="text-slate-500 font-medium">صفحة {{ page }} — {{ items|length }} صنف معروض</span>
+<div class="flex items-center gap-1.5 font-medium">
+{% set qs = '&group=' + selected_group if selected_group else '' %}
+{% set qs = qs + '&brand=' + selected_brand if selected_brand else qs %}
+{% set qs = qs + '&q=' + search_term if search_term else qs %}
+{% if has_prev %}
+<a href="/staff/items?page={{ prev_page }}{{ qs }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">السابق</a>
+{% else %}
+<span class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-400 bg-white opacity-50 cursor-not-allowed">السابق</span>
+{% endif %}
+<span class="w-8 h-8 rounded-lg bg-primary text-white font-bold transition-all shadow-2xs flex items-center justify-center">{{ page }}</span>
+{% if has_next %}
+<a href="/staff/items?page={{ next_page }}{{ qs }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">التالي</a>
+{% else %}
+<span class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-400 bg-white opacity-50 cursor-not-allowed">التالي</span>
+{% endif %}
+</div>
+</footer>
+<!-- END: PaginationFooter -->
+</section>
+<!-- END: ItemsTableSection -->
+</div>
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: SlideInSidePanelDrawer -->
+<!-- Backdrop Overlay -->
+<div id="item-drawer-backdrop" aria-hidden="true" class="hidden fixed inset-0 bg-darkNavy/20 backdrop-blur-[1.5px] z-40 transition-opacity" data-purpose="drawer-backdrop" onclick="closeItemPanel()"></div>
+<!-- Drawer Panel Container (Anchored Right for RTL Layout) -->
+<aside id="item-drawer" class="hidden fixed inset-y-0 right-0 max-w-md w-full bg-white z-50 shadow-drawer flex flex-col justify-between border-l border-borderSubtle" data-purpose="edit-item-side-drawer">
+<!-- Drawer Header -->
+<div class="px-6 py-5 border-b border-borderSubtle flex items-center justify-between">
+<div>
+<h2 id="item-drawer-title" class="text-lg font-bold text-darkNavy">تعديل الصنف</h2>
+<p class="text-xs text-slate-400 mt-0.5">تحديث بيانات التعريف والأسعار للصنف المحدد</p>
+</div>
+<button onclick="closeItemPanel()" aria-label="إغلاق اللوحة" class="w-8 h-8 rounded-lg text-slate-400 hover:text-darkNavy hover:bg-slate-100 flex items-center justify-center transition-colors">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+<!-- Drawer Body: Form Fields strictly in ordered sequence -->
+<div class="p-6 overflow-y-auto space-y-4 flex-1 text-right"><!-- 1. اسم الصنف -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-name">اسم الصنف</label>
+<input class="w-full bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-name" type="text" value="قفازات جراحية معقمة (قياس 7.5)"/>
+</div>
+<!-- 2. الكود -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-sku">الكود (SKU)</label>
+<input class="w-full bg-white border border-borderSubtle font-mono rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-sku" type="text" value="BZ-GLV-01"/>
+</div>
+<!-- 3. المجموعة -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-group">المجموعة</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-group">
+{% for g in item_groups %}
+<option value="{{ g.name }}">{{ g.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+</div>
+<!-- 4. العلامة التجارية -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-brand">العلامة التجارية</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-brand">
+<option value="">بدون علامة تجارية</option>
+{% for b in brands %}
+<option value="{{ b.name }}">{{ b.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+</div>
+<!-- 5. وحدة القياس -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-unit">وحدة القياس</label>
+<input class="w-full bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-unit" type="text" value="كرتون (100 زوج)"/>
+</div>
+<!-- 6. السعر (سعر الجمهور) -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-price">السعر (سعر الجمهور)</label>
+<div class="relative">
+<input class="w-full bg-white border border-borderSubtle rounded-xl pr-3.5 pl-14 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-price" type="text" value="85.00"/>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-xs text-slate-400 font-bold pointer-events-none">
+              ج.م
+            </span>
+</div>
+<!-- 7. Read-only summary line directly below the price field -->
+<div class="pt-1.5 pb-1 flex items-center justify-between text-xs">
+<div id="item-discounts-summary" class="flex items-center gap-1.5 flex-wrap">
+<span class="text-slate-500 font-medium text-[11px]">الخصومات النشطة:</span>
+<span class="text-slate-400 text-[11px]">—</span>
+</div>
+<a id="manage-discounts-link" class="text-slate-500 hover:text-primary transition-colors text-[11px] font-semibold underline underline-offset-2 flex-shrink-0 cursor-pointer" href="/staff/discounts">إدارة الخصومات</a>
+</div>
+</div>
+<!-- 8. تفعيل الصنف (Toggle Switch) -->
+<div class="pt-2">
+<div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-borderSubtle">
+<div>
+<span class="block text-xs font-bold text-darkNavy">تفعيل الصنف</span>
+<span class="text-[11px] text-slate-500 font-medium">متاح للطلب المباشر في الفواتير</span>
+</div>
+<!-- Custom Toggle -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input id="item-active-toggle" checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div></div>
+<!-- Drawer Footer -->
+<div class="p-6 border-t border-borderSubtle bg-white space-y-3">
+<!-- Main Actions Row -->
+<div class="flex items-center gap-3">
+<button onclick="saveItemPanel()" class="flex-1 bg-primary hover:bg-primary-hover text-white text-sm font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all text-center">
+            حفظ التعديلات
+          </button>
+<button onclick="closeItemPanel()" class="px-5 py-2.5 rounded-xl border border-borderSubtle text-slate-600 hover:bg-slate-50 hover:text-darkNavy text-sm font-bold transition-colors">
+            إلغاء
+          </button>
+</div>
+<!-- Disable Action Link (Strictly No Delete Icon) -->
+<div id="disable-item-wrapper" class="text-center pt-1">
+<button onclick="disableCurrentItem()" class="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors">
+            تعطيل الصنف
+          </button>
+</div>
+</div>
+</aside>
+<!-- END: SlideInSidePanelDrawer -->
+</div>
+<!-- END: MainLayoutContainer -->
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+let currentItemCode = null;
+
+function openItemPanel(data) {
+  const drawer = document.getElementById('item-drawer');
+  const backdrop = document.getElementById('item-drawer-backdrop');
+  const title = document.getElementById('item-drawer-title');
+  const disableWrapper = document.getElementById('disable-item-wrapper');
+  const discountsSummary = document.getElementById('item-discounts-summary');
+  const manageLink = document.getElementById('manage-discounts-link');
+
+  if (data) {
+    // تعديل صنف موجود
+    currentItemCode = data.item_code;
+    title.textContent = 'تعديل الصنف';
+    document.getElementById('item-name').value = data.item_name || '';
+    document.getElementById('item-sku').value = data.item_code || '';
+    document.getElementById('item-sku').disabled = true; // الكود مايتغيرش وقت التعديل
+    if (data.item_group) document.getElementById('item-group').value = data.item_group;
+    if (data.brand) document.getElementById('item-brand').value = data.brand;
+    document.getElementById('item-price').value = data.price != null ? data.price : '';
+    document.getElementById('item-active-toggle').checked = !data.disabled;
+    disableWrapper.classList.remove('hidden');
+    manageLink.href = '/staff/discounts?item=' + encodeURIComponent(data.item_code);
+    // ملحوظة: الخصومات الفعلية مش متبعتة في data الصف حاليًا (الجدول بيعرضها
+    // بس)، فالخط ده بيتسيب عام لحد ما نمرر تفاصيل الخصم مع كل صف كمان.
+    discountsSummary.innerHTML = '<span class="text-slate-500 font-medium text-[11px]">الخصومات النشطة:</span><span class="text-slate-400 text-[11px]">راجع عمود الخصومات بالجدول</span>';
+  } else {
+    // إضافة صنف جديد
+    currentItemCode = null;
+    title.textContent = 'إضافة صنف';
+    document.getElementById('item-name').value = '';
+    document.getElementById('item-sku').value = '';
+    document.getElementById('item-sku').disabled = false;
+    document.getElementById('item-group').selectedIndex = 0;
+    document.getElementById('item-brand').selectedIndex = 0;
+    document.getElementById('item-unit').value = '';
+    document.getElementById('item-price').value = '';
+    document.getElementById('item-active-toggle').checked = true;
+    disableWrapper.classList.add('hidden');
+    manageLink.href = '/staff/discounts';
+    discountsSummary.innerHTML = '<span class="text-slate-400 text-[11px]">يمكنك إضافة خصومات بعد حفظ الصنف</span>';
+  }
+
+  drawer.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+}
+
+function closeItemPanel() {
+  document.getElementById('item-drawer').classList.add('hidden');
+  document.getElementById('item-drawer-backdrop').classList.add('hidden');
+}
+
+function saveItemPanel() {
+  const payload = {
+    item_code: currentItemCode,
+    item_name: document.getElementById('item-name').value,
+    new_item_code: document.getElementById('item-sku').value,
+    item_group: document.getElementById('item-group').value,
+    brand: document.getElementById('item-brand').value,
+    stock_uom: document.getElementById('item-unit').value,
+    price: document.getElementById('item-price').value,
+    disabled: document.getElementById('item-active-toggle').checked ? 0 : 1,
+  };
+
+  fetch('/api/method/biozone_web.api.staff_save_item', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': CSRF_TOKEN,
+    },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => res.json())
+    .then((res) => {
+      if (res.message && res.message.ok) {
+        window.location.reload();
+      } else {
+        alert((res.message && res.message.error) || 'حصل خطأ أثناء الحفظ');
+      }
+    })
+    .catch(() => alert('تعذر الاتصال بالسيرفر'));
+}
+
+function disableCurrentItem() {
+  if (!currentItemCode) return;
+  if (!confirm('تأكيد تعطيل الصنف؟ الصنف لن يظهر للطلب من الفروع بعد ذلك.')) return;
+
+  fetch('/api/method/biozone_web.api.staff_disable_item', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Frappe-CSRF-Token': CSRF_TOKEN,
+    },
+    body: JSON.stringify({ item_code: currentItemCode }),
+  })
+    .then((res) => res.json())
+    .then(() => window.location.reload())
+    .catch(() => alert('تعذر الاتصال بالسيرفر'));
+}
+</script>
+</body></html>

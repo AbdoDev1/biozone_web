@@ -126,6 +126,15 @@ tailwind.config = {
               <span class="text-sm text-outline">السعر غير متاح</span>
               {% endif %}
             </div>
+            <button
+              class="mt-2 w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              {% if not item.price %}disabled{% endif %}
+              onclick='addToCart({{ item.item_code|tojson }}, {{ item.item_name|tojson }}, {{ item.item_group|tojson }}, {{ item.price or 0 }}, this)'
+              type="button"
+            >
+              <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+              أضف للسلة
+            </button>
           </div>
         </article>
         {% endfor %}
@@ -136,5 +145,6 @@ tailwind.config = {
 </main>
 
 {% include "biozone_web/templates/includes/site_footer.html" %}
+{% include "biozone_web/templates/includes/cart_helpers.html" %}
 
 </body></html>

@@ -1,0 +1,76 @@
+{# Shared staff-panel shell (top half): sidebar backdrop, collapsible
+   right sidebar, and the top header bar. Paired with
+   staff_shell_bottom.html (mobile tab bar + sidebar-toggle JS) at the
+   end of the page. Originally built for /staff/dashboard; extracted
+   here so /staff/stock (and future staff pages) share the exact same
+   responsive shell instead of copy-pasting it.
+
+   Each page's get_context() must set:
+   - active_page: "dashboard" | "items" | "stock" | "orders"
+   - user_full_name, today_display (dashboard.py already sets these
+     via get_header_context() + its own today_display line — other
+     staff pages should do the same) #}
+<body class="min-h-screen bg-surface flex flex-col antialiased text-navy-text selection:bg-primary/15 selection:text-primary">
+<!-- Mobile & Tablet Sidebar Overlay Backdrop -->
+<div class="fixed inset-0 bg-navy-text/30 backdrop-blur-sm z-40 hidden transition-opacity duration-300" id="drawer-backdrop" onclick="toggleSidebar(false)"></div>
+<!-- Collapsible Right Sidebar (RTL) -->
+<aside class="fixed top-0 right-0 h-full bg-white z-50 flex flex-col justify-between transition-all duration-300 ease-in-out border-l border-surface-subtle shadow-sm w-64 max-lg:translate-x-full lg:max-xl:w-20 xl:w-64" id="sidebar">
+<div class="flex flex-col py-6">
+<div class="px-6 flex items-center justify-between lg:max-xl:px-4 lg:max-xl:justify-center">
+<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl border border-surface-subtle flex items-center justify-center font-bold text-xl shrink-0 shadow-sm text-white bg-primary">B</div><div class="flex flex-col lg:max-xl:hidden"><span class="text-xl font-bold text-navy-text leading-tight">Biozone</span></div></div>
+<button aria-label="إغلاق القائمة" class="lg:hidden p-1.5 text-navy-text/60 hover:text-navy-text rounded-lg hover:bg-surface-subtle" onclick="toggleSidebar(false)">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<nav class="mt-8 flex flex-col gap-1.5 px-3 lg:max-xl:px-2">
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'dashboard' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/dashboard" title="الرئيسية">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="text-sm lg:max-xl:hidden">الرئيسية</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'items' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/items" title="الأصناف">
+<span class="material-symbols-outlined text-[22px]">inventory_2</span>
+<span class="text-sm lg:max-xl:hidden">الأصناف</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'stock' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/stock" title="حركة المخزون">
+<span class="material-symbols-outlined text-[22px]">sync_alt</span>
+<span class="text-sm lg:max-xl:hidden">حركة المخزون</span>
+</a>
+<a class="flex items-center justify-between px-3.5 py-3 rounded-xl text-navy-text/40 hover:text-navy-text/60 hover:bg-surface-subtle transition-colors lg:max-xl:justify-center lg:max-xl:px-0" href="/staff/orders" title="تجهيز الطلبات">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[22px]">receipt_long</span>
+<span class="text-sm lg:max-xl:hidden">تجهيز الطلبات</span>
+</div>
+<span class="text-[11px] bg-surface-container text-navy-text/60 px-2 py-0.5 rounded font-normal lg:max-xl:hidden">قريباً</span>
+</a>
+</nav>
+</div>
+<div class="p-4 px-6 lg:max-xl:p-3 lg:max-xl:text-center text-xs text-navy-text/40 border-t border-surface-subtle flex items-center justify-between lg:max-xl:justify-center">
+<span class="lg:max-xl:hidden">المستودعات v2.4</span>
+<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col transition-all duration-300 xl:mr-64 lg:max-xl:mr-20 pb-20 sm:pb-8">
+<header class="h-16 bg-white border-b border-surface-subtle sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between">
+<div class="flex items-center gap-3 sm:gap-4">
+<button aria-label="فتح القائمة" class="lg:hidden p-2 text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle rounded-lg focus:outline-none" onclick="toggleSidebar(true)">
+<span class="material-symbols-outlined text-2xl">menu</span>
+</button>
+<div class="w-8 h-8 rounded-lg bg-primary flex sm:hidden items-center justify-center text-white">
+<span class="material-symbols-outlined text-lg">local_pharmacy</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-subtle text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-lg">person</span>
+</div>
+<span class="text-sm sm:text-base font-bold text-navy-text">{{ user_full_name }}</span>
+</div>
+</div>
+<div class="flex items-center gap-4 sm:gap-6">
+<span class="hidden sm:inline text-xs text-navy-text/50 font-medium">{{ today_display }}</span>
+<a class="flex items-center gap-1.5 text-xs sm:text-sm text-navy-text/60 hover:text-alert-red font-medium transition-colors" href="/logout">
+<span class="material-symbols-outlined text-base">logout</span>
+<span class="">تسجيل خروج</span>
+</a>
+</div>
+</header>

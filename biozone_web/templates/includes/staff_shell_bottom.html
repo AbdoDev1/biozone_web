@@ -1,0 +1,32 @@
+{# Bottom half of the shared staff shell — pairs with staff_shell_top.html.
+   Each page's mobile bottom-tab-bar link is bolded via `active_page`,
+   same values as the sidebar. Include this right before </body>. #}
+<!-- Mobile Bottom Navigation Tab Bar (Fixed) -->
+<nav class="sm:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-surface-subtle z-40 flex items-center justify-around px-2 shadow-sm">
+<a class="flex flex-col items-center gap-1 py-1 px-3 {% if active_page == 'dashboard' %}text-primary{% else %}text-navy-text/50 hover:text-primary{% endif %}" href="/staff/dashboard">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-[11px] {% if active_page == 'dashboard' %}font-bold{% else %}font-medium{% endif %}">الرئيسية</span>
+</a>
+<a class="flex flex-col items-center gap-1 py-1 px-3 {% if active_page == 'items' %}text-primary{% else %}text-navy-text/50 hover:text-primary{% endif %}" href="/staff/items">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span class="text-[11px] {% if active_page == 'items' %}font-bold{% else %}font-medium{% endif %}">الأصناف</span>
+</a>
+<a class="flex flex-col items-center gap-1 py-1 px-3 {% if active_page == 'stock' %}text-primary{% else %}text-navy-text/50 hover:text-primary{% endif %}" href="/staff/stock">
+<span class="material-symbols-outlined text-[20px]">sync_alt</span>
+<span class="text-[11px] {% if active_page == 'stock' %}font-bold{% else %}font-medium{% endif %}">حركة المخزون</span>
+</a>
+</nav>
+<script>
+    // Sidebar Drawer Toggle for Mobile and Tablet
+    function toggleSidebar(open) {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('drawer-backdrop');
+      if (open) {
+        sidebar.classList.remove('max-lg:translate-x-full');
+        backdrop.classList.remove('hidden');
+      } else {
+        sidebar.classList.add('max-lg:translate-x-full');
+        backdrop.classList.add('hidden');
+      }
+    }
+</script>

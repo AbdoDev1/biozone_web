@@ -46,21 +46,6 @@ tailwind.config = {
 
 {% include "biozone_web/templates/includes/site_header.html" %}
 
-<!-- Category Filter Bar -->
-<nav class="bg-surface-container-lowest border-b border-surface-variant sticky top-[72px] z-40">
-  <div class="max-w-container-max mx-auto px-md py-3 overflow-x-auto no-scrollbar">
-    <ul class="flex gap-sm items-center w-max min-w-full pb-1">
-      <li>
-        <a href="/catalog{% if search_term %}?q={{ search_term }}{% endif %}" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if not selected_category %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">الكل</a>
-      </li>
-      {% for cat in categories %}
-      <li>
-        <a href="/catalog?category={{ cat }}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-4 py-1.5 rounded-full font-bold whitespace-nowrap transition-colors border {% if selected_category == cat %}bg-primary-container text-on-primary-container border-transparent shadow-sm{% else %}bg-surface text-on-surface-variant border-outline-variant hover:bg-surface-container-high{% endif %}">{{ cat }}</a>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-</nav>
 
 <!-- Main Content -->
 <main class="max-w-container-max mx-auto px-md py-lg min-h-screen">
@@ -94,7 +79,12 @@ tailwind.config = {
           <span class="text-sm text-outline">السعر غير متاح</span>
           {% endif %}
         </div>
-        <button class="mt-2 w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm">
+        <button
+          class="mt-2 w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed add-to-cart-btn"
+          {% if not item.price %}disabled{% endif %}
+          onclick='addToCart({{ item.item_code|tojson }}, {{ item.item_name|tojson }}, {{ item.item_group|tojson }}, {{ item.price or 0 }}, this)'
+          type="button"
+        >
           <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
           أضف للسلة
         </button>
@@ -104,7 +94,7 @@ tailwind.config = {
   </div>
   {% else %}
   <div class="text-center py-xl text-on-surface-variant">
-    {% if search_term %}مفيش نتائج لـ"{{ search_term }}"{% else %}لا يوجد أصناف{% endif %}
+    {% if search_term %}لا توجد نتائج لـ"{{ search_term }}"{% else %}لا توجد أصناف{% endif %}
   </div>
   {% endif %}
 
@@ -124,5 +114,6 @@ tailwind.config = {
 </main>
 
 {% include "biozone_web/templates/includes/site_footer.html" %}
+{% include "biozone_web/templates/includes/cart_helpers.html" %}
 
 </body></html>

@@ -79,3 +79,172 @@ def biozone_forgot_password(email: str):
 			"إذا كان هذا البريد الإلكتروني مسجلًا لدينا، فسيصلك رابط لإعادة تعيين كلمة المرور. يُرجى التحقق من صندوق الوارد."
 		)
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_save_item(
+	item_code: str | None,
+	new_item_code: str,
+	item_name: str,
+	item_group: str,
+	brand: str | None = None,
+	stock_uom: str | None = None,
+	price: str | float | None = None,
+	disabled: int = 0,
+):
+	"""إضافة/تعديل صنف من واجهة الموظف (`/staff/items`).
+
+	ملحوظة صلاحيات مهمة: الفحص هنا لسه بسيط (require_staff_access = أي
+	System User)، مش الـRole المخصص لإدارة التسعير اللي اتفقنا عليه في
+	الخطة (قسم 7، قرار 3 سبتمبر). لازم يتضاف فحص `frappe.has_permission`
+	أدق قبل ما الصفحة دي تتفتح لكل الموظفين فعليًا في الإنتاج.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	new_item_code = (new_item_code or "").strip()
+	item_name = (item_name or "").strip()
+
+	if not new_item_code or not item_name or not item_group:
+		return {"ok": False, "error": _("من فضلك أكمل اسم الصنف والكود والمجموعة")}
+
+	if item_code:
+		# تعديل صنف موجود
+		if not frappe.db.exists("Item", item_code):
+			return {"ok": False, "error": _("الصنف غير موجود")}
+
+		if new_item_code != item_code:
+			# تغيير الكود = إعادة تسمية الـdoc نفسه، مش مجرد تحديث حقل
+			frappe.rename_doc("Item", item_code, new_item_code, force=True)
+
+		doc = frappe.get_doc("Item", new_item_code)
+		doc.item_name = item_name
+		doc.item_group = item_group
+		doc.brand = brand or None
+		if stock_uom:
+			doc.stock_uom = stock_uom
+		doc.disabled = frappe.utils.cint(disabled)
+		doc.save(ignore_permissions=True)
+	else:
+		# صنف جديد
+		if frappe.db.exists("Item", new_item_code):
+			return {"ok": False, "error": _("الكود ده مستخدم بالفعل لصنف تاني")}
+
+		doc = frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": new_item_code,
+				"item_name": item_name,
+				"item_group": item_group,
+				"brand": brand or None,
+				"stock_uom": stock_uom or "Nos",
+				"is_stock_item": 1,
+				"disabled": frappe.utils.cint(disabled),
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+	# السعر (سعر الجمهور) — سطر واحد بس في Item Price لقائمة Standard
+	# Selling، مطابقةً للقرار المصحح (سعر واحد + خصومات متعددة منفصلة)
+	if price not in (None, ""):
+		price_value = frappe.utils.flt(price)
+		existing_price = frappe.db.get_value(
+			"Item Price",
+			{"item_code": doc.item_code, "price_list": "Standard Selling"},
+			"name",
+		)
+		if existing_price:
+			frappe.db.set_value("Item Price", existing_price, "price_list_rate", price_value)
+		else:
+			frappe.get_doc(
+				{
+					"doctype": "Item Price",
+					"item_code": doc.item_code,
+					"price_list": "Standard Selling",
+					"price_list_rate": price_value,
+				}
+			).insert(ignore_permissions=True)
+
+	frappe.db.commit()
+	return {"ok": True, "item_code": doc.item_code}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_disable_item(item_code: str):
+	"""تعطيل صنف (مش حذف) — نفس القرار المتفق عليه: مفيش زرار حذف في
+	واجهة الموظف خالص."""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	if not frappe.db.exists("Item", item_code):
+		return {"ok": False, "error": _("الصنف غير موجود")}
+
+	frappe.db.set_value("Item", item_code, "disabled", 1)
+	frappe.db.commit()
+	return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_log_stock_movement(item_code: str, movement_type: str, uom: str, qty: float, note: str = ""):
+	"""يسجل حركة مخزون حقيقية (Stock Entry) — B6b. يفترض مستودع واحد
+	ضمني (get_default_warehouse) لأن اللوحة (تسجيل حركة) ما بتسألش عن
+	مستودع، زي ما اتحدد في مواصفات الشاشة."""
+	from biozone_web.utils import get_default_warehouse, require_staff_access
+
+	require_staff_access()
+
+	if movement_type not in ("in", "out"):
+		frappe.throw(_("نوع الحركة غير صحيح"))
+
+	qty = frappe.utils.flt(qty)
+	if qty <= 0:
+		frappe.throw(_("الكمية يجب أن تكون أكبر من صفر"))
+
+	item = frappe.db.get_value("Item", item_code, ["item_name", "stock_uom", "disabled"], as_dict=True)
+	if not item or item.disabled:
+		frappe.throw(_("الصنف غير موجود أو غير مفعّل"))
+
+	conversion_factor = 1.0
+	if uom != item.stock_uom:
+		conversion_factor = frappe.db.get_value(
+			"UOM Conversion Detail",
+			{"parent": item_code, "parenttype": "Item", "uom": uom},
+			"conversion_factor",
+		)
+		if not conversion_factor:
+			frappe.throw(_("الوحدة المختارة غير معرّفة لهذا الصنف"))
+
+	warehouse = get_default_warehouse()
+	purpose = "Material Receipt" if movement_type == "in" else "Material Issue"
+
+	if not frappe.db.exists("Stock Entry Type", purpose):
+		frappe.throw(
+			_("نوع حركة المخزون \"{0}\" غير معرّف في النظام — يرجى إعداده أولًا").format(purpose)
+		)
+
+	stock_entry = frappe.get_doc(
+		{
+			"doctype": "Stock Entry",
+			"stock_entry_type": purpose,
+			"purpose": purpose,
+			"to_warehouse": warehouse if movement_type == "in" else None,
+			"from_warehouse": warehouse if movement_type == "out" else None,
+			"remarks": note or None,
+			"items": [
+				{
+					"item_code": item_code,
+					"qty": qty,
+					"uom": uom,
+					"conversion_factor": conversion_factor,
+					"t_warehouse": warehouse if movement_type == "in" else None,
+					"s_warehouse": warehouse if movement_type == "out" else None,
+				}
+			],
+		}
+	)
+	stock_entry.insert()
+	stock_entry.submit()
+
+	return {"ok": True, "stock_entry": stock_entry.name}

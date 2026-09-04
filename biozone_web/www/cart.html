@@ -1,0 +1,265 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Biozone - سلة المشتريات</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-high": "#dce9ff",
+        "surface-variant": "#d3e4fe",
+        "on-surface-variant": "#3d4947",
+        "secondary": "#5c5f61",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff"
+      },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
+      fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col">
+
+{% include "biozone_web/templates/includes/site_header.html" %}
+
+<main class="flex-grow max-w-container-max mx-auto px-md py-lg w-full">
+  <div class="mb-lg flex items-center gap-3">
+    <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface">سلة المشتريات</h1>
+    <span class="hidden rounded-full bg-surface-container px-3 py-1 text-sm font-semibold text-on-surface-variant" id="cart-item-count-badge"></span>
+  </div>
+
+  <!-- Empty state -->
+  <div class="hidden flex-col items-center justify-center rounded-xl border border-outline-variant/50 bg-surface-container-lowest px-6 py-20 text-center shadow-sm" id="empty-cart">
+    <div class="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container">
+      <span class="material-symbols-outlined text-5xl text-primary">remove_shopping_cart</span>
+    </div>
+    <h2 class="mt-6 text-xl font-extrabold text-on-surface">سلتك فارغة حاليًا</h2>
+    <p class="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant">
+      لم تقم بإضافة أي منتجات إلى سلة المشتريات بعد. تصفّح مجموعتنا من المستلزمات والأجهزة الطبية لبدء طلبك.
+    </p>
+    <a class="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container" href="/catalog">
+      <span class="material-symbols-outlined text-xl">storefront</span>
+      تصفّح المنتجات
+    </a>
+  </div>
+
+  <!-- Cart content -->
+  <div class="hidden grid-cols-1 gap-lg lg:grid-cols-3 lg:items-start" id="cart-content">
+    <div class="flex flex-col gap-md lg:col-span-2" id="cart-items-list"></div>
+
+    <aside class="lg:col-span-1 lg:sticky lg:top-28">
+      <div class="rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+        <h2 class="text-lg font-extrabold text-on-surface">ملخص الطلب</h2>
+        <dl class="mt-5 space-y-3 text-sm">
+          <div class="flex items-center justify-between">
+            <dt class="text-on-surface-variant" id="summary-subtotal-label">الإجمالي الفرعي</dt>
+            <dd class="font-semibold text-on-surface" id="summary-subtotal">٠٫٠٠ ج.م</dd>
+          </div>
+          <div class="flex items-center justify-between">
+            <dt class="text-on-surface-variant">الشحن</dt>
+            <dd class="font-semibold text-primary-container">يُحتسب عند التأكيد</dd>
+          </div>
+        </dl>
+        <div class="my-5 h-px bg-outline-variant/50"></div>
+        <div class="flex items-center justify-between">
+          <span class="text-base font-bold text-on-surface">الإجمالي</span>
+          <span class="text-xl font-extrabold text-primary" id="summary-total">٠٫٠٠ ج.م</span>
+        </div>
+        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button">
+          <span class="material-symbols-outlined text-xl">check_circle</span>
+          تأكيد الطلب
+        </button>
+        <p class="hidden mt-3 text-sm text-error text-center" id="confirm-order-error"></p>
+        <p class="mt-4 flex items-center justify-center gap-1.5 text-xs text-on-surface-variant">
+          <span class="material-symbols-outlined text-base">verified_user</span>
+          معاملة آمنة وموثوقة للمنشآت الطبية
+        </p>
+      </div>
+    </aside>
+  </div>
+</main>
+
+{% include "biozone_web/templates/includes/site_footer.html" %}
+
+<template id="cart-item-template">
+  <article class="flex gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm sm:gap-5 sm:p-5">
+    <div class="shrink-0 overflow-hidden rounded-xl bg-surface-container-low ring-1 ring-inset ring-outline-variant/40 h-24 w-24 sm:h-28 sm:w-28 flex items-center justify-center">
+      <img class="h-full w-full object-cover cart-item-image" src="" alt="">
+    </div>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <span class="inline-flex items-center rounded-full bg-primary-container/10 px-2.5 py-0.5 text-xs font-medium text-primary-container cart-item-category"></span>
+          <h3 class="mt-2 text-sm font-bold leading-6 text-on-surface sm:text-base cart-item-name"></h3>
+          <p class="mt-1 text-sm text-on-surface-variant">سعر الوحدة: <span class="cart-item-unit-price"></span></p>
+        </div>
+        <button aria-label="إزالة" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error cart-item-remove" type="button">
+          <span class="material-symbols-outlined text-xl">delete</span>
+        </button>
+      </div>
+      <div class="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
+        <div class="flex items-center rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60">
+          <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high disabled:opacity-40 cart-item-decrement" type="button">
+            <span class="material-symbols-outlined text-xl">remove</span>
+          </button>
+          <span class="min-w-10 text-center text-sm font-bold cart-item-qty"></span>
+          <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high cart-item-increment" type="button">
+            <span class="material-symbols-outlined text-xl">add</span>
+          </button>
+        </div>
+        <div class="text-left">
+          <p class="text-xs text-on-surface-variant">الإجمالي الفرعي</p>
+          <p class="text-base font-extrabold text-primary sm:text-lg cart-item-subtotal"></p>
+        </div>
+      </div>
+    </div>
+  </article>
+</template>
+
+<script>
+(function () {
+  const CART_KEY = 'biozone_cart_items';
+  // Cart shape: [{ item_code, item_name, item_group, price, image, quantity }]
+
+  function loadCart() {
+    try {
+      return JSON.parse(localStorage.getItem(CART_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCart(items) {
+    localStorage.setItem(CART_KEY, JSON.stringify(items));
+    var badge = document.getElementById('cart-count-badge');
+    if (badge) badge.textContent = items.reduce(function (sum, it) { return sum + it.quantity; }, 0);
+  }
+
+  function formatPrice(value) {
+    return value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  }
+
+  function render() {
+    const items = loadCart();
+    const emptyEl = document.getElementById('empty-cart');
+    const contentEl = document.getElementById('cart-content');
+    const listEl = document.getElementById('cart-items-list');
+    const badgeEl = document.getElementById('cart-item-count-badge');
+
+    const totalUnits = items.reduce((sum, it) => sum + it.quantity, 0);
+
+    if (items.length === 0) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.classList.add('flex');
+      contentEl.classList.add('hidden');
+      contentEl.classList.remove('grid');
+      badgeEl.classList.add('hidden');
+      return;
+    }
+
+    emptyEl.classList.add('hidden');
+    emptyEl.classList.remove('flex');
+    contentEl.classList.remove('hidden');
+    contentEl.classList.add('grid');
+    badgeEl.classList.remove('hidden');
+    badgeEl.textContent = items.length + ' منتجات';
+
+    const template = document.getElementById('cart-item-template');
+    listEl.innerHTML = '';
+    let subtotal = 0;
+
+    items.forEach((item) => {
+      const lineSubtotal = item.price * item.quantity;
+      subtotal += lineSubtotal;
+
+      const node = template.content.cloneNode(true);
+      const img = node.querySelector('.cart-item-image');
+      img.src = item.image || '/assets/biozone_web/images/product-placeholder.svg';
+      img.alt = item.item_name;
+      node.querySelector('.cart-item-category').textContent = item.item_group || '';
+      node.querySelector('.cart-item-name').textContent = item.item_name;
+      node.querySelector('.cart-item-unit-price').textContent = formatPrice(item.price);
+      node.querySelector('.cart-item-qty').textContent = item.quantity;
+      node.querySelector('.cart-item-subtotal').textContent = formatPrice(lineSubtotal);
+
+      const decBtn = node.querySelector('.cart-item-decrement');
+      decBtn.disabled = item.quantity <= 1;
+      decBtn.addEventListener('click', () => updateQty(item.item_code, item.quantity - 1));
+      node.querySelector('.cart-item-increment').addEventListener('click', () => updateQty(item.item_code, item.quantity + 1));
+      node.querySelector('.cart-item-remove').addEventListener('click', () => removeItem(item.item_code));
+
+      listEl.appendChild(node);
+    });
+
+    document.getElementById('summary-subtotal-label').textContent = 'الإجمالي الفرعي (' + totalUnits + ' عنصر)';
+    document.getElementById('summary-subtotal').textContent = formatPrice(subtotal);
+    document.getElementById('summary-total').textContent = formatPrice(subtotal);
+  }
+
+  function updateQty(itemCode, newQty) {
+    let items = loadCart();
+    if (newQty < 1) return;
+    items = items.map((it) => it.item_code === itemCode ? { ...it, quantity: newQty } : it);
+    saveCart(items);
+    render();
+  }
+
+  function removeItem(itemCode) {
+    let items = loadCart().filter((it) => it.item_code !== itemCode);
+    saveCart(items);
+    render();
+  }
+
+  document.getElementById('confirm-order-btn').addEventListener('click', async () => {
+    const items = loadCart();
+    const errorEl = document.getElementById('confirm-order-error');
+    errorEl.classList.add('hidden');
+    if (items.length === 0) return;
+
+    try {
+      const res = await fetch('/api/method/biozone_web.api.biozone_confirm_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
+          || data.exception || 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
+        throw new Error(msg);
+      }
+      localStorage.removeItem(CART_KEY);
+      window.location.href = (data.message && data.message.redirect) || '/biozone-home';
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('hidden');
+    }
+  });
+
+  render();
+})();
+</script>
+
+</body></html>

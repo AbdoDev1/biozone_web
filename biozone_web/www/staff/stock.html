@@ -1,0 +1,418 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | حركة المخزون</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6",
+            "amber-text": "#92400e"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full flex flex-col gap-6 sm:gap-8">
+<div class="flex items-center justify-between">
+<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">حركة المخزون</h1>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-alert-bg/60 text-alert-red flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">warning</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-alert-red tracking-tight">{{ low_stock_count }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">قاربت على النفاد</span>
+</div>
+</div>
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">inventory_2</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ "{:,}".format(total_items) }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">إجمالي البنود</span>
+</div>
+</div>
+</div>
+
+<!-- Simple underline tabs -->
+<div class="border-b border-surface-subtle flex gap-6">
+<button class="pb-3 px-1 border-b-2 border-primary text-primary font-bold flex items-center gap-1.5" id="tab-btn-stock" onclick="switchTab('stock')" type="button">
+<span class="material-symbols-outlined text-[20px]">home_storage</span>
+المخزون الأرصدة الحالية
+</button>
+<button class="pb-3 px-1 border-b-2 border-transparent text-navy-text/50 hover:text-navy-text font-bold flex items-center gap-1.5" id="tab-btn-log" onclick="switchTab('log')" type="button">
+<span class="material-symbols-outlined text-[20px]">history</span>
+سجل الحركات
+</button>
+</div>
+
+<!-- TAB 1: Current stock -->
+<div id="tab-content-stock" class="flex flex-col gap-4">
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+<button class="bg-primary hover:bg-primary-accent text-white font-bold rounded-xl px-4 py-2.5 flex items-center gap-2 justify-center transition-colors shadow-sm" onclick="openMovementPanel()" type="button">
+<span class="material-symbols-outlined text-xl">add</span>
+تسجيل حركة
+</button>
+<form class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3" method="get" action="/staff/stock">
+<label class="flex items-center gap-2 bg-white border border-surface-subtle rounded-xl px-3 py-2 text-sm font-bold text-navy-text/70 cursor-pointer whitespace-nowrap">
+<input type="checkbox" name="low_only" value="1" onchange="this.form.submit()" {% if low_only %}checked{% endif %} class="rounded border-outline-variant text-primary focus:ring-primary">
+المنخفض فقط
+<span class="bg-alert-bg text-alert-red text-xs font-bold rounded-full px-2 py-0.5">{{ low_stock_count }}</span>
+</label>
+<div class="relative flex-grow sm:w-64">
+<input class="w-full pr-9 pl-3 py-2 bg-white rounded-xl border border-surface-subtle focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm outline-none" name="q" placeholder="ابحث بالاسم أو الكود..." type="text" value="{{ search_term or '' }}">
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-navy-text/40 text-lg">search</span>
+</div>
+</form>
+</div>
+
+<!-- Desktop/Tablet table -->
+<div class="hidden sm:block bg-white rounded-2xl shadow-sm overflow-x-auto">
+<table class="w-full text-right border-collapse min-w-[640px]">
+<thead>
+<tr class="border-b border-surface-subtle text-xs text-navy-text/50">
+<th class="py-3 px-4 font-bold">اسم الصنف</th>
+<th class="py-3 px-4 font-bold">الكود</th>
+<th class="py-3 px-4 font-bold">الكمية الحالية</th>
+<th class="py-3 px-4 font-bold lg:max-xl:hidden">الحد الأدنى</th>
+<th class="py-3 px-4 font-bold">الحالة</th>
+<th class="py-3 px-4 font-bold text-left">إجراء سريع</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-subtle">
+{% for row in stock_rows %}
+<tr class="hover:bg-surface transition-colors">
+<td class="py-3.5 px-4 font-bold text-navy-text">{{ row.item_name }}</td>
+<td class="py-3.5 px-4 text-navy-text/60 font-mono text-sm">{{ row.item_code }}</td>
+<td class="py-3.5 px-4 font-bold text-navy-text">{{ row.actual_qty|int }} <span class="text-xs font-normal text-navy-text/50">{{ row.stock_uom }}</span></td>
+<td class="py-3.5 px-4 text-navy-text/50 text-sm lg:max-xl:hidden">{{ row.reorder_level|int if row.reorder_level else "—" }}</td>
+<td class="py-3.5 px-4">
+{% if row.status == "available" %}
+<span class="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-bold px-2.5 py-1 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>متوفر</span>
+{% elif row.status == "low" %}
+<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-text text-xs font-bold px-2.5 py-1 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>منخفض</span>
+{% else %}
+<span class="inline-flex items-center gap-1 bg-alert-bg text-alert-red text-xs font-bold px-2.5 py-1 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-alert-red"></span>غير متوفر</span>
+{% endif %}
+</td>
+<td class="py-3.5 px-4 text-left">
+<button aria-label="تسجيل حركة لهذا الصنف" class="p-1.5 rounded-lg text-navy-text/50 hover:text-primary hover:bg-surface-subtle transition-colors" onclick='openMovementPanel({{ row.item_code|tojson }})' type="button">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+</button>
+</td>
+</tr>
+{% else %}
+<tr><td class="py-8 text-center text-navy-text/50 text-sm" colspan="6">لا توجد أصناف مطابقة</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<!-- Mobile stacked cards -->
+<div class="sm:hidden flex flex-col gap-3">
+{% for row in stock_rows %}
+<div class="bg-white rounded-xl p-4 shadow-sm flex items-start justify-between gap-3">
+<div class="flex flex-col gap-1 min-w-0">
+<span class="font-bold text-navy-text text-sm truncate">{{ row.item_name }}</span>
+<span class="text-xs text-navy-text/50 font-mono">{{ row.item_code }}</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-bold text-navy-text">{{ row.actual_qty|int }} {{ row.stock_uom }}</span>
+{% if row.status == "available" %}
+<span class="bg-primary/10 text-primary text-[11px] font-bold px-2 py-0.5 rounded-full">متوفر</span>
+{% elif row.status == "low" %}
+<span class="bg-amber-100 text-amber-text text-[11px] font-bold px-2 py-0.5 rounded-full">منخفض</span>
+{% else %}
+<span class="bg-alert-bg text-alert-red text-[11px] font-bold px-2 py-0.5 rounded-full">غير متوفر</span>
+{% endif %}
+</div>
+</div>
+<button aria-label="تسجيل حركة لهذا الصنف" class="p-2 rounded-lg text-navy-text/50 hover:text-primary hover:bg-surface-subtle transition-colors shrink-0" onclick='openMovementPanel({{ row.item_code|tojson }})' type="button">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+</button>
+</div>
+{% else %}
+<p class="py-8 text-center text-navy-text/50 text-sm">لا توجد أصناف مطابقة</p>
+{% endfor %}
+</div>
+
+<!-- Pagination -->
+<div class="flex items-center justify-between text-sm text-navy-text/60 px-1">
+<span>عرض {{ stock_rows|length }} من أصل {{ total_count_ar }} صنف</span>
+<div class="flex items-center gap-2">
+{% if has_prev %}
+<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ prev_page }}{% if search_term %}&q={{ search_term }}{% endif %}{% if low_only %}&low_only=1{% endif %}">السابق</a>
+{% endif %}
+<span class="px-3 py-1.5 rounded-lg bg-primary text-white font-bold">{{ page }}</span>
+{% if has_next %}
+<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ next_page }}{% if search_term %}&q={{ search_term }}{% endif %}{% if low_only %}&low_only=1{% endif %}">التالي</a>
+{% endif %}
+</div>
+</div>
+</div>
+
+<!-- TAB 2: Movement log — not built yet, see note in main.py comment below -->
+<div class="hidden flex-col gap-4 items-center justify-center bg-white rounded-2xl shadow-sm py-20 text-center" id="tab-content-log">
+<span class="material-symbols-outlined text-4xl text-navy-text/30">construction</span>
+<p class="text-navy-text/50 text-sm">تبويب "سجل الحركات" غير مبنيّ بعد — سيُضاف في الخطوة القادمة</p>
+</div>
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+
+<!-- "تسجيل حركة" Slide-in Panel -->
+<div class="fixed inset-0 bg-navy-text/30 backdrop-blur-sm z-50 hidden transition-opacity duration-300" id="movement-panel-backdrop" onclick="closeMovementPanel()"></div>
+<div class="fixed top-0 left-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between" id="movement-panel">
+<div class="p-6 overflow-y-auto flex-1">
+<div class="flex items-center justify-between pb-4 border-b border-surface-subtle">
+<h3 class="text-lg font-bold text-navy-text">تسجيل حركة مخزنية</h3>
+<button aria-label="إغلاق" class="p-1.5 text-navy-text/50 hover:text-navy-text rounded-lg hover:bg-surface-subtle" onclick="closeMovementPanel()" type="button">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<div class="mt-6 flex flex-col gap-5">
+<div class="relative">
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">الصنف</label>
+<input autocomplete="off" class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-item-search" placeholder="اكتب بالاسم أو الكود..." type="text">
+<div class="hidden absolute z-10 mt-1 w-full bg-white border border-surface-subtle rounded-xl shadow-lg max-h-56 overflow-y-auto" id="mp-item-results"></div>
+<input id="mp-item-code" type="hidden">
+</div>
+<div>
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">نوع الحركة</label>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2.5 rounded-xl font-bold text-sm border-2 border-primary bg-primary/10 text-primary transition-colors" data-type="in" id="mp-type-in" onclick="setMovementType('in')" type="button">وارد</button>
+<button class="py-2.5 rounded-xl font-bold text-sm border-2 border-surface-subtle text-navy-text/60 hover:bg-surface-subtle transition-colors" data-type="out" id="mp-type-out" onclick="setMovementType('out')" type="button">صادر</button>
+</div>
+</div>
+<div>
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">الوحدة</label>
+<select class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" disabled id="mp-uom">
+<option value="">اختر صنفًا أولًا</option>
+</select>
+</div>
+<div>
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">الكمية</label>
+<input class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-qty" min="0" step="any" type="number">
+</div>
+<div>
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">ملاحظة <span class="text-navy-text/40 font-normal">(اختياري)</span></label>
+<input class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-note" type="text">
+</div>
+<p class="hidden text-sm text-alert-red" id="mp-error"></p>
+</div>
+</div>
+<div class="p-6 border-t border-surface-subtle bg-surface-subtle/40 flex gap-3">
+<button class="flex-1 py-2.5 px-4 text-navy-text/70 font-bold text-sm hover:bg-surface-subtle rounded-xl transition-colors" onclick="closeMovementPanel()" type="button">إلغاء</button>
+<button class="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-accent transition-colors shadow-sm" id="mp-save-btn" onclick="saveMovement()" type="button">حفظ</button>
+</div>
+</div>
+
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+const ITEMS = {{ items_json }};
+let mpSelectedType = 'in';
+
+function switchTab(tab) {
+  const stockBtn = document.getElementById('tab-btn-stock');
+  const logBtn = document.getElementById('tab-btn-log');
+  const stockContent = document.getElementById('tab-content-stock');
+  const logContent = document.getElementById('tab-content-log');
+  if (tab === 'stock') {
+    stockBtn.classList.add('border-primary', 'text-primary');
+    stockBtn.classList.remove('border-transparent', 'text-navy-text/50');
+    logBtn.classList.remove('border-primary', 'text-primary');
+    logBtn.classList.add('border-transparent', 'text-navy-text/50');
+    stockContent.classList.remove('hidden');
+    stockContent.classList.add('flex');
+    logContent.classList.add('hidden');
+    logContent.classList.remove('flex');
+  } else {
+    logBtn.classList.add('border-primary', 'text-primary');
+    logBtn.classList.remove('border-transparent', 'text-navy-text/50');
+    stockBtn.classList.remove('border-primary', 'text-primary');
+    stockBtn.classList.add('border-transparent', 'text-navy-text/50');
+    logContent.classList.remove('hidden');
+    logContent.classList.add('flex');
+    stockContent.classList.add('hidden');
+    stockContent.classList.remove('flex');
+  }
+}
+
+function setMovementType(type) {
+  mpSelectedType = type;
+  const inBtn = document.getElementById('mp-type-in');
+  const outBtn = document.getElementById('mp-type-out');
+  const active = 'py-2.5 rounded-xl font-bold text-sm border-2 border-primary bg-primary/10 text-primary transition-colors';
+  const inactive = 'py-2.5 rounded-xl font-bold text-sm border-2 border-surface-subtle text-navy-text/60 hover:bg-surface-subtle transition-colors';
+  inBtn.className = type === 'in' ? active : inactive;
+  outBtn.className = type === 'out' ? active : inactive;
+}
+
+function populateUomOptions(itemCode) {
+  const uomSelect = document.getElementById('mp-uom');
+  const item = ITEMS.find((i) => i.item_code === itemCode);
+  uomSelect.innerHTML = '';
+  if (!item) {
+    uomSelect.disabled = true;
+    uomSelect.innerHTML = '<option value="">اختر صنفًا أولًا</option>';
+    return;
+  }
+  uomSelect.disabled = false;
+  item.units.forEach((u) => {
+    const opt = document.createElement('option');
+    opt.value = u;
+    opt.textContent = u;
+    uomSelect.appendChild(opt);
+  });
+}
+
+function selectItem(item) {
+  document.getElementById('mp-item-search').value = item.item_name + ' (' + item.item_code + ')';
+  document.getElementById('mp-item-code').value = item.item_code;
+  document.getElementById('mp-item-results').classList.add('hidden');
+  populateUomOptions(item.item_code);
+}
+
+document.getElementById('mp-item-search').addEventListener('input', function () {
+  const query = this.value.trim();
+  document.getElementById('mp-item-code').value = '';
+  const resultsEl = document.getElementById('mp-item-results');
+  if (!query) {
+    resultsEl.classList.add('hidden');
+    resultsEl.innerHTML = '';
+    return;
+  }
+  const matches = ITEMS.filter((i) =>
+    i.item_name.includes(query) || i.item_code.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 8);
+
+  resultsEl.innerHTML = '';
+  if (matches.length === 0) {
+    resultsEl.innerHTML = '<div class="px-3.5 py-3 text-sm text-navy-text/40 text-center">لا توجد نتائج</div>';
+  } else {
+    matches.forEach((item) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'w-full text-right px-3.5 py-2.5 hover:bg-surface-subtle text-sm border-b border-surface-subtle last:border-0 flex flex-col';
+      row.innerHTML = '<span class="font-bold text-navy-text">' + item.item_name + '</span><span class="text-xs text-navy-text/50 font-mono">' + item.item_code + '</span>';
+      row.addEventListener('click', () => selectItem(item));
+      resultsEl.appendChild(row);
+    });
+  }
+  resultsEl.classList.remove('hidden');
+});
+
+function openMovementPanel(preselectItemCode) {
+  document.getElementById('mp-error').classList.add('hidden');
+  document.getElementById('mp-qty').value = '';
+  document.getElementById('mp-note').value = '';
+  setMovementType('in');
+
+  if (preselectItemCode) {
+    const item = ITEMS.find((i) => i.item_code === preselectItemCode);
+    if (item) selectItem(item);
+  } else {
+    document.getElementById('mp-item-search').value = '';
+    document.getElementById('mp-item-code').value = '';
+    populateUomOptions(null);
+  }
+
+  document.getElementById('movement-panel').classList.remove('-translate-x-full');
+  document.getElementById('movement-panel-backdrop').classList.remove('hidden');
+}
+
+function closeMovementPanel() {
+  document.getElementById('movement-panel').classList.add('-translate-x-full');
+  document.getElementById('movement-panel-backdrop').classList.add('hidden');
+  document.getElementById('mp-item-results').classList.add('hidden');
+}
+
+async function saveMovement() {
+  const errorEl = document.getElementById('mp-error');
+  errorEl.classList.add('hidden');
+
+  const itemCode = document.getElementById('mp-item-code').value;
+  const uom = document.getElementById('mp-uom').value;
+  const qty = document.getElementById('mp-qty').value;
+  const note = document.getElementById('mp-note').value;
+
+  if (!itemCode) {
+    errorEl.textContent = 'يرجى اختيار الصنف من نتائج البحث';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (!qty || parseFloat(qty) <= 0) {
+    errorEl.textContent = 'يرجى إدخال كمية أكبر من صفر';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const saveBtn = document.getElementById('mp-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'جارٍ الحفظ...';
+
+  try {
+    const res = await fetch('/api/method/biozone_web.api.staff_log_stock_movement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({
+        item_code: itemCode,
+        movement_type: mpSelectedType,
+        uom: uom,
+        qty: qty,
+        note: note,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
+        || data.exception || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
+      throw new Error(msg);
+    }
+    window.location.reload();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'حفظ';
+  }
+}
+</script>
+
+</body></html>

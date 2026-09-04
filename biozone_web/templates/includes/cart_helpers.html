@@ -1,0 +1,64 @@
+<!-- Shared "add to cart" helper. Include once near the end of any page
+     with product cards that call addToCart(). Uses the same
+     localStorage key/shape as /cart's own script — see cart.html for
+     the full read/render logic. -->
+<div class="fixed bottom-6 inset-x-0 flex justify-center z-[60] pointer-events-none" id="cart-toast-wrap">
+  <div class="hidden bg-on-surface text-surface text-sm font-bold px-5 py-3 rounded-full shadow-lg items-center gap-2 transition-opacity duration-300" id="cart-toast">
+    <span class="material-symbols-outlined text-lg text-primary-fixed">check_circle</span>
+    <span id="cart-toast-text"></span>
+  </div>
+</div>
+<script>
+  const CART_STORAGE_KEY = 'biozone_cart_items';
+
+  function addToCart(itemCode, itemName, itemGroup, price, buttonEl) {
+    let items = [];
+    try {
+      items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
+    } catch (e) {
+      items = [];
+    }
+
+    const existing = items.find((it) => it.item_code === itemCode);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      items.push({
+        item_code: itemCode,
+        item_name: itemName,
+        item_group: itemGroup,
+        price: price,
+        image: '',
+        quantity: 1,
+      });
+    }
+
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+
+    const badge = document.getElementById('cart-count-badge');
+    if (badge) {
+      badge.textContent = items.reduce((sum, it) => sum + it.quantity, 0);
+    }
+
+    showCartToast(itemName + ' أُضيف إلى السلة');
+
+    if (buttonEl) {
+      const original = buttonEl.innerHTML;
+      buttonEl.innerHTML = '<span class="material-symbols-outlined text-[18px]">check</span> أُضيف';
+      setTimeout(() => { buttonEl.innerHTML = original; }, 1200);
+    }
+  }
+
+  let cartToastTimeout;
+  function showCartToast(message) {
+    const toast = document.getElementById('cart-toast');
+    document.getElementById('cart-toast-text').textContent = message;
+    toast.classList.remove('hidden');
+    toast.classList.add('flex');
+    clearTimeout(cartToastTimeout);
+    cartToastTimeout = setTimeout(() => {
+      toast.classList.add('hidden');
+      toast.classList.remove('flex');
+    }, 2000);
+  }
+</script>

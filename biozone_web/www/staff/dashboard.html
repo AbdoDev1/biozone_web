@@ -1,0 +1,275 @@
+<!DOCTYPE html><html dir="rtl" lang="ar" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | لوحة التحكم</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #bcc9c6;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full flex flex-col gap-6 sm:gap-8">
+<!-- Section Title Area -->
+<div class="flex items-center justify-between">
+<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">نظرة عامة</h1>
+<span class="text-xs text-primary font-medium bg-primary/10 px-3 py-1 rounded-full">محدث لحظياً</span>
+</div>
+<!-- 4 KPI Cards -->
+<!-- Desktop: 4 in 1 row (grid-cols-4) | Laptop & Tablet: 2x2 (grid-cols-2) | Mobile: 1 col with compact horizontal flow -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+<!-- KPI 1: إجمالي الأصناف -->
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">inventory_2</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ "{:,}".format(total_items) }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">إجمالي الأصناف</span>
+</div>
+</div>
+<!-- KPI 2: أصناف منخفضة المخزون -->
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-alert-bg/60 text-alert-red flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">warning</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-alert-red tracking-tight">{{ low_stock_count }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">أصناف منخفضة المخزون</span>
+</div>
+</div>
+<!-- KPI 3: حركات اليوم -->
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">sync_alt</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ today_movements_count }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">حركات اليوم</span>
+</div>
+</div>
+<!-- KPI 4: آخر حركة مخزون -->
+
+</div>
+<!-- Action Links (Minimal, airy, fast-scan) -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+<a class="group bg-white hover:bg-surface-subtle transition-all duration-200 p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm" href="/staff/items">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">inventory_2</span>
+</div>
+<span class="text-base font-bold text-navy-text group-hover:text-primary transition-colors">الأصناف</span>
+</div>
+<span class="material-symbols-outlined text-navy-text/40 group-hover:text-primary group-hover:-translate-x-1 transition-all text-xl">arrow_back</span>
+</a>
+<a class="group bg-white hover:bg-surface-subtle transition-all duration-200 p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm" href="/staff/stock">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+</div>
+<span class="text-base font-bold text-navy-text group-hover:text-primary transition-colors">سجل حركات المخزون</span>
+</div>
+<span class="material-symbols-outlined text-navy-text/40 group-hover:text-primary group-hover:-translate-x-1 transition-all text-xl">arrow_back</span>
+</a>
+</div>
+<!-- Transactions Section -->
+<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col gap-4">
+<!-- Header -->
+<div class="flex items-center justify-between pb-2 border-b border-surface-subtle">
+<h2 class="text-lg sm:text-xl font-bold text-navy-text">آخر حركات المخزون</h2>
+<span class="text-xs text-navy-text/50 font-medium">اضغط على أي حركة للتفاصيل</span>
+</div>
+<!-- Desktop, Laptop & Tablet: 4-Column Table -->
+<div class="hidden sm:block overflow-x-auto">
+<table class="w-full text-right border-collapse">
+<thead>
+<tr class="text-xs text-navy-text/50 font-bold border-b border-surface-subtle">
+<th class="pb-3 pr-2">اسم الصنف</th>
+<th class="pb-3 text-center">نوع الحركة</th>
+<th class="pb-3 text-center">الكمية</th>
+<th class="pb-3 pl-2 text-left">الوقت</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-subtle text-sm">
+{% for m in movements %}
+<tr class="hover:bg-surface cursor-pointer transition-colors group" onclick='openMovementDetails({
+                    name: {{ m.item_name|tojson }},
+                    code: {{ m.item_code|tojson }},
+                    type: {{ ('وارد' if m.direction == 'in' else 'صادر')|tojson }},
+                    isIncoming: {{ 'true' if m.direction == 'in' else 'false' }},
+                    qty: {{ (('+' if m.direction == 'in' else '-') ~ m.qty_display|string ~ ' ' ~ (m.stock_uom or ''))|tojson }},
+                    time: {{ m.ago|tojson }},
+                    permit: {{ (m.voucher_no or '')|tojson }},
+                    staff: {{ (m.staff_name or '')|tojson }},
+                    location: {{ (m.warehouse or '')|tojson }}
+                  })'>
+<td class="py-4 pr-2 font-medium text-navy-text group-hover:text-primary transition-colors">
+                  {{ m.item_name }}
+                </td>
+<td class="py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ 'bg-primary/10 text-primary' if m.direction == 'in' else 'bg-amber-50 text-amber-700' }}">
+                    {{ 'وارد' if m.direction == 'in' else 'صادر' }}
+                  </span>
+</td>
+<td class="py-4 text-center font-bold {{ 'text-primary' if m.direction == 'in' else 'text-navy-text/80' }}" dir="ltr">{{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display }} {{ m.stock_uom or '' }}</td>
+<td class="py-4 pl-2 text-left text-navy-text/60 text-xs">{{ m.ago }}</td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="py-6 text-center text-navy-text/50 text-sm">لا توجد حركات مخزون مسجّلة بعد</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<!-- Mobile: Minimalist Feed/List (No headers, name on top, single line below) -->
+<div class="sm:hidden flex flex-col divide-y divide-surface-subtle">
+{% for m in movements %}
+<button class="py-3.5 text-right w-full flex flex-col gap-1 focus:outline-none" onclick='openMovementDetails({
+                    name: {{ m.item_name|tojson }},
+                    code: {{ m.item_code|tojson }},
+                    type: {{ ('وارد' if m.direction == 'in' else 'صادر')|tojson }},
+                    isIncoming: {{ 'true' if m.direction == 'in' else 'false' }},
+                    qty: {{ (('+' if m.direction == 'in' else '-') ~ m.qty_display|string ~ ' ' ~ (m.stock_uom or ''))|tojson }},
+                    time: {{ m.ago|tojson }},
+                    permit: {{ (m.voucher_no or '')|tojson }},
+                    staff: {{ (m.staff_name or '')|tojson }},
+                    location: {{ (m.warehouse or '')|tojson }}
+                  })'>
+<span class="font-bold text-sm text-navy-text">{{ m.item_name }}</span>
+<div class="flex items-center gap-2 text-xs">
+<span class="font-bold {{ 'text-primary' if m.direction == 'in' else 'text-amber-700' }}">{{ 'وارد' if m.direction == 'in' else 'صادر' }} {{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display }} {{ m.stock_uom or '' }}</span>
+<span class="text-navy-text/30">·</span>
+<span class="text-navy-text/50">{{ m.ago }}</span>
+</div>
+</button>
+{% else %}
+<p class="py-6 text-center text-navy-text/50 text-sm">لا توجد حركات مخزون مسجّلة بعد</p>
+{% endfor %}
+</div>
+</div>
+</main>
+</div>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+<!-- Interactive Slide-in Detail Drawer for Movement Details -->
+<div class="fixed inset-0 bg-navy-text/30 backdrop-blur-sm z-50 hidden transition-opacity duration-300" id="detail-drawer-backdrop" onclick="closeMovementDrawer()"></div>
+<div class="fixed top-0 left-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between" id="detail-drawer">
+<div class="p-6 overflow-y-auto">
+<!-- Drawer Header -->
+<div class="flex items-center justify-between pb-4 border-b border-surface-subtle">
+<h3 class="text-lg font-bold text-navy-text">تفاصيل الحركة</h3>
+<button aria-label="إغلاق" class="p-1.5 text-navy-text/50 hover:text-navy-text rounded-lg hover:bg-surface-subtle" onclick="closeMovementDrawer()">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<!-- Drawer Content -->
+<div class="mt-6 flex flex-col gap-5">
+<!-- Item Name & Status -->
+<div>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold mb-2" id="drawer-type-badge"></span>
+<h4 class="text-base font-bold text-navy-text" id="drawer-item-name"></h4>
+<span class="text-xs text-navy-text/50 font-mono" id="drawer-item-code"></span>
+</div>
+<!-- Details Grid -->
+<div class="bg-surface p-4 rounded-xl flex flex-col gap-3.5 text-sm">
+<div class="flex items-center justify-between">
+<span class="text-navy-text/60">الكمية المسجلة:</span>
+<span class="font-bold text-navy-text" id="drawer-qty"></span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-navy-text/60">رقم الإذن:</span>
+<span class="font-mono font-bold text-primary" id="drawer-permit"></span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-navy-text/60">المسؤول عن الحركة:</span>
+<span class="font-medium text-navy-text" id="drawer-staff"></span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-navy-text/60">الموقع / المستودع:</span>
+<span class="font-medium text-navy-text" id="drawer-location"></span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-navy-text/60">التوقيت:</span>
+<span class="font-medium text-navy-text/80 text-xs" id="drawer-time"></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Drawer Footer Actions -->
+<div class="p-6 border-t border-surface-subtle bg-surface-subtle/40">
+<button class="w-full py-2.5 px-4 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-accent transition-colors shadow-sm" onclick="closeMovementDrawer()">
+        تم
+      </button>
+</div>
+</div>
+<script>
+    // Detail Drawer Modal for Movement Inspection
+    function openMovementDetails(data) {
+      document.getElementById('drawer-item-name').innerText = data.name;
+      document.getElementById('drawer-item-code').innerText = 'كود: ' + data.code;
+      document.getElementById('drawer-qty').innerText = data.qty;
+      document.getElementById('drawer-permit').innerText = data.permit;
+      document.getElementById('drawer-staff').innerText = data.staff;
+      document.getElementById('drawer-location').innerText = data.location;
+      document.getElementById('drawer-time').innerText = data.time;
+
+      const badge = document.getElementById('drawer-type-badge');
+      badge.innerText = data.type;
+      if (data.isIncoming) {
+        badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold mb-2 bg-primary/10 text-primary';
+      } else {
+        badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold mb-2 bg-amber-50 text-amber-700';
+      }
+
+      const drawer = document.getElementById('detail-drawer');
+      const backdrop = document.getElementById('detail-drawer-backdrop');
+      drawer.classList.remove('-translate-x-full');
+      backdrop.classList.remove('hidden');
+    }
+
+    function closeMovementDrawer() {
+      const drawer = document.getElementById('detail-drawer');
+      const backdrop = document.getElementById('detail-drawer-backdrop');
+      drawer.classList.add('-translate-x-full');
+      backdrop.classList.add('hidden');
+    }
+  </script>
+
+
+</body></html>
