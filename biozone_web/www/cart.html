@@ -140,6 +140,7 @@ tailwind.config = {
 
 <script>
 (function () {
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
   const CART_KEY = 'biozone_cart_items';
   // Cart shape: [{ item_code, item_name, item_group, price, image, quantity }]
 
@@ -241,7 +242,10 @@ tailwind.config = {
     try {
       const res = await fetch('/api/method/biozone_web.api.biozone_confirm_order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-CSRF-Token': CSRF_TOKEN,
+        },
         body: JSON.stringify({ items })
       });
       const data = await res.json();
