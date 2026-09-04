@@ -305,3 +305,83 @@ def staff_log_stock_movement(item_code: str, movement_type: str, uom: str, qty: 
 	stock_entry.submit()
 
 	return {"ok": True, "stock_entry": stock_entry.name}
+
+@frappe.whitelist(methods=["POST"])
+def staff_confirm_order(order_name: str):
+    """B6c — 'قبول/تأكيد الطلب' من واجهة الموظف.
+
+    ب4 بيحفظ الطلبات كـ Draft (قرار: التأكيد النهائي متوقع من الموظف).
+    هذه الخطوة بتقفل الطلب فعليًا: submit للـSales Order (بتتحول لـ
+    To Deliver and Bill) + إنشاء وتسليم Delivery Note مرتبط بيه على
+    نفس المستودع الافتراضي (بنفس منطق single-warehouse في المخزون).
+    """
+    from biozone_web.utils import get_default_warehouse, require_staff_access
+
+    require_staff_access()
+
+    order_name = (order_name or "").strip()
+    if not order_name or not frappe.db.exists("Sales Order", order_name):
+        return {"ok": False, "error": _("الطلب غير موجود")}
+
+    so = frappe.get_doc("Sales Order", order_name)
+    if so.docstatus != 0:
+        return {"ok": False, "error": _("هذا الطلب مؤكَّد بالفعل")}
+
+    # 1) تأكيد الطلب (submit) — لو فشل نرجع الخطأ قبل ما نعمل إشعار تسليم
+    try:
+        so.submit()
+    except Exception as exc:
+        frappe.db.rollback()
+        return {"ok": False, "error": _("تعذر تأكيد الطلب: {0}").format(exc)}
+
+    # 2) إنشاء وتسليم Delivery Note مرتبط بالطلب المنفّذ
+    warehouse = get_default_warehouse()
+    try:
+        dn = _create_delivery_note_for_order(so, warehouse)
+    except Exception as exc:
+        frappe.db.rollback()
+        return {
+            "ok": False,
+            "error": _("تم تأكيد الطلب لكن تعذر إنشاء إشعار التسليم: {0}").format(exc),
+        }
+
+    frappe.db.commit()
+    return {"ok": True, "sales_order": so.name, "delivery_note": dn.name}
+
+
+def _create_delivery_note_for_order(so, warehouse):
+    """ينشئ ويقدّم Delivery Note مرتبط بالطلب — الأصناف بـ`against_sales_order`
+    + `so_detail` عشان عند الـsubmit تنزل الكميات من المستودع (`warehouse`)
+    ويتحدّث delivered_qty على الطلب الأصلي.
+
+    (الحقول اتأكدنا منها فعليًا على الإصدار المثبّت: البند فيه `warehouse`
+    + `target_warehouse` للمرتجع فقط — مفيش `from_warehouse` ولا
+    `delivery_note_type` على المستوى الأب).
+    """
+    dn = frappe.get_doc(
+        {
+            "doctype": "Delivery Note",
+            "customer": so.customer,
+            "company": so.company,
+            "delivery_date": frappe.utils.today(),
+            "set_warehouse": warehouse,
+            "items": [
+                {
+                    "item_code": it.item_code,
+                    "item_name": it.item_name,
+                    "description": it.description or it.item_name,
+                    "qty": it.qty,
+                    "uom": it.uom,
+                    "rate": it.rate,
+                    "amount": it.amount,
+                    "against_sales_order": so.name,
+                    "so_detail": it.name,
+                    "warehouse": warehouse,
+                }
+                for it in so.items
+            ],
+        }
+    )
+    dn.insert(ignore_permissions=True)
+    dn.submit()
+    return dn

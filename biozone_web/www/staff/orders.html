@@ -1,0 +1,338 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | تجهيز الطلبات</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6",
+            "amber-text": "#92400e"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full flex flex-col gap-6 sm:gap-8">
+<div class="flex items-center justify-between">
+<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">تجهيز الطلبات</h1>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">pending_actions</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ pending_count }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">بانتظار التأكيد</span>
+</div>
+</div>
+<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
+<div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-2xl">inventory_2</span>
+</div>
+<div class="text-left sm:text-right flex flex-col">
+<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ total_items|default(0) }}</span>
+<span class="text-sm text-navy-text/60 font-medium mt-1">بنود ضُبطت</span>
+</div>
+</div>
+</div>
+
+<!-- Simple underline tabs -->
+<div class="border-b border-surface-subtle flex gap-6">
+<button class="pb-3 px-1 border-b-2 border-primary text-primary font-bold flex items-center gap-1.5" id="tab-btn-pending" onclick="switchTab('pending')" type="button">
+<span class="material-symbols-outlined text-[20px]">pending</span>
+بانتظار التأكيد
+</button>
+<button class="pb-3 px-1 border-b-2 border-transparent text-navy-text/50 hover:text-navy-text font-bold flex items-center gap-1.5" id="tab-btn-confirmed" onclick="switchTab('confirmed')" type="button">
+<span class="material-symbols-outlined text-[20px]">task_alt</span>
+المؤكَّدة مؤخرًا
+</button>
+</div>
+
+<!-- TAB 1: Pending orders -->
+<div id="tab-content-pending" class="flex flex-col gap-4">
+{% if pending_count == 0 %}
+<div class="flex flex-col items-center justify-center bg-white rounded-2xl shadow-sm py-20 text-center">
+<span class="material-symbols-outlined text-4xl text-navy-text/30">inbox</span>
+<p class="text-navy-text/50 text-sm mt-3">لا توجد طلبات بانتظار التأكيد</p>
+</div>
+{% else %}
+<!-- Pending: desktop table -->
+<div class="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden">
+<table class="w-full text-sm">
+<thead>
+<tr class="bg-surface-subtle/60 text-navy-text/60 text-xs">
+<th class="py-3.5 px-6 text-right font-bold">رقم الطلب</th>
+<th class="py-3.5 px-6 text-right font-bold">العميل</th>
+<th class="py-3.5 px-6 text-center font-bold">عدد الأصناف</th>
+<th class="py-3.5 px-6 text-center font-bold">الإجمالي</th>
+<th class="py-3.5 px-6 text-center font-bold">تاريخ الطلب</th>
+<th class="py-3.5 px-6 text-center font-bold">موعد التسليم</th>
+<th class="py-3.5 px-6 text-center font-bold">إجراء</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-subtle">
+{% for so in pending_orders %}
+<tr class="hover:bg-surface-subtle/40 transition-colors cursor-pointer" onclick="openOrderDrawer('{{ so.name }}')">
+<td class="py-4 px-6 font-mono font-bold text-primary">{{ so.name }}</td>
+<td class="py-4 px-6 font-bold text-navy-text">{{ so.customer_name }}</td>
+<td class="py-4 px-6 text-center text-navy-text/70">{{ so.items_count }}</td>
+<td class="py-4 px-6 text-center font-bold text-navy-text">{{ "{:,.2f}".format(so.grand_total) }} ج.م</td>
+<td class="py-4 px-6 text-center text-navy-text/70">{{ so.created_display }}</td>
+<td class="py-4 px-6 text-center text-navy-text/70">{{ so.delivery_date or '—' }}</td>
+<td class="py-4 px-6 text-center">
+<button type="button" onclick="event.stopPropagation(); openOrderDrawer('{{ so.name }}')" class="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+عرض
+</button>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<!-- Pending: mobile cards -->
+<div class="md:hidden flex flex-col gap-3">
+{% for so in pending_orders %}
+<button type="button" onclick="openOrderDrawer('{{ so.name }}')" class="bg-white rounded-2xl shadow-sm p-5 text-right flex flex-col gap-3 active:bg-surface-subtle/50 transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-mono font-bold text-primary text-sm">{{ so.name }}</span>
+<span class="material-symbols-outlined text-navy-text/30 text-[20px]">chevron_left</span>
+</div>
+<p class="font-bold text-navy-text">{{ so.customer_name }}</p>
+<div class="flex items-center justify-between text-xs text-navy-text/60">
+<span>{{ so.items_count }} صنف</span>
+<span>{{ so.created_display }}</span>
+</div>
+<div class="pt-2 border-t border-surface-subtle flex items-center justify-between">
+<span class="text-xs text-navy-text/60">الإجمالي</span>
+<span class="font-bold text-navy-text">{{ "{:,.2f}".format(so.grand_total) }} ج.م</span>
+</div>
+</button>
+{% endfor %}
+</div>
+{% endif %}
+</div>
+<!-- TAB 2: Confirmed orders -->
+<div id="tab-content-confirmed" class="hidden flex-col gap-4">
+{% if confirmed_orders|length == 0 %}
+<div class="flex flex-col items-center justify-center bg-white rounded-2xl shadow-sm py-20 text-center">
+<span class="material-symbols-outlined text-4xl text-navy-text/30">task_alt</span>
+<p class="text-navy-text/50 text-sm mt-3">لا توجد طلبات مؤكَّدة بعد</p>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+<table class="w-full text-sm">
+<thead>
+<tr class="bg-surface-subtle/60 text-navy-text/60 text-xs">
+<th class="py-3.5 px-6 text-right font-bold">رقم الطلب</th>
+<th class="py-3.5 px-6 text-right font-bold">العميل</th>
+<th class="py-3.5 px-6 text-center font-bold">الإجمالي</th>
+<th class="py-3.5 px-6 text-center font-bold">تاريخ التأكيد</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-subtle">
+{% for so in confirmed_orders %}
+<tr class="hover:bg-surface-subtle/40 transition-colors">
+<td class="py-4 px-6 font-mono font-bold text-navy-text/70">{{ so.name }}</td>
+<td class="py-4 px-6 font-bold text-navy-text">{{ so.customer_name }}</td>
+<td class="py-4 px-6 text-center font-bold text-navy-text">{{ "{:,.2f}".format(so.grand_total) }} ج.م</td>
+<td class="py-4 px-6 text-center text-navy-text/70">{{ so.confirmed_display }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endif %}
+</div>
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+<!-- Order details drawer (opens from right, RTL) -->
+<div id="order-backdrop" class="hidden fixed inset-0 bg-navy-text/40 z-40" onclick="closeOrderDrawer()"></div>
+<aside id="order-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white z-50 shadow-2xl translate-x-full transition-transform duration-300 flex flex-col">
+<div class="flex items-center justify-between px-6 py-4 border-b border-surface-subtle">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]">receipt_long</span>
+<h2 class="font-bold text-navy-text text-lg">تفاصيل الطلب</h2>
+</div>
+<button type="button" onclick="closeOrderDrawer()" class="w-9 h-9 rounded-lg inline-flex items-center justify-center text-navy-text/50 hover:bg-surface-subtle hover:text-navy-text transition-colors">
+<span class="material-symbols-outlined text-[22px]">close</span>
+</button>
+</div>
+<div id="order-drawer-body" class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+<!-- Filled by JS -->
+</div>
+<div class="px-6 py-4 border-t border-surface-subtle flex flex-col gap-3">
+<p id="od-error" class="hidden text-sm font-bold text-alert-red bg-alert-bg px-4 py-2.5 rounded-xl"></p>
+<div class="flex gap-3">
+<button type="button" onclick="closeOrderDrawer()" class="flex-1 py-2.5 rounded-xl border-2 border-surface-subtle text-navy-text/70 font-bold text-sm hover:bg-surface-subtle transition-colors">إلغاء</button>
+<button type="button" id="od-confirm-btn" onclick="confirmOrder()" class="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary-accent transition-colors">تأكيد الطلب وتسليمه</button>
+</div>
+</div>
+</aside>
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+const ORDERS = {{ orders_json }};
+let currentOrder = null;
+
+function switchTab(tab) {
+  const pendingBtn = document.getElementById('tab-btn-pending');
+  const confirmedBtn = document.getElementById('tab-btn-confirmed');
+  const pendingContent = document.getElementById('tab-content-pending');
+  const confirmedContent = document.getElementById('tab-content-confirmed');
+  const activeBtn = ['border-primary', 'text-primary'];
+  const inactiveBtn = ['border-transparent', 'text-navy-text/50'];
+  if (tab === 'pending') {
+    pendingBtn.classList.add(...activeBtn);
+    pendingBtn.classList.remove(...inactiveBtn);
+    confirmedBtn.classList.remove(...activeBtn);
+    confirmedBtn.classList.add(...inactiveBtn);
+    pendingContent.classList.remove('hidden');
+    pendingContent.classList.add('flex');
+    confirmedContent.classList.add('hidden');
+    confirmedContent.classList.remove('flex');
+  } else {
+    confirmedBtn.classList.add(...activeBtn);
+    confirmedBtn.classList.remove(...inactiveBtn);
+    pendingBtn.classList.remove(...activeBtn);
+    pendingBtn.classList.add(...inactiveBtn);
+    confirmedContent.classList.remove('hidden');
+    confirmedContent.classList.add('flex');
+    pendingContent.classList.add('hidden');
+    pendingContent.classList.remove('flex');
+  }
+}
+
+function money(v) {
+  return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+}
+
+function openOrderDrawer(orderName) {
+  const order = ORDERS.find((o) => o.name === orderName);
+  if (!order) return;
+  currentOrder = order;
+  document.getElementById('od-error').classList.add('hidden');
+
+  let html = '';
+  html += '<div class="flex flex-col gap-1">';
+  html += '<span class="font-mono font-bold text-primary text-lg">' + order.name + '</span>';
+  html += '<span class="font-bold text-navy-text">' + order.customer_name + '</span>';
+  html += '<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-navy-text/60 mt-1">';
+  html += '<span>تاريخ الطلب: ' + order.created_display + '</span>';
+  html += '<span>التسليم: ' + (order.delivery_date || '—') + '</span>';
+  html += '</div></div>';
+
+  html += '<div class="rounded-2xl border border-surface-subtle overflow-hidden">';
+  html += '<table class="w-full text-sm">';
+  html += '<thead><tr class="bg-surface-subtle/60 text-navy-text/60 text-xs">';
+  html += '<th class="py-2.5 px-3 text-right font-bold">الصنف</th>';
+  html += '<th class="py-2.5 px-3 text-center font-bold">الكمية</th>';
+  html += '<th class="py-2.5 px-3 text-center font-bold">السعر</th>';
+  html += '<th class="py-2.5 px-3 text-center font-bold">الإجمالي</th>';
+  html += '</tr></thead><tbody class="divide-y divide-surface-subtle">';
+  order.items.forEach((it) => {
+    html += '<tr>';
+    html += '<td class="py-3 px-3 font-bold text-navy-text">' + it.item_name + '<span class="block text-[11px] text-navy-text/40 font-mono">' + it.item_code + '</span></td>';
+    html += '<td class="py-3 px-3 text-center text-navy-text/70 whitespace-nowrap">' + it.qty + ' ' + (it.uom || '') + '</td>';
+    html += '<td class="py-3 px-3 text-center text-navy-text/70 whitespace-nowrap">' + money(it.rate) + '</td>';
+    html += '<td class="py-3 px-3 text-center font-bold text-navy-text whitespace-nowrap">' + money(it.amount) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<div class="rounded-2xl bg-surface-subtle/50 p-4 flex flex-col gap-2 text-sm">';
+  html += '<div class="flex items-center justify-between"><span class="text-navy-text/60">الإجمالي الفرعي</span><span class="font-bold text-navy-text">' + money(order.net_total) + '</span></div>';
+  if (order.taxes && order.taxes.length > 0) {
+    order.taxes.forEach((t) => {
+      html += '<div class="flex items-center justify-between"><span class="text-navy-text/60">' + t.description + '</span><span class="font-bold text-navy-text">' + money(t.tax_amount) + '</span></div>';
+    });
+  }
+  html += '<div class="flex items-center justify-between pt-2 border-t border-surface-subtle"><span class="font-bold text-navy-text">الإجمالي النهائي</span><span class="font-black text-primary text-lg">' + money(order.grand_total) + '</span></div>';
+  html += '</div>';
+
+  html += '<p class="text-xs text-navy-text/50 leading-relaxed">عند التأكيد سيتم قفل الطلب نهائيًا وإنشاء إشعار تسليم (Delivery Note) مرتبط به وتحديث أرصدة المخزون.</p>';
+
+  document.getElementById('order-drawer-body').innerHTML = html;
+  document.getElementById('order-drawer').classList.remove('translate-x-full');
+  document.getElementById('order-backdrop').classList.remove('hidden');
+}
+
+function closeOrderDrawer() {
+  document.getElementById('order-drawer').classList.add('translate-x-full');
+  document.getElementById('order-backdrop').classList.add('hidden');
+  currentOrder = null;
+}
+
+async function confirmOrder() {
+  if (!currentOrder) return;
+  if (!window.confirm('تأكيد تسليم الطلب ' + currentOrder.name + '؟ سيتم قفله وإنشاء إشعار تسليم.')) return;
+
+  const errorEl = document.getElementById('od-error');
+  errorEl.classList.add('hidden');
+  const btn = document.getElementById('od-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارٍ التأكيد...';
+
+  try {
+    const res = await fetch('/api/method/biozone_web.api.staff_confirm_order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({ order_name: currentOrder.name }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      let msg = data.exception || 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
+      if (data._server_messages) {
+        try { msg = JSON.parse(JSON.parse(data._server_messages)[0]).message; } catch (e) {}
+      }
+      throw new Error(msg);
+    }
+    window.location.reload();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'تأكيد الطلب وتسليمه';
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeOrderDrawer();
+});
+</script>
+
+</body></html>

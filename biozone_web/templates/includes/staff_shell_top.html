@@ -35,12 +35,11 @@
 <span class="material-symbols-outlined text-[22px]">sync_alt</span>
 <span class="text-sm lg:max-xl:hidden">حركة المخزون</span>
 </a>
-<a class="flex items-center justify-between px-3.5 py-3 rounded-xl text-navy-text/40 hover:text-navy-text/60 hover:bg-surface-subtle transition-colors lg:max-xl:justify-center lg:max-xl:px-0" href="/staff/orders" title="تجهيز الطلبات">
+<a class="flex items-center justify-between px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'orders' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/orders" title="تجهيز الطلبات">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-[22px]">receipt_long</span>
 <span class="text-sm lg:max-xl:hidden">تجهيز الطلبات</span>
 </div>
-<span class="text-[11px] bg-surface-container text-navy-text/60 px-2 py-0.5 rounded font-normal lg:max-xl:hidden">قريباً</span>
 </a>
 </nav>
 </div>

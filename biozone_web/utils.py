@@ -28,13 +28,19 @@ def get_default_warehouse():
 	"""Single-warehouse assumption: the stock-movement panel doesn't ask
 	the user to pick a warehouse (per the agreed field list), so every
 	movement logged from /staff/stock goes against one implicit
-	warehouse. Uses Stock Settings' default_warehouse if set, otherwise
+	warehouse. Uses Stock Settings' default_warehouse if set **and
+	actually exists** (اتأكدنا عمليًا إن الإعداد ممكن يبقى فيه قيمة
+	قديمة لمستودع محذوف زي "Stores - MG" — فحص الوجود إلزامي)، otherwise
 	falls back to the first non-group Warehouse. Raises clearly if
 	neither exists so the failure is obvious instead of a silent None.
 	"""
 	warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
+	if warehouse and not frappe.db.exists("Warehouse", warehouse):
+		warehouse = None
 	if not warehouse:
-		warehouse = frappe.db.get_value("Warehouse", {"is_group": 0}, "name", order_by="creation asc")
+		warehouse = frappe.db.get_value(
+			"Warehouse", {"is_group": 0, "disabled": 0}, "name", order_by="creation asc"
+		)
 	if not warehouse:
 		frappe.throw(_("لا يوجد مستودع معرّف في النظام — يرجى إعداد مستودع أولًا"))
 	return warehouse
