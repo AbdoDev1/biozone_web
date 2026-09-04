@@ -1,0 +1,102 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>طلباتي - Biozone</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-high": "#dce9ff",
+        "surface-variant": "#d3e4fe",
+        "on-surface-variant": "#3d4947",
+        "secondary": "#5c5f61",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff"
+      },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
+      fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
+</head>
+<body class="bg-surface text-on-surface">
+
+{% include "biozone_web/templates/includes/site_header.html" %}
+
+<main class="flex-1 px-4 py-8 sm:py-12">
+  <div class="w-full max-w-[820px] mx-auto">
+
+    <div class="flex items-center gap-2 mb-6">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-primary"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-3"/><circle cx="7" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg>
+      <h1 class="text-xl sm:text-2xl font-extrabold text-on-surface">طلباتي</h1>
+    </div>
+
+    {% if orders_count == 0 %}
+    <!-- حالة عدم وجود أي طلبات سابقة -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-10 text-center">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="w-9 h-9 text-outline mb-3 inline-block"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+      <h2 class="font-bold text-on-surface mb-1">لسه مفيش طلبات</h2>
+      <p class="text-sm text-on-surface-variant mb-5">أول ما تعمل طلب من المتجر، هيظهر هنا فورًا.</p>
+      <a href="/catalog" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary-container text-on-primary font-bold text-sm transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4.5 h-4.5"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/></svg>
+        روح للمتجر
+      </a>
+    </div>
+
+    {% else %}
+    <!-- قائمة الطلبات -->
+    <div class="flex flex-col gap-3.5">
+      {% for order in orders %}
+      <a
+        href="/order-confirmed?name={{ order.name }}"
+        class="block bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5 hover:border-primary/40 hover:shadow-sm transition-all"
+      >
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-primary"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/></svg>
+            </div>
+            <div>
+              <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ order.name }}</div>
+              <div class="text-xs text-on-surface-variant mt-0.5">{{ order.date_display }} · {{ order.items_count }} أصناف</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-bold text-on-surface whitespace-nowrap">{{ "{:,.2f}".format(order.grand_total) }} ج.م</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ order.status_style }}">{{ order.status_label }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-outline"><path d="M15 19l-7-7 7-7"/></svg>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</main>
+
+{% include "biozone_web/templates/includes/site_footer.html" %}
+
+</body></html>
