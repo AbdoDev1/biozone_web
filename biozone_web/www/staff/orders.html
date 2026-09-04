@@ -314,8 +314,8 @@ async function confirmOrder() {
       body: JSON.stringify({ order_name: currentOrder.name }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      let msg = data.exception || 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
+    if (!res.ok || !data.message || data.message.ok === false) {
+      let msg = (data.message && data.message.error) || data.exception || 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
       if (data._server_messages) {
         try { msg = JSON.parse(JSON.parse(data._server_messages)[0]).message; } catch (e) {}
       }

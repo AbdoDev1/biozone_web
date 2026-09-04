@@ -63,7 +63,7 @@ tailwind.config = {
       <div class="inline-flex items-center gap-2 bg-surface-container px-4 py-1.5 rounded-full border border-surface-variant mb-3">
         <span class="text-xs text-on-surface-variant font-medium">رقم الطلب:</span>
         <span class="font-mono text-sm font-bold text-primary tracking-wider" style="direction: ltr;">#{{ order_number }}</span>
-        <button class="text-outline hover:text-primary transition-colors pr-1" title="نسخ رقم الطلب" onclick="navigator.clipboard?.writeText({{ order_number|tojson }})" type="button">
+        <button class="text-outline hover:text-primary transition-colors pr-1" title="نسخ رقم الطلب" onclick='navigator.clipboard?.writeText({{ order_number|tojson }})' type="button">
           <span class="material-symbols-outlined text-base">content_copy</span>
         </button>
       </div>

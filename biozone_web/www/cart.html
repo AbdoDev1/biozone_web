@@ -74,17 +74,13 @@ tailwind.config = {
         <h2 class="text-lg font-extrabold text-on-surface">ملخص الطلب</h2>
         <dl class="mt-5 space-y-3 text-sm">
           <div class="flex items-center justify-between">
-            <dt class="text-on-surface-variant" id="summary-subtotal-label">الإجمالي الفرعي</dt>
-            <dd class="font-semibold text-on-surface" id="summary-subtotal">٠٫٠٠ ج.م</dd>
-          </div>
-          <div class="flex items-center justify-between">
             <dt class="text-on-surface-variant">الشحن</dt>
             <dd class="font-semibold text-primary-container">يُحتسب عند التأكيد</dd>
           </div>
         </dl>
         <div class="my-5 h-px bg-outline-variant/50"></div>
         <div class="flex items-center justify-between">
-          <span class="text-base font-bold text-on-surface">الإجمالي</span>
+          <span class="text-base font-bold text-on-surface" id="summary-total-label">الإجمالي</span>
           <span class="text-xl font-extrabold text-primary" id="summary-total">٠٫٠٠ ج.م</span>
         </div>
         <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button">
@@ -214,8 +210,7 @@ tailwind.config = {
       listEl.appendChild(node);
     });
 
-    document.getElementById('summary-subtotal-label').textContent = 'الإجمالي الفرعي (' + totalUnits + ' عنصر)';
-    document.getElementById('summary-subtotal').textContent = formatPrice(subtotal);
+    document.getElementById('summary-total-label').textContent = 'الإجمالي (' + totalUnits + ' عنصر)';
     document.getElementById('summary-total').textContent = formatPrice(subtotal);
   }
 
