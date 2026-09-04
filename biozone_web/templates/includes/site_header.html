@@ -34,6 +34,9 @@
     <div class="flex items-center gap-sm">
       {% if is_logged_in %}
         <span class="hidden md:inline text-sm font-bold text-on-surface-variant">{{ user_full_name }}</span>
+        <a href="/my-orders" title="طلباتي" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-3"/><circle cx="7" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg>
+        </a>
         <a href="/logout" title="تسجيل خروج" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
           <span class="material-symbols-outlined">logout</span>
         </a>
