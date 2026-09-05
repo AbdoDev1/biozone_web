@@ -1,6 +1,6 @@
 import frappe
 
-from biozone_web.utils import get_header_context
+from biozone_web.utils import get_header_context, redirect_staff_away_from_store
 
 # تسمية عربية لحالات Sales Order القياسية في ERPNext، عشان تتعرض للعميل
 # بلغة مفهومة بدل قيم النظام الإنجليزية الخام.
@@ -30,6 +30,8 @@ STATUS_STYLES = {
 
 
 def get_context(context):
+	redirect_staff_away_from_store()
+
 	context.no_cache = 1
 	context.active_page = None
 	context.update(get_header_context())

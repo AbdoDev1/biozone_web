@@ -132,8 +132,22 @@ def biozone_confirm_order(items):
 			"items": so_items,
 		}
 	)
-	so.insert(ignore_permissions=True)
-	frappe.db.commit()
+
+	# ملحوظة مهمة: insert(ignore_permissions=True) بيتخطى فحص الصلاحية
+	# على "Sales Order" بس. لكن جوه الحفظ، ERPNext بيحتاج يقرأ تفاصيل
+	# كل صنف من "Item" (السعر، الوصف...) وده فحص صلاحية منفصل — والعميل
+	# (Customer/Website User) مش المفروض يبقى عنده صلاحية قراءة على Item
+	# أصلًا (ده قرار أمني صح، مش هنغيّره). فبنشغّل خطوة الحفظ دي بس
+	# كـAdministrator مؤقتًا (بعد ما أخدنا هوية العميل الحقيقية فوق)،
+	# وبعدين نرجع لهوية العميل تاني فورًا — التأكيد نفسه (submit) بيحصل
+	# لاحقًا من واجهة الموظف (B6c) مش هنا.
+	current_user = frappe.session.user
+	frappe.set_user("Administrator")
+	try:
+		so.insert(ignore_permissions=True)
+		frappe.db.commit()
+	finally:
+		frappe.set_user(current_user)
 
 	return {"message": {"redirect": f"/order-confirmed?name={so.name}"}}
 
@@ -244,10 +258,27 @@ def staff_disable_item(item_code: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def staff_log_stock_movement(item_code: str, movement_type: str, uom: str, qty: float, note: str = ""):
+def staff_log_stock_movement(
+	item_code: str,
+	movement_type: str,
+	uom: str,
+	qty: float,
+	note: str = "",
+	rate: str | float | None = None,
+):
 	"""يسجل حركة مخزون حقيقية (Stock Entry) — B6b. يفترض مستودع واحد
 	ضمني (get_default_warehouse) لأن اللوحة (تسجيل حركة) ما بتسألش عن
-	مستودع، زي ما اتحدد في مواصفات الشاشة."""
+	مستودع، زي ما اتحدد في مواصفات الشاشة.
+
+	**سعر التكلفة (valuation rate):** Material Receipt/Issue في ERPNext
+	محتاجين سعر تكلفة معروف عشان يقدروا يعملوا القيود المحاسبية المرتبطة
+	بيهم. لو الصنف لسه ما اتحركش قبل كده خالص، مفيش سعر تكلفة متسجل، وده
+	كان بيطلع كأخطاء تقنية خام من Frappe (zero rate / valuation rate
+	required) بدل رسالة عربية واضحة. الحل هنا: (1) للوارد — لو مفيش سعر
+	تكلفة سابق، لازم يتبعت `rate` صريح من اللوحة ونحطه كـ`basic_rate` على
+	بند الحركة؛ لو فيه سعر سابق ومفيش سعر جديد متبعت، بنستخدم القديم.
+	(2) للصادر — لو مفيش سعر تكلفة سابق خالص، نرفض الحركة برسالة واضحة
+	بدل ما نسيب Frappe يرمي الخطأ الخام."""
 	from biozone_web.utils import get_default_warehouse, require_staff_access
 
 	require_staff_access()
@@ -281,6 +312,40 @@ def staff_log_stock_movement(item_code: str, movement_type: str, uom: str, qty: 
 			_("نوع حركة المخزون \"{0}\" غير معرّف في النظام — يرجى إعداده أولًا").format(purpose)
 		)
 
+	current_valuation_rate = frappe.utils.flt(
+		frappe.db.get_value(
+			"Bin", {"item_code": item_code, "warehouse": warehouse}, "valuation_rate"
+		)
+	)
+
+	item_row = {
+		"item_code": item_code,
+		"qty": qty,
+		"uom": uom,
+		"conversion_factor": conversion_factor,
+		"t_warehouse": warehouse if movement_type == "in" else None,
+		"s_warehouse": warehouse if movement_type == "out" else None,
+	}
+
+	if movement_type == "in":
+		effective_rate = frappe.utils.flt(rate) or current_valuation_rate
+		if effective_rate <= 0:
+			frappe.throw(
+				_(
+					"هذا الصنف مفيش له سعر تكلفة مسجل من قبل — من فضلك أدخل"
+					" سعر التكلفة للوحدة قبل تسجيل أول حركة وارد له"
+				)
+			)
+		item_row["basic_rate"] = effective_rate
+	else:
+		if current_valuation_rate <= 0:
+			frappe.throw(
+				_(
+					"لا يمكن تسجيل صرف لهذا الصنف لأنه ليس له سعر تكلفة مسجل"
+					" بعد — سجّل حركة وارد أولًا وحدد سعر التكلفة"
+				)
+			)
+
 	stock_entry = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
@@ -289,16 +354,7 @@ def staff_log_stock_movement(item_code: str, movement_type: str, uom: str, qty: 
 			"to_warehouse": warehouse if movement_type == "in" else None,
 			"from_warehouse": warehouse if movement_type == "out" else None,
 			"remarks": note or None,
-			"items": [
-				{
-					"item_code": item_code,
-					"qty": qty,
-					"uom": uom,
-					"conversion_factor": conversion_factor,
-					"t_warehouse": warehouse if movement_type == "in" else None,
-					"s_warehouse": warehouse if movement_type == "out" else None,
-				}
-			],
+			"items": [item_row],
 		}
 	)
 	stock_entry.insert()

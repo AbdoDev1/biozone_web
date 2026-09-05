@@ -4,24 +4,50 @@ from frappe import _
 
 def require_staff_access():
 	"""يتأكد إن اللي بيفتح أي صفحة تحت /staff/* هو حساب موظف (System User)
-	مش حساب عميل (Website User اللي بيتعمل وقت التسجيل في /catalog).
+	مفعّل (enabled)، مش حساب عميل (Website User اللي بيتعمل وقت التسجيل
+	في /catalog) ومش حساب موظف اتقفل بعد ما سابه.
 
-	ملحوظة مهمة: ده فحص أولي بس (نوع الحساب) — مفيش لسه Role مخصص يفرّق
-	بين موظف مخزن وموظف تسعير وموظف تجهيز طلبات (B6a/B6b/B6d كل واحد
-	محتاج صلاحية مختلفة زي ما اتحدد في الخطة). لما B6d (الحسابات
-	والخصومات) تتبنى فعليًا، لازم نضيف هنا (أو في كل صفحة لوحدها) فحص
-	frappe.has_permission(...) على الـdoctype المناسب بدل الاكتفاء
-	بـ"موظف عادي = يشوف كل حاجة" زي دلوقتي.
+	ملحوظة مهمة: ده فحص أولي بس (نوع الحساب + حالة التفعيل) — مفيش لسه
+	Role مخصص يفرّق بين موظف مخزن وموظف تسعير وموظف تجهيز طلبات (B6a/
+	B6b/B6d كل واحد محتاج صلاحية مختلفة زي ما اتحدد في الخطة). لما B6d
+	(الحسابات والخصومات) تتبنى فعليًا، لازم نضيف هنا (أو في كل صفحة/
+	API لوحدها) فحص Role حقيقي (مثلًا frappe.has_role("Store Staff"))
+	بدل الاكتفاء بـ"موظف عادي = يشوف كل حاجة" زي دلوقتي.
 	"""
 	user = frappe.session.user
 
 	if user == "Guest":
-		frappe.local.flags.redirect_location = "/login"
+		frappe.local.flags.redirect_location = "/staff/login"
 		raise frappe.Redirect
 
+	user_type, enabled = frappe.db.get_value("User", user, ["user_type", "enabled"])
+	if user_type != "System User" or not enabled:
+		# حساب عميل، أو حساب موظف اتقفل (enabled=0) بعد ما ساب الشركة
+		# مثلًا لكن جلسته القديمة لسه شغالة — في الحالتين نرجّعه للمتجر
+		# بدل ما يشوف صفحة خطأ صلاحيات خام.
+		frappe.local.flags.redirect_location = "/biozone-home"
+		raise frappe.Redirect
+
+
+def redirect_staff_away_from_store():
+	"""عكس require_staff_access تمامًا: لو حساب موظف (System User) حاول
+	يفتح أي صفحة من صفحات المتجر/العميل (الرئيسية، المتجر، السلة،
+	تأكيد الطلب، طلباتي، تسجيل الدخول)، بنرجّعه على لوحة تحكم الموظف
+	بدل كده.
+
+	فصل كامل بين المدخلين ده اتطلب عشان الاستضافة النهائية هتكون على
+	دومينين منفصلين (staff.biozone.pro لواجهة الموظف، biozone.pro
+	للمتجر) — فكل فئة توصل لمدخلها بس حتى لو حد جرّب يفتح رابط
+	المدخل التاني يدويًا.
+	"""
+	user = frappe.session.user
+	if user == "Guest":
+		return
+
 	user_type = frappe.db.get_value("User", user, "user_type")
-	if user_type != "System User":
-		frappe.throw(_("هذه الصفحة مخصصة للموظفين فقط"), frappe.PermissionError)
+	if user_type == "System User":
+		frappe.local.flags.redirect_location = "/staff/dashboard"
+		raise frappe.Redirect
 
 
 def get_default_warehouse():
@@ -98,7 +124,14 @@ def get_or_create_customer_for_current_user():
 			"territory": get_default_territory(),
 		}
 	)
-	customer.insert(ignore_permissions=True)
+	# نفس احتياط biozone_confirm_order: لو أي فحص صلاحية داخلي في مسار
+	# إنشاء الـCustomer (مثلًا على Territory/Customer Group) اتعمل بنفس
+	# طريقة فحص Item، الفلاج العام ده بيمنعه.
+	frappe.flags.ignore_permissions = True
+	try:
+		customer.insert(ignore_permissions=True)
+	finally:
+		frappe.flags.ignore_permissions = False
 	return customer.name
 
 

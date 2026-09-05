@@ -1,6 +1,6 @@
 import frappe
 
-from biozone_web.utils import get_header_context
+from biozone_web.utils import get_header_context, redirect_staff_away_from_store
 
 PAGE_SIZE = 20
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
@@ -11,6 +11,8 @@ def _to_arabic_digits(number):
 
 
 def get_context(context):
+    redirect_staff_away_from_store()
+
     context.no_cache = 1
     context.active_page = "catalog"
     context.update(get_header_context())

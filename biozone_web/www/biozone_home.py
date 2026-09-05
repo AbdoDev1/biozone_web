@@ -1,10 +1,13 @@
 import frappe
 
-from biozone_web.utils import get_header_context
+from biozone_web.utils import get_header_context, redirect_staff_away_from_store
 
 
 def get_context(context):
+    redirect_staff_away_from_store()
+
     context.active_page = "home"
+    context.no_cache = 1
     context.update(get_header_context())
 
     # Top categories: real item groups, ranked by how many active items

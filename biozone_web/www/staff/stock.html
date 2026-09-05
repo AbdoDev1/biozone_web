@@ -226,6 +226,10 @@
 <label class="text-sm font-bold text-navy-text/70 mb-1.5 block">الكمية</label>
 <input class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-qty" min="0" step="any" type="number">
 </div>
+<div id="mp-rate-wrapper">
+<label class="text-sm font-bold text-navy-text/70 mb-1.5 block">سعر التكلفة للوحدة <span class="text-navy-text/40 font-normal">(لازم تحدده أول مرة يدخل فيها الصنف المخزون)</span></label>
+<input class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-rate" min="0" step="any" type="number">
+</div>
 <div>
 <label class="text-sm font-bold text-navy-text/70 mb-1.5 block">ملاحظة <span class="text-navy-text/40 font-normal">(اختياري)</span></label>
 <input class="w-full px-3.5 py-2.5 bg-surface border border-surface-subtle rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm" id="mp-note" type="text">
@@ -278,6 +282,9 @@ function setMovementType(type) {
   const inactive = 'py-2.5 rounded-xl font-bold text-sm border-2 border-surface-subtle text-navy-text/60 hover:bg-surface-subtle transition-colors';
   inBtn.className = type === 'in' ? active : inactive;
   outBtn.className = type === 'out' ? active : inactive;
+
+  const rateWrapper = document.getElementById('mp-rate-wrapper');
+  rateWrapper.classList.toggle('hidden', type !== 'in');
 }
 
 function populateUomOptions(itemCode) {
@@ -337,6 +344,7 @@ document.getElementById('mp-item-search').addEventListener('input', function () 
 function openMovementPanel(preselectItemCode) {
   document.getElementById('mp-error').classList.add('hidden');
   document.getElementById('mp-qty').value = '';
+  document.getElementById('mp-rate').value = '';
   document.getElementById('mp-note').value = '';
   setMovementType('in');
 
@@ -366,6 +374,7 @@ async function saveMovement() {
   const itemCode = document.getElementById('mp-item-code').value;
   const uom = document.getElementById('mp-uom').value;
   const qty = document.getElementById('mp-qty').value;
+  const rate = document.getElementById('mp-rate').value;
   const note = document.getElementById('mp-note').value;
 
   if (!itemCode) {
@@ -375,6 +384,11 @@ async function saveMovement() {
   }
   if (!qty || parseFloat(qty) <= 0) {
     errorEl.textContent = 'يرجى إدخال كمية أكبر من صفر';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (mpSelectedType === 'in' && rate && parseFloat(rate) < 0) {
+    errorEl.textContent = 'سعر التكلفة لا يمكن أن يكون سالبًا';
     errorEl.classList.remove('hidden');
     return;
   }
@@ -395,6 +409,7 @@ async function saveMovement() {
         movement_type: mpSelectedType,
         uom: uom,
         qty: qty,
+        rate: mpSelectedType === 'in' ? rate : '',
         note: note,
       }),
     });

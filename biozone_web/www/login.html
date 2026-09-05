@@ -310,7 +310,7 @@
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
-                showError('login-error', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
+                showError('login-error', err.message || 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
             }
         });
 

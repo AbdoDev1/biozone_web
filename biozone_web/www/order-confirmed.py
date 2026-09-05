@@ -1,10 +1,12 @@
 import frappe
 from frappe import _
 
-from biozone_web.utils import get_header_context
+from biozone_web.utils import get_header_context, redirect_staff_away_from_store
 
 
 def get_context(context):
+	redirect_staff_away_from_store()
+
 	context.no_cache = 1
 	context.active_page = None
 	context.update(get_header_context())
@@ -16,10 +18,10 @@ def get_context(context):
 	so = frappe.get_doc("Sales Order", order_name)
 
 	# فحص ملكية يدوي (مش نظام صلاحيات Frappe الافتراضي، زي باقي صفحات
-	# الموقع) — بس صاحب الطلب الأصلي أو أي موظف (System User) يقدر
-	# يشوف صفحة التأكيد دي.
-	is_staff = frappe.db.get_value("User", frappe.session.user, "user_type") == "System User"
-	if so.owner != frappe.session.user and not is_staff:
+	# الموقع) — بس صاحب الطلب الأصلي. الموظفين اتحجبوا عن الصفحة دي من
+	# الأساس فوق (redirect_staff_away_from_store)؛ مراجعة الطلبات من
+	# ناحيتهم بتتم من /staff/orders نفسها.
+	if so.owner != frappe.session.user:
 		frappe.throw(_("لا تملك صلاحية عرض هذا الطلب"), frappe.PermissionError)
 
 	context.order_number = so.name

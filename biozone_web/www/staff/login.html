@@ -1,0 +1,127 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | دخول الموظفين</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+</script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4 py-10">
+
+  <div class="w-full max-w-[380px]">
+
+    <!-- شعار بيوزون -->
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shrink-0 shadow-sm text-white bg-primary mb-3">B</div>
+      <h1 class="text-xl font-bold text-navy-text">بيوزون</h1>
+      <p class="text-sm text-navy-text/60 mt-1">دخول الموظفين</p>
+    </div>
+
+    <!-- كارت تسجيل الدخول -->
+    <div class="bg-white border border-surface-container rounded-2xl p-6 sm:p-7 shadow-sm">
+      <form id="staff-login-form" class="flex flex-col gap-4">
+
+        <div>
+          <label class="block text-xs font-bold text-navy-text/70 mb-1.5" for="staff-email">البريد الإلكتروني</label>
+          <input
+            class="w-full rounded-xl border border-surface-container bg-surface-subtle px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            id="staff-email" name="usr" type="email" autocomplete="username" required
+          >
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-navy-text/70 mb-1.5" for="staff-password">كلمة المرور</label>
+          <input
+            class="w-full rounded-xl border border-surface-container bg-surface-subtle px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            id="staff-password" name="pwd" type="password" autocomplete="current-password" required
+          >
+        </div>
+
+        <p class="hidden text-xs font-semibold text-alert-red bg-alert-bg rounded-lg px-3 py-2" id="staff-login-error"></p>
+
+        <button
+          class="mt-1 w-full flex items-center justify-center gap-2 rounded-full bg-primary hover:bg-primary-accent text-white font-bold text-sm py-3 shadow-sm transition-colors disabled:opacity-60"
+          id="staff-login-submit" type="submit"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+          <span>تسجيل الدخول</span>
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-xs text-navy-text/45 mt-6">
+      حسابات الموظفين تُنشأ بواسطة الإدارة — للعملاء
+      <a class="text-primary font-bold hover:underline" href="/login">اضغط هنا</a>
+    </p>
+
+  </div>
+
+<script>
+  const form = document.getElementById('staff-login-form');
+  const errorEl = document.getElementById('staff-login-error');
+  const submitBtn = document.getElementById('staff-login-submit');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorEl.classList.add('hidden');
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/method/biozone_web.api.staff_login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          usr: document.getElementById('staff-email').value,
+          pwd: document.getElementById('staff-password').value,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
+          || data.exception || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        throw new Error(msg);
+      }
+
+      window.location.href = (data.message && data.message.home_page) || '/staff/dashboard';
+    } catch (err) {
+      errorEl.textContent = err.message || 'تعذر تسجيل الدخول، حاول مرة أخرى';
+      errorEl.classList.remove('hidden');
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+
+</body></html>
