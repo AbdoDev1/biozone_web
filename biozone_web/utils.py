@@ -94,44 +94,80 @@ def get_header_context():
 	}
 
 
-def get_or_create_customer_for_current_user():
-	"""يرجع اسم الـCustomer المرتبط بالمستخدم الحالي، وينشئ واحد جديد لو
-	مفيش. الربط بيتم بتسمية الـCustomer صراحة ببريد المستخدم نفسه
-	(name = email) بدل الاعتماد على منطق Frappe Webshop الجاهز (اللي
-	المشروع قرر الاستغناء عنه أصلًا) — بيدّي بحث مباشر وسريع من غير
-	حاجة لحقل مخصص إضافي.
-
-	⚠️ يحتاج تأكيد فعلي على السيرفر: customer_group وterritory
-	الافتراضيين هنا (get_default_customer_group/get_default_territory)
-	اتحطوا كـfallback معقول بس، لسه محتاج تتأكد إن القيمة اللي هترجع
-	مناسبة فعلًا لعميل جديد لسه مش مصنّف (B5 - التسعير حسب نوع الحساب -
-	هو اللي هيحل التصنيف الصحيح لاحقًا).
+def find_customer_for_current_user():
+	"""يدوّر عن Customer مرتبط رسميًا بالمستخدم الحالي عن طريق جدول Portal
+	User الفرعي — بدل الاعتماد على Customer.name == email، اللي اتأكد
+	إنه مكسور بسبب Customer.autoname() في ERPNext (بيتجاهل أي name
+	صريح لما Customer Naming By = "Customer Name"، فبتتعمل نسخة Customer
+	جديدة كل مرة بدل ما تتلاقى الموجودة). يرجع اسم Customer لو لقى ربط
+	فعلي، أو None لو مفيش (يشمل حالة Guest).
 	"""
 	user_email = frappe.session.user
 
-	if frappe.db.exists("Customer", user_email):
-		return user_email
+	if user_email == "Guest":
+		return None
+
+	return frappe.db.get_value(
+		"Portal User", {"user": user_email, "parenttype": "Customer"}, "parent"
+	)
+
+
+def get_or_create_customer_for_current_user():
+	"""يرجع اسم الـCustomer المرتبط بالمستخدم الحالي، وينشئ واحد جديد لو
+	مفيش. الربط دلوقتي عن طريق جدول Portal User الفرعي على Customer
+	(بدل تسمية الـCustomer صراحة ببريد المستخدم — القديم، اتأكد إنه مكسور).
+
+	🛑 P0 مؤقت (8 سبتمبر 2026): الافتراض القديم `Customer.name == email`
+	كان بيخلي أي عميل عنده أكتر من طلب يتفرّق على Customers متعددة (باج
+	بيانات حقيقي، راجع ticket منفصل + خطة migration). الدالة دي اتصلحت
+	تستخدم Portal User بدل تطابق الاسم، لكن **مسار إنشاء Customer جديد
+	لسه متقفل مؤقتًا** لحد ما نختبره حي بالكامل (Customer + صف Portal
+	User + استدعاء تاني بيرجع نفس الاسم بلا تكرار) — الشيل هيبقى في
+	commit منفصل بعد الاختبار، مش هنا.
+	"""
+	user_email = frappe.session.user
+
+	if user_email == "Guest":
+		frappe.throw(_("يجب تسجيل الدخول أولًا"))
+
+	customer_name = find_customer_for_current_user()
+	if customer_name:
+		return customer_name
+
+	# 🛑 P0 مؤقت — مسار الإنشاء (تحت) لسه متقفل لحد ما يتاختبر حي بالكامل
+	# ويتشال في commit منفصل. راجع ticket منفصل قبل الشيل.
+	frappe.throw(_("عذرًا، الطلبات الجديدة متوقفة مؤقتًا لصيانة عاجلة. حاول لاحقًا."))
 
 	full_name = frappe.db.get_value("User", user_email, "full_name") or user_email
 
 	customer = frappe.get_doc(
 		{
 			"doctype": "Customer",
-			"name": user_email,
 			"customer_name": full_name,
 			"customer_type": "Individual",
 			"customer_group": get_default_customer_group(),
 			"territory": get_default_territory(),
+			"portal_users": [{"user": user_email}],
 		}
 	)
-	# نفس احتياط biozone_confirm_order: لو أي فحص صلاحية داخلي في مسار
-	# إنشاء الـCustomer (مثلًا على Territory/Customer Group) اتعمل بنفس
-	# طريقة فحص Item، الفلاج العام ده بيمنعه.
-	frappe.flags.ignore_permissions = True
-	try:
-		customer.insert(ignore_permissions=True)
-	finally:
-		frappe.flags.ignore_permissions = False
+	customer.insert(ignore_permissions=True)
+
+	# حماية بسيطة من سباق التزامن (طلبين متزامنين لأول مرة لنفس
+	# المستخدم قبل ما أي ربط يتعمل): تحقق بعدي، مش lock حقيقي — لو حصل
+	# سباق فعلي، ناخد أقدم Customer اتعمل ونمسح الزيادة اللي إحنا
+	# عملناها دلوقتي.
+	all_matches = frappe.get_all(
+		"Portal User",
+		filters={"user": user_email, "parenttype": "Customer"},
+		fields=["parent", "creation"],
+		order_by="creation asc",
+	)
+	if len(all_matches) > 1:
+		canonical = all_matches[0].parent
+		if canonical != customer.name:
+			frappe.delete_doc("Customer", customer.name, ignore_permissions=True, force=True)
+			return canonical
+
 	return customer.name
 
 

@@ -152,6 +152,71 @@ def biozone_confirm_order(items):
 	return {"message": {"redirect": f"/order-confirmed?name={so.name}"}}
 
 
+def _set_customer_account_type(customer, customer_group):
+	"""يغيّر Customer Group لعميل موجود — منطق مشترك بين endpoint العميل
+	(لنفسه) وendpoint الموظف (لأي عميل)، عشان السلوك يكون واحد بالظبط
+	للاتنين.
+
+	قرارات مهمة اتاخدت هنا (راجع قسم 13 من الخطة):
+	1) `frappe.get_doc(...).save()` مش `frappe.db.set_value()` — عشان
+	   `Customer.validate_customer_group()` و`check_customer_group_change()`
+	   و`update_customer_groups()` (بتنشر التغيير لمستندات مرتبطة تانية)
+	   كلهم يشتغلوا زي بالظبط لو حد غيّرها يدوي من Frappe Desk.
+	2) `ignore_permissions=True` بيتخطى فحص صلاحية Frappe على Customer بس
+	   (لا العميل ولا الموظف عندهم Read/Write فعلي على Customer) — منطق
+	   التحقق التجاري جوه validate() نفسه لسه شغال عادي.
+	3) idempotent صراحة: لو نفس الفئة اتبعتت تاني، مفيش save() ولا Version
+	   جديدة تتسجل.
+	4) التسجيل (log): Customer عنده track_changes=1 بالفعل، فـFrappe
+	   بيسجل القيمة القديمة/الجديدة/المستخدم/الوقت تلقائيًا في Version
+	   doctype بمجرد save() عادي — مفيش داعي لـlogging يدوي إضافي.
+	"""
+	if not frappe.db.exists("Customer", customer):
+		frappe.throw(_("العميل غير موجود"))
+
+	if not frappe.db.exists(
+		"Customer Group",
+		{"name": customer_group, "is_group": 0, "disabled": 0},
+	):
+		frappe.throw(_("نوع الحساب المختار غير صالح"))
+
+	doc = frappe.get_doc("Customer", customer)
+
+	if doc.customer_group != customer_group:
+		doc.customer_group = customer_group
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
+	return {"customer": doc.name, "customer_group": doc.customer_group}
+
+
+@frappe.whitelist()
+def customer_set_account_type(customer_group):
+	"""يسمح للعميل الحالي (بعد تسجيل الدخول، من صفحة الإعدادات) يختار/يغيّر
+	نوع حسابه بنفسه. الـCustomer بيتحدد من الجلسة مباشرة (نفس منطق
+	get_or_create_customer_for_current_user: name == session user email) —
+	بلا استقبال اسم Customer من العميل خالص، عشان محدش يقدر يبعت اسم
+	عميل تاني (IDOR)."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("يجب تسجيل الدخول أولًا"), frappe.PermissionError)
+
+	from biozone_web.utils import get_or_create_customer_for_current_user
+
+	customer = get_or_create_customer_for_current_user()
+	return _set_customer_account_type(customer, customer_group)
+
+
+@frappe.whitelist()
+def staff_set_customer_account_type(customer, customer_group):
+	"""يسمح لموظف (Biozone Pricing Staff) يغيّر نوع حساب أي عميل — من
+	واجهة الموظف، مش من فورم التسجيل ولا إعدادات العميل نفسه."""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	return _set_customer_account_type(customer, customer_group)
+
+
 @frappe.whitelist(methods=["POST"])
 def staff_save_item(
 	item_code: str | None,
