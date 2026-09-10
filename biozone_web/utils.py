@@ -134,10 +134,6 @@ def get_or_create_customer_for_current_user():
 	if customer_name:
 		return customer_name
 
-	# 🛑 P0 مؤقت — مسار الإنشاء (تحت) لسه متقفل لحد ما يتاختبر حي بالكامل
-	# ويتشال في commit منفصل. راجع ticket منفصل قبل الشيل.
-	frappe.throw(_("عذرًا، الطلبات الجديدة متوقفة مؤقتًا لصيانة عاجلة. حاول لاحقًا."))
-
 	full_name = frappe.db.get_value("User", user_email, "full_name") or user_email
 
 	customer = frappe.get_doc(
