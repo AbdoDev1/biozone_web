@@ -149,6 +149,7 @@ def biozone_confirm_order(items):
 					{
 						"doctype": "Sales Order",
 						"customer": customer,
+						"owner": original_user,
 						"company": get_default_company(),
 						"selling_price_list": "Standard Selling",
 						"delivery_date": frappe.utils.add_days(
@@ -181,9 +182,7 @@ def biozone_confirm_order(items):
 		frappe.session.user = original_user
 
 	return {
-		"message": {
-			"redirect": f"/order-confirmed?name={so.name}",
-		}
+		"redirect": f"/order-confirmed?name={so.name}",
 	}
 
 
