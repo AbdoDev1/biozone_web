@@ -1,0 +1,58 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Biozone - مدخل الموظف</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container-low": "#eff4ff",
+        "surface-container-high": "#dce9ff",
+        "on-surface-variant": "#3d4947",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6"
+      },
+      fontFamily: { body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center">
+  <main class="w-full max-w-xl mx-auto px-6 py-12 text-center">
+    <h1 class="text-2xl font-bold text-primary">Biozone</h1>
+    <p class="text-sm text-on-surface-variant mb-10">اختر المدخل</p>
+
+    {# صفحة مدخل الموظف: زرين بس كما طلب التصميم — من غير
+       Edit Profile / Reset Password / Manage 3rd party apps.
+       - "الرجوع للمتجر" (store_url): رابط كامل لدومين المتجر العام
+         (biozone.pro أو ما يعادله في التطوير) بيتفتح في تبويب جديد
+         (target=_blank + rel=noopener) بجلسة منفصلة — التبويب الجديد
+         على دومين مختلف مش بيحمل كوكيز/توكن جلسة الموظف أصلًا، فتتجنب
+         أي redirect لـ /staff/dashboard من غير ما نلمس قاعدة العزل.
+       - "الرئيسية" (home_route): بتتحدد ديناميكيًا في system_home.py
+         من get_home_route_for_system_user — /staff/dashboard للموظف
+         العادي و/desk للإداري. #}
+    <div class="flex flex-col gap-4 w-full max-w-sm">
+      <a href="{{ store_url }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center bg-primary text-on-primary font-bold rounded-full px-8 py-3.5 hover:bg-primary-container transition-colors shadow-sm text-lg">
+        الرجوع للمتجر
+      </a>
+      <a href="{{ home_route }}" class="inline-flex items-center justify-center bg-surface-container-high text-on-surface font-bold rounded-full px-8 py-3.5 hover:bg-surface-container-low transition-colors text-lg">
+        الرئيسية
+      </a>
+    </div>
+  </main>
+</body></html>

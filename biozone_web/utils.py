@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import has_common
 
 
 def require_staff_access():
@@ -48,6 +49,130 @@ def redirect_staff_away_from_store():
 	if user_type == "System User":
 		frappe.local.flags.redirect_location = "/staff/dashboard"
 		raise frappe.Redirect
+
+
+SYSTEM_USER_ROLES = ("System Manager", "Administrator")
+
+
+def is_system_user(user=None):
+	"""هل الحساب موظف/أدمن (System User)؟
+
+	الاعتماد الأساسي على User.user_type — نفس المعيار اللي biozone كله
+	بيستخدمه في require_staff_access وredirect_staff_away_from_store —
+	مع احتياط بالأدوار (System Manager/Administrator) عشان أي حساب
+	تايبه Website User بس اتنفذت له صلاحيات نظام يتحسب صح برضه.
+	استخدمنا frappe.utils.has_common في فحص الأدوار بدل التخمين بالاسم.
+
+	ملحوظة: الدالة دي بتفضل مستخدمة كحارس لصفحة /system-home (وكمان
+	في require_staff_accsess) بس — أما قرار الصفحة اللي بيوصل ليها
+	الموظف من "/" فبيبقى في get_home_route_for_system_user تحت (تمييز
+	الموظف العادي عن صاحب صلاحية الـ Desk).
+	"""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+
+	user_type = frappe.db.get_value("User", user, "user_type")
+	if user_type == "System User":
+		return True
+
+	return bool(has_common(frappe.get_roles(user), SYSTEM_USER_ROLES))
+
+
+# الأدوار الإدارية اللي بتودي صاحبها للـ Desk بدل لوحة الموظف العادية.
+# القرار مبني على نتيجة البحث في قاعدة البيانات (راجع التقرير): مفيش
+# أي Role مخصص (is_custom=1) للمحاسبة/الإدارة في `tabRole` — كل اللي
+# اتلاقى زي "Accounts Manager" و"Accounts User" أدوار ERPNext قياسية
+# (is_custom=0). بناءً على طلب العميل، بنستعمل الـ fallback المتفق
+# عليه: Administrator + System Manager فقط. لو اتطلب لاحقًا إن أي دور
+# محاسبة قياسي (مثلًا "Accounts Manager") يودّي للـ Desk برضه، يكفي
+# إضافته لقائمة الـ tuple دي.
+ADMIN_DESK_ROLES = ("Administrator", "System Manager")
+
+
+def get_home_route_for_system_user(user):
+	"""يفرّق بين نوعين من حسابات System User حسب خطة الدومينات الأصلية:
+
+	- موظف عادي (System User من غير دور إداري): /staff/dashboard
+	- Administrator أو صاحب دور إداري (ADMIN_DESK_ROLES): /desk
+
+	التمييز بـ frappe.get_roles + frappe.utils.has_common وليس بالتخمين
+	بالأسماء، وكمان فحص صريح لاسم المستخدم Administrator.
+	"""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		# الدالة دي بتتستدعى للـ System User بس — ده دفاع نظرًا لعدم وصول
+		# الزائر هنا أصلًا.
+		return "/biozone-home"
+
+	roles = frappe.get_roles(user)
+	if user == "Administrator" or has_common(roles, ADMIN_DESK_ROLES):
+		return "/desk"
+
+	return "/staff/dashboard"
+
+
+def get_store_url(path="/biozone-home"):
+	"""رابط المتجر العام (دومين biozone.pro أو ما يعادله في التطوير)
+	عشان زر "الرجوع للمتجر" في /system-home يفتحه في **تبويب جديد**
+	بجلسة منفصلة — التبويب الجديد على دومين مختلف مش بيحمل كوكيز/
+	توكن جلسة الموظف أصلًا، فقاعدة عزل الدومينين
+	(redirect_staff_away_from_store) تفضل شغالة من غير ما تتعدل.
+
+	بيرجع رابط كامل بالـ scheme والـ port من الطلب الحالي عشان يشتغل
+	على dev server (نفس البورت لو جوه التطوير) وعلى الإنتاج (https).
+	"""
+	store_domain = ""
+	for domain in frappe.get_site_config().get("domains") or []:
+		if domain and "staff" not in domain and "app" not in domain:
+			store_domain = domain
+			break
+
+	if not store_domain:
+		# مفيش دومين عام معرّف — نرجّع مسار نسبي (مش رابط كامل).
+		return path
+
+	scheme = "http"
+	port = ""
+	request = getattr(frappe.local, "request", None)
+	if request:
+		scheme = request.scheme or "http"
+		host = getattr(request, "host", "") or ""
+		if ":" in host:
+			port = host.rsplit(":", 1)[1]
+
+	if port.isdigit():
+		return f"{scheme}://{store_domain}:{port}{path}"
+
+	return f"{scheme}://{store_domain}{path}"
+
+
+def get_website_user_home_page(user=None):
+	"""يحدد الصفحة اللي بيوصل ليها اللي بيفتح "/" حسب نوع الحساب:
+
+	- Guest: بيفتح المتجر مباشرة /biozone-home — تعديل 3 (الزائر
+	  بيتصفح الكاتالوج فعليًا، بدل ما يقع على صفحة تسجيل الدخول).
+	- Website User: يروح مباشرة لصفحة المتجر (/biozone-home) بدل صفحة
+	  Settings الافتراضية (Edit Profile / Reset Password / 3rd party apps).
+	- System User:
+	    * موظف عادي → /staff/dashboard
+	    * Administrator/صاحب دور إداري → /desk
+	  (تعديل 1 — تمييز صريح عبر get_home_route_for_system_user، مش
+	  تجميع كل الـ System Users في مسار واحد.)
+
+	ملحوظة الأولوية: الدالة دي بتتستدعى من get_home_page() (عن طريق
+	hook get_website_user_home_page) قبل Website Settings.home_page —
+	بس بعد Role.home_page وPortal Settings.default_portal_home (لو
+	اتعييّنوا لأي مستخدم هيبقى ليهم الأولوية عليها).
+	"""
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return "/biozone-home"
+
+	if is_system_user(user):
+		return get_home_route_for_system_user(user)
+
+	return "/biozone-home"
 
 
 def get_default_warehouse():

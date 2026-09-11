@@ -60,9 +60,23 @@ app_license = "mit"
 # home_page = "login"
 
 # website user home page (by Role)
+# ملحوظة: ده معطّل عمليًا — مفيش Role اسمه "System User" في القاعدة،
+# فالشيك ده مش بيطابق حد. التحديد الفعلي بيحصل في
+# get_website_user_home_page تحت.
 role_home_page = {
 	"System User": "/staff/dashboard",
 }
+
+# الصفحة الرئيسية حسب نوع الحساب لمسار "/" — التشخيص:
+# من غير hook ده، Website User بيتحط على fallback "me" فبيشوف
+# صفحة Settings الافتراضية (Edit Profile / Reset Password / 3rd party
+# apps) جوّا استجابة 200 لـ "/". الدالة دي بتحدد الصفحة لكل نوع:
+# - Guest: بيفتح المتجر مباشرة /biozone-home (يشوف الكاتالوج فعليًا).
+# - Website User: بيوصل مباشرة لصفحة المتجر /biozone-home.
+# - System User: /staff/dashboard لو موظف عادي، أو /desk لو
+#   Administrator/صاحب دور إداري (راجع get_home_route_for_system_user).
+# من غير المساس بصفحة /me نفسها لأنها ممكن تكون مطلوبة من أماكن تانية.
+get_website_user_home_page = "biozone_web.utils.get_website_user_home_page"
 
 # Generators
 # ----------
