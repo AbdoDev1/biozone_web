@@ -227,6 +227,46 @@ def customer_set_account_type(customer_group):
 
 
 @frappe.whitelist()
+def get_customer_account_info():
+	if frappe.session.user == "Guest":
+		frappe.throw(
+			_("يجب تسجيل الدخول أولًا"),
+			frappe.PermissionError,
+		)
+
+	from biozone_web.utils import get_or_create_customer_for_current_user
+
+	customer = get_or_create_customer_for_current_user()
+
+	customer_group = frappe.db.get_value(
+		"Customer",
+		customer,
+		"customer_group",
+	)
+
+	return {
+		"customer": customer,
+		"customer_group": customer_group,
+	}
+
+
+@frappe.whitelist()
+def get_available_account_types():
+	if frappe.session.user == "Guest":
+		frappe.throw(
+			_("يجب تسجيل الدخول أولًا"),
+			frappe.PermissionError,
+		)
+
+	return frappe.get_all(
+		"Customer Group",
+		filters={"is_group": 0, "disabled": 0},
+		fields=["name"],
+		order_by="name",
+	)
+
+
+@frappe.whitelist()
 def staff_set_customer_account_type(customer, customer_group):
 	from biozone_web.utils import require_staff_access
 
