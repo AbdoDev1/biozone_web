@@ -81,6 +81,18 @@ def biozone_forgot_password(email: str):
 
 @frappe.whitelist(methods=["POST"])
 def biozone_confirm_order(items):
+	"""ينشئ Sales Order من سلة المتجر للمستخدم الحالي.
+
+	الملكية: لا يتم تغيير frappe.session.user إطلاقًا. الطلب يُنشأ
+	بجلسة المستخدم الحقيقي، و owner يُحفظ تلقائيًا بواسطة Frappe
+	يساوي المستخدم الحالي (set_user_and_timestamp).
+
+	الصلاحيات: Website User لا يملك DocPerm لإنشاء Sales Order
+	(لا يوجد أي تعديل من Desk ولا fixtures)، لذلك يُستخدم
+	so.insert(ignore_permissions=True) لفحص الإنشاء فقط، مع بقاء
+	owner = المستخدم الحقيقي. كل فحوصات الروابط والقيم الإلزامية
+	تظل مفعّلة (ignore_links لم يُستخدم).
+	"""
 	if frappe.session.user == "Guest":
 		frappe.throw(
 			_("يجب تسجيل الدخول أولًا لتأكيد الطلب"),
@@ -133,23 +145,20 @@ def biozone_confirm_order(items):
 	# يجب ألا يحذف Customer تم إنشاؤه حديثًا.
 	frappe.db.commit()
 
-	original_user = frappe.session.user
+	# الملكية: لا يتم تغيير frappe.session.user إطلاقًا. owner يُحفظ
+	# تلقائيًا بواسطة Frappe (set_user_and_timestamp) يساوي المستخدم
+	# الحالي الذي أرسل الطلب.
+	ordering_user = frappe.session.user
 	max_attempts = 3
 	so = None
 
 	try:
-		# تغيير المستخدم مباشرةً لتجاوز فحص صلاحيات Item
-		# بدون استخدام frappe.set_user()، حتى لا يتغير
-		# session.sid أو session.data.
-		frappe.session.user = "Administrator"
-
 		for attempt in range(max_attempts):
 			try:
 				so = frappe.get_doc(
 					{
 						"doctype": "Sales Order",
 						"customer": customer,
-						"owner": original_user,
 						"company": get_default_company(),
 						"selling_price_list": "Standard Selling",
 						"delivery_date": frappe.utils.add_days(
@@ -160,6 +169,11 @@ def biozone_confirm_order(items):
 					}
 				)
 
+				# ignore_permissions=True يتجاوز فحص صلاحية إنشاء
+				# Sales Order فقط (Website User بلا DocPerm — لا يوجد
+				# تعديل من Desk ولا fixtures)، لكن owner يبقى =
+				# ordering_user تلقائيًا. لا تعيين يدوي لـ owner هنا:
+				# set_user_and_timestamp() يتجاهل أي owner صريح.
 				so.insert(ignore_permissions=True)
 				frappe.db.commit()
 				break
@@ -174,14 +188,20 @@ def biozone_confirm_order(items):
 
 				time.sleep(0.1 * (attempt + 1))
 
+		if so is None:
+			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
+
+		# ضمان صريح: owner يجب أن يكون المستخدم الذي أرسل الطلب.
+		if so.owner != ordering_user:
+			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
+
 	except Exception:
 		frappe.db.rollback()
 		raise
 
-	finally:
-		frappe.session.user = original_user
-
 	return {
+		"ok": True,
+		"sales_order": so.name,
 		"redirect": f"/order-confirmed?name={so.name}",
 	}
 

@@ -2,7 +2,7 @@ import frappe
 
 from frappe import _
 from biozone_web.utils import (
-    find_customer_for_current_user,
+    assert_can_view_sales_order,
     get_header_context,
     redirect_staff_away_from_store,
 )
@@ -13,7 +13,6 @@ def get_context(context):
 
     context.no_cache = 1
     context.active_page = None
-    context.test_message = "تم تحميل ملف Python بنجاح"
 
     context.update(get_header_context())
 
@@ -32,18 +31,10 @@ def get_context(context):
         )
 
     so = frappe.get_doc("Sales Order", order_name)
-    current_user = frappe.session.user
 
-    # الطلبات المنشأة من المتجر تُحفظ بمالك Administrator بسبب منطق
-    # إنشاء الطلب في biozone_confirm_order، لذلك نتحقق من الملكية عبر
-    # ربط Customer بالمستخدم الحالي كحل بديل آمن.
-    if so.owner != current_user:
-        customer = find_customer_for_current_user()
-        if not customer or so.customer != customer:
-            frappe.throw(
-                _("لا تملك صلاحية عرض هذا الطلب"),
-                frappe.PermissionError,
-            )
+    # الطلبات الجديدة: owner الحقيقي. الطلبات القديمة (owner =
+    # Administrator): fallback عبر Customer الفريد فقط.
+    assert_can_view_sales_order(so)
 
     context.order_number = str(so.name)
     context.item_count = len(so.items or [])

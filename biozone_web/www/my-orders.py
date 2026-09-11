@@ -3,6 +3,7 @@ import frappe
 from biozone_web.utils import (
 	find_customer_for_current_user,
 	get_header_context,
+	is_unique_customer_binding,
 	redirect_staff_away_from_store,
 )
 
@@ -53,7 +54,10 @@ def get_context(context):
 	customer = find_customer_for_current_user()
 
 	orders = []
-	if customer:
+	# حماية Customer المشترك: لو نفس الـ Customer مرتبط بأكثر من
+	# مستخدم (Portal User)، لا نعرض أي طلبات — حتى لا يرى مستخدم
+	# طلبات مستخدم آخر يشترك معه في نفس الـ Customer.
+	if customer and is_unique_customer_binding(customer, frappe.session.user):
 		rows = frappe.get_all(
 			"Sales Order",
 			filters={"customer": customer},

@@ -112,6 +112,70 @@ def find_customer_for_current_user():
 	)
 
 
+def get_portal_users_for_customer(customer):
+	"""يرجع قائمة User المرتبطين بـ Customer عبر جدول Portal User."""
+	if not customer:
+		return []
+
+	rows = frappe.get_all(
+		"Portal User",
+		filters={"parent": customer, "parenttype": "Customer"},
+		fields=["user"],
+	)
+	return [r.user for r in rows if r.user]
+
+
+def is_unique_customer_binding(customer, user):
+	"""يتحقق أن Customer مرتبط بالمستخدم الحالي فقط ولا يشاركه أحد.
+
+	يرجع True فقط إذا كان المستخدم الحالي هو الـ Portal User الوحيد
+	لهذا الـ Customer. أي Customer مشترك بين عدة مستخدمين يرجع False
+	لمنع تسريب الطلبات بين المستخدمين.
+	"""
+	if not customer or not user or user == "Guest":
+		return False
+
+	users = get_portal_users_for_customer(customer)
+	return users == [user]
+
+
+def can_current_user_view_sales_order(so, user=None):
+	"""يحدد هل المستخدم الحالي مسموح له بعرض Sales Order أم لا.
+
+	القاعدة:
+	1. الطلبات الجديدة: owner الحقيقي يطابق المستخدم الحالي.
+	2. الطلبات القديمة (owner = Administrator بسبب hack الإنشاء المحذوف):
+	   يُقبل fallback عبر Customer فقط إذا كان الربط فريدًا — أي أن
+	   المستخدم الحالي هو الـ Portal User الوحيد لهذا الـ Customer.
+	   أي Customer مشترك يُرفض لمنع تسريب الطلبات.
+	"""
+	user = user or frappe.session.user
+
+	if not user or user == "Guest":
+		return False
+
+	if so.owner == user:
+		return True
+
+	# Fallback للطلبات القديمة فقط: مالكها Administrator والطلب مرتبط
+	# بنفس Customer الفريد للمستخدم الحالي.
+	if so.owner == "Administrator" and so.customer:
+		customer = find_customer_for_current_user()
+		if customer and so.customer == customer and is_unique_customer_binding(customer, user):
+			return True
+
+	return False
+
+
+def assert_can_view_sales_order(so, user=None):
+	"""يرمي PermissionError إذا لم يكن مسموحًا للمستخدم عرض الطلب."""
+	if not can_current_user_view_sales_order(so, user=user):
+		frappe.throw(
+			_("لا تملك صلاحية عرض هذا الطلب"),
+			frappe.PermissionError,
+		)
+
+
 def get_or_create_customer_for_current_user():
 	"""يرجع اسم الـCustomer المرتبط بالمستخدم الحالي، وينشئ واحد جديد لو
 	مفيش. الربط دلوقتي عن طريق جدول Portal User الفرعي على Customer
