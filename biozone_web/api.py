@@ -215,18 +215,6 @@ def _set_customer_account_type(customer, customer_group):
 
 
 @frappe.whitelist()
-def customer_set_account_type(customer_group):
-	if frappe.session.user == "Guest":
-		frappe.throw(_("يجب تسجيل الدخول أولًا"), frappe.PermissionError)
-
-	from biozone_web.utils import get_or_create_customer_for_current_user
-
-	customer = get_or_create_customer_for_current_user()
-
-	return _set_customer_account_type(customer, customer_group)
-
-
-@frappe.whitelist()
 def get_customer_account_info():
 	if frappe.session.user == "Guest":
 		frappe.throw(
