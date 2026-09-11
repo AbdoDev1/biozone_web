@@ -651,6 +651,80 @@ def staff_toggle_customer_group(customer_group: str, disabled: int):
 
 
 @frappe.whitelist(methods=["POST"])
+def staff_create_customer_group(customer_group_name: str):
+	"""ينشئ فئة عميل جديدة (Customer Group) تظهر في تاب "الفئات" وتاب
+	"الخصومات" بعد كده.
+
+	Customer Group في Frappe شجرية (Tree/NestedSet)، يعني أي فئة جديدة
+	لازم يكون ليها parent_customer_group. بدل افتراض اسم زي
+	"All Customer Groups" (نفس نوع الافتراض العام اللي سبب مشكلة قبل
+	كده في staff_set_item_discount)، بنجيب الأب بفحص حي فعلي: بنقرأ كل
+	قيم parent_customer_group الفريدة للفئات (leaf) الموجودة بالفعل.
+	لو القيمة مش واحدة (يا مفيش فئات أصلًا، يا فيه أكتر من أب — يعني
+	الشجرة بقت متداخلة مش مسطّحة زي ما افترضنا)، بنرفض وبنطلب تدخل
+	يدوي بدل ما نخمّن.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	customer_group_name = (customer_group_name or "").strip()
+
+	if not customer_group_name:
+		return {
+			"ok": False,
+			"error": _("من فضلك أدخل اسم الفئة"),
+		}
+
+	if frappe.db.exists("Customer Group", customer_group_name):
+		return {
+			"ok": False,
+			"error": _("فيه فئة بنفس الاسم موجودة بالفعل"),
+		}
+
+	existing_parents = frappe.db.sql(
+		"""
+		select distinct parent_customer_group
+		from `tabCustomer Group`
+		where is_group = 0
+		""",
+		as_dict=True,
+	)
+	distinct_parents = {
+		row.parent_customer_group for row in existing_parents if row.parent_customer_group
+	}
+
+	if len(distinct_parents) != 1:
+		return {
+			"ok": False,
+			"error": _(
+				"تعذر تحديد الفئة الأب تلقائيًا (مفيش فئات حالية نقيس "
+				"عليها، أو فيه أكتر من أب مختلف). راجع شجرة Customer "
+				"Group يدويًا من /app قبل الإضافة."
+			),
+		}
+
+	parent_customer_group = distinct_parents.pop()
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Customer Group",
+			"customer_group_name": customer_group_name,
+			"parent_customer_group": parent_customer_group,
+			"is_group": 0,
+			"disabled": 0,
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"ok": True,
+		"customer_group": doc.name,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
 def staff_set_item_discount(
 	item_code: str,
 	customer_group: str,

@@ -4,7 +4,7 @@
 <title>بيوزون | التسعير</title>
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&amp;display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
@@ -37,23 +37,53 @@
       color: #0b1c30;
       -webkit-font-smoothing: antialiased;
     }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+    }
   </style>
 </head>
 {% include "biozone_web/templates/includes/staff_shell_top.html" %}
 <!-- Page Content Container -->
 <main class="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full flex flex-col gap-6 sm:gap-8">
-<div class="flex items-center justify-between">
-<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">التسعير</h1>
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+<div>
+<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">إدارة التسعير والخصومات</h1>
+<p class="text-sm text-navy-text/50 mt-1">تحديد فئات العملاء المعتمدة وضبط نسب خصم الأصناف لكل فئة.</p>
+</div>
 </div>
 
 <!-- Tabs -->
-<div class="flex gap-2 border-b border-surface-subtle">
-<a class="px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors {% if tab == 'groups' %}text-primary border-b-2 border-primary{% else %}text-navy-text/50 hover:text-navy-text{% endif %}" href="/staff/pricing?tab=groups">الفئات</a>
-<a class="px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors {% if tab == 'discounts' %}text-primary border-b-2 border-primary{% else %}text-navy-text/50 hover:text-navy-text{% endif %}" href="/staff/pricing?tab=discounts">الخصومات</a>
+<div class="flex gap-1 border-b border-surface-subtle bg-white rounded-t-2xl px-2">
+<a class="px-4 py-3.5 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors {% if tab == 'groups' %}text-primary border-primary{% else %}text-navy-text/50 border-transparent hover:text-navy-text{% endif %}" href="/staff/pricing?tab=groups">
+<span class="material-symbols-outlined text-lg">category</span>
+الفئات
+<span class="bg-surface-container text-primary text-xs px-2 py-0.5 rounded-full font-bold">{{ groups|length }}</span>
+</a>
+<a class="px-4 py-3.5 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors {% if tab == 'discounts' %}text-primary border-primary{% else %}text-navy-text/50 border-transparent hover:text-navy-text{% endif %}" href="/staff/pricing?tab=discounts">
+<span class="material-symbols-outlined text-lg">percent</span>
+الخصومات
+</a>
 </div>
 
 {% if tab == 'groups' %}
 <!-- Categories Tab -->
+<div class="flex flex-col gap-4">
+<!-- Note + Add form -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-subtle p-4 rounded-xl border border-surface-container/60">
+<div class="text-sm text-navy-text">
+<span class="font-bold">ملاحظة تشغيلية:</span> الفئات المفعّلة فقط هي التي تظهر في تاب "الخصومات" وتُطبّق على طلبات العملاء.
+</div>
+<form class="flex items-center gap-2" id="add-group-form" onsubmit="return createGroup(event)">
+<input class="rounded-xl border border-surface-container bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" id="new-group-name" name="new-group-name" placeholder="اسم الفئة الجديدة..." type="text">
+<button class="px-4 py-2 bg-primary hover:bg-primary-accent text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors whitespace-nowrap" type="submit">
+<span class="material-symbols-outlined text-base">add</span>
+إضافة فئة
+</button>
+</form>
+</div>
+<p class="hidden text-xs text-alert-red font-bold px-1" id="add-group-error"></p>
+
 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
 <table class="w-full text-sm">
 <thead>
@@ -63,10 +93,15 @@
 <th class="text-right py-3 px-4">إجراء</th>
 </tr>
 </thead>
-<tbody>
+<tbody id="groups-table-body">
 {% for g in groups %}
 <tr class="border-t border-surface-subtle">
-<td class="py-3 px-4 font-bold text-navy-text">{{ g.name }}</td>
+<td class="py-3 px-4 font-bold text-navy-text flex items-center gap-2.5">
+<span class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-base">category</span>
+</span>
+{{ g.name }}
+</td>
 <td class="py-3 px-4">
 {% if g.disabled %}
 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-alert-bg/60 text-alert-red text-xs font-bold">معطّلة</span>
@@ -81,8 +116,12 @@
 </td>
 </tr>
 {% endfor %}
+{% if not groups %}
+<tr><td class="py-8 px-4 text-center text-navy-text/40" colspan="3">مفيش فئات لسه — أضف واحدة من الفورم فوق</td></tr>
+{% endif %}
 </tbody>
 </table>
+</div>
 </div>
 
 {% else %}
@@ -181,6 +220,47 @@
         }
       })
       .catch(() => alert('تعذر الاتصال بالسيرفر'));
+  }
+
+  function createGroup(event) {
+    event.preventDefault();
+
+    const input = document.getElementById('new-group-name');
+    const errorEl = document.getElementById('add-group-error');
+    const name = input.value.trim();
+
+    errorEl.classList.add('hidden');
+    errorEl.innerText = '';
+
+    if (!name) {
+      errorEl.innerText = 'من فضلك أدخل اسم الفئة';
+      errorEl.classList.remove('hidden');
+      return false;
+    }
+
+    fetch('/api/method/biozone_web.api.staff_create_customer_group', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({ customer_group_name: name }),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.message && res.message.ok) {
+          window.location.reload();
+        } else {
+          errorEl.innerText = (res.message && res.message.error) || 'حصل خطأ أثناء الإضافة';
+          errorEl.classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        errorEl.innerText = 'تعذر الاتصال بالسيرفر';
+        errorEl.classList.remove('hidden');
+      });
+
+    return false;
   }
 
   function saveDiscount(itemCode) {
