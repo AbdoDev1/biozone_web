@@ -1,0 +1,215 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | التسعير</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6",
+            "amber-text": "#92400e"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full flex flex-col gap-6 sm:gap-8">
+<div class="flex items-center justify-between">
+<h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">التسعير</h1>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-2 border-b border-surface-subtle">
+<a class="px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors {% if tab == 'groups' %}text-primary border-b-2 border-primary{% else %}text-navy-text/50 hover:text-navy-text{% endif %}" href="/staff/pricing?tab=groups">الفئات</a>
+<a class="px-4 py-2.5 text-sm font-bold rounded-t-lg transition-colors {% if tab == 'discounts' %}text-primary border-b-2 border-primary{% else %}text-navy-text/50 hover:text-navy-text{% endif %}" href="/staff/pricing?tab=discounts">الخصومات</a>
+</div>
+
+{% if tab == 'groups' %}
+<!-- Categories Tab -->
+<div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+<table class="w-full text-sm">
+<thead>
+<tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold">
+<th class="text-right py-3 px-4">الفئة</th>
+<th class="text-right py-3 px-4">الحالة</th>
+<th class="text-right py-3 px-4">إجراء</th>
+</tr>
+</thead>
+<tbody>
+{% for g in groups %}
+<tr class="border-t border-surface-subtle">
+<td class="py-3 px-4 font-bold text-navy-text">{{ g.name }}</td>
+<td class="py-3 px-4">
+{% if g.disabled %}
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-alert-bg/60 text-alert-red text-xs font-bold">معطّلة</span>
+{% else %}
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">مفعّلة</span>
+{% endif %}
+</td>
+<td class="py-3 px-4">
+<button class="text-xs font-bold {% if g.disabled %}text-primary{% else %}text-alert-red{% endif %} hover:underline" onclick="toggleGroup('{{ g.name }}', {{ 0 if g.disabled else 1 }})">
+{% if g.disabled %}تفعيل{% else %}تعطيل{% endif %}
+</button>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% else %}
+<!-- Discounts Tab -->
+<div class="flex flex-col gap-4">
+<!-- Group selector -->
+<div class="flex gap-2 overflow-x-auto pb-1">
+{% for g in active_groups %}
+<a class="shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-colors {% if g.name == selected_group %}bg-primary text-white{% else %}bg-white text-navy-text/70 hover:bg-surface-subtle{% endif %}" href="/staff/pricing?tab=discounts&amp;group={{ g.name | urlencode }}">{{ g.name }}</a>
+{% endfor %}
+</div>
+
+{% if not selected_group %}
+<div class="bg-white rounded-2xl shadow-sm p-8 text-center text-navy-text/50 text-sm">
+لا يوجد فئات مفعّلة حاليًا — فعّل فئة من تاب "الفئات" أولًا.
+</div>
+{% else %}
+<!-- Search -->
+<form class="flex gap-2" method="get">
+<input name="tab" type="hidden" value="discounts">
+<input name="group" type="hidden" value="{{ selected_group }}">
+<input class="flex-1 rounded-xl border border-surface-subtle bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" name="q" placeholder="بحث باسم الصنف..." type="text" value="{{ search_term or '' }}">
+<button class="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold" type="submit">بحث</button>
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+<table class="w-full text-sm">
+<thead>
+<tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold">
+<th class="text-right py-3 px-4">الصنف</th>
+<th class="text-right py-3 px-4">المجموعة</th>
+<th class="text-right py-3 px-4">نسبة الخصم %</th>
+<th class="text-right py-3 px-4">إجراء</th>
+</tr>
+</thead>
+<tbody>
+{% for it in items %}
+<tr class="border-t border-surface-subtle" id="row-{{ it.item_code }}">
+<td class="py-3 px-4">
+<div class="font-bold text-navy-text">{{ it.item_name }}</div>
+<div class="text-xs text-navy-text/40">{{ it.item_code }}</div>
+</td>
+<td class="py-3 px-4 text-navy-text/60">{{ it.item_group }}</td>
+<td class="py-3 px-4">
+<input class="w-20 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" data-item-code="{{ it.item_code }}" id="discount-{{ it.item_code }}" max="100" min="0" step="0.01" type="number" value="{{ it.discount_percent }}">
+</td>
+<td class="py-3 px-4">
+<button class="text-xs font-bold text-primary hover:underline" onclick="saveDiscount('{{ it.item_code }}')">حفظ</button>
+<span class="text-xs text-navy-text/40 mr-2 hidden" id="saved-{{ it.item_code }}">تم الحفظ ✓</span>
+</td>
+</tr>
+{% endfor %}
+{% if not items %}
+<tr><td class="py-8 px-4 text-center text-navy-text/40" colspan="4">مفيش أصناف مطابقة</td></tr>
+{% endif %}
+</tbody>
+</table>
+</div>
+
+<!-- Pagination -->
+<div class="flex items-center justify-between text-sm text-navy-text/60">
+<span>{{ total_count }} صنف</span>
+<div class="flex gap-2">
+{% if has_prev %}
+<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ prev_page }}">السابق</a>
+{% endif %}
+{% if has_next %}
+<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ next_page }}">التالي</a>
+{% endif %}
+</div>
+</div>
+{% endif %}
+</div>
+{% endif %}
+
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+
+  function toggleGroup(name, disabled) {
+    fetch('/api/method/biozone_web.api.staff_toggle_customer_group', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({ customer_group: name, disabled: disabled }),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.message && res.message.ok) {
+          window.location.reload();
+        } else {
+          alert((res.message && res.message.error) || 'حصل خطأ أثناء الحفظ');
+        }
+      })
+      .catch(() => alert('تعذر الاتصال بالسيرفر'));
+  }
+
+  function saveDiscount(itemCode) {
+    const input = document.getElementById('discount-' + itemCode);
+    const savedLabel = document.getElementById('saved-' + itemCode);
+    const value = input.value;
+
+    fetch('/api/method/biozone_web.api.staff_set_item_discount', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({
+        item_code: itemCode,
+        customer_group: '{{ selected_group }}',
+        discount_percent: value,
+      }),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.message && res.message.ok) {
+          savedLabel.classList.remove('hidden');
+          setTimeout(() => savedLabel.classList.add('hidden'), 1500);
+        } else {
+          alert((res.message && res.message.error) || 'حصل خطأ أثناء الحفظ');
+        }
+      })
+      .catch(() => alert('تعذر الاتصال بالسيرفر'));
+  }
+</script>
+</body></html>

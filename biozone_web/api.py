@@ -623,3 +623,135 @@ def _create_delivery_note_for_order(so, warehouse):
 	dn.submit()
 
 	return dn
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_toggle_customer_group(customer_group: str, disabled: int):
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	if not frappe.db.exists("Customer Group", customer_group):
+		return {
+			"ok": False,
+			"error": _("الفئة غير موجودة"),
+		}
+
+	frappe.db.set_value(
+		"Customer Group",
+		customer_group,
+		"disabled",
+		frappe.utils.cint(disabled),
+	)
+	frappe.db.commit()
+
+	return {
+		"ok": True,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_set_item_discount(
+	item_code: str,
+	customer_group: str,
+	discount_percent: str | float,
+):
+	"""يحدد/يحدّث/يعطّل خصم صنف واحد لفئة عميل واحدة، عبر Pricing Rule على
+	مستوى الكود (apply_on = 'Item Code')، بنسبة خصم مستقلة لكل زوج
+	(صنف، فئة) — مش على مستوى المجموعة (Item Group).
+
+	⚠️ ملحوظة: أسماء الحقول هنا (price_or_product_discount،
+	rate_or_discount، إلخ) اتكتبت من المعرفة العامة بـERPNext، مش من
+	فحص حي لـfrappe.get_meta("Pricing Rule") زي القاعدة المتبعة في
+	باقي المشروع (راجع قسم B6d) — لازم تتأكد منها بفحص حي أو باختبار
+	إنشاء صف فعلي قبل الاعتماد عليها في الإنتاج.
+
+	تعطيل بدل حذف (زي باقي الشاشات في المشروع): تصفير النسبة بيعطّل
+	الـPricing Rule الموجودة بدل ما يمسحها، عشان نحتفظ بتاريخ القرار.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	if not frappe.db.exists("Item", item_code):
+		return {
+			"ok": False,
+			"error": _("الصنف غير موجود"),
+		}
+
+	if not frappe.db.exists(
+		"Customer Group",
+		{
+			"name": customer_group,
+			"is_group": 0,
+			"disabled": 0,
+		},
+	):
+		return {
+			"ok": False,
+			"error": _("الفئة غير موجودة أو غير مفعّلة"),
+		}
+
+	discount_percent = frappe.utils.flt(discount_percent)
+
+	if discount_percent < 0 or discount_percent > 100:
+		return {
+			"ok": False,
+			"error": _("نسبة الخصم يجب أن تكون بين 0 و100"),
+		}
+
+	existing = frappe.db.sql(
+		"""
+		select pr.name
+		from `tabPricing Rule Item Code` pri
+		inner join `tabPricing Rule` pr on pr.name = pri.parent
+		where pr.apply_on = 'Item Code'
+			and pr.customer_group = %(customer_group)s
+			and pri.item_code = %(item_code)s
+		limit 1
+		""",
+		{"customer_group": customer_group, "item_code": item_code},
+		as_dict=True,
+	)
+	existing_name = existing[0].name if existing else None
+
+	if discount_percent <= 0:
+		# مفيش نسبة خصم = تعطيل القاعدة الموجودة لو فيه، من غير حذفها.
+		if existing_name:
+			frappe.db.set_value("Pricing Rule", existing_name, "disable", 1)
+			frappe.db.commit()
+
+		return {
+			"ok": True,
+			"pricing_rule": existing_name,
+			"discount_percent": 0,
+		}
+
+	if existing_name:
+		doc = frappe.get_doc("Pricing Rule", existing_name)
+		doc.discount_percentage = discount_percent
+		doc.disable = 0
+		doc.save(ignore_permissions=True)
+	else:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Pricing Rule",
+				"title": f"{item_code} - {customer_group}",
+				"apply_on": "Item Code",
+				"price_or_product_discount": "Price",
+				"selling": 1,
+				"customer_group": customer_group,
+				"rate_or_discount": "Discount Percentage",
+				"discount_percentage": discount_percent,
+				"items": [{"item_code": item_code}],
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+	frappe.db.commit()
+
+	return {
+		"ok": True,
+		"pricing_rule": doc.name,
+		"discount_percent": discount_percent,
+	}
