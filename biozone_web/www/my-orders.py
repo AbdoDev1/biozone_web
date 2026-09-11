@@ -1,6 +1,10 @@
 import frappe
 
-from biozone_web.utils import get_header_context, redirect_staff_away_from_store
+from biozone_web.utils import (
+	find_customer_for_current_user,
+	get_header_context,
+	redirect_staff_away_from_store,
+)
 
 # تسمية عربية لحالات Sales Order القياسية في ERPNext، عشان تتعرض للعميل
 # بلغة مفهومة بدل قيم النظام الإنجليزية الخام.
@@ -40,13 +44,16 @@ def get_context(context):
 		frappe.local.flags.redirect_location = "/login"
 		raise frappe.Redirect
 
-	# نفس تسمية get_or_create_customer_for_current_user في utils.py: اسم
-	# الـCustomer = بريد المستخدم نفسه. لو مفيش Customer بالاسم ده لسه،
-	# معناه المستخدم لسه ما عملش أي طلب خالص.
-	customer = frappe.session.user
+	# الربط بين المستخدم والـCustomer بيتم عبر جدول Portal User الفرعي
+	# (find_customer_for_current_user)، مش بافتراض Customer.name == email
+	# القديم المكسور — نفس الإصلاح اللي اتطبق على
+	# get_or_create_customer_for_current_user بتاريخ 8 سبتمبر 2026. لو
+	# رجّعت None، معناها المستخدم لسه ما عملش أي طلب خالص (مفيش ربط
+	# Portal User اتعمل له لحد دلوقتي).
+	customer = find_customer_for_current_user()
 
 	orders = []
-	if frappe.db.exists("Customer", customer):
+	if customer:
 		rows = frappe.get_all(
 			"Sales Order",
 			filters={"customer": customer},
