@@ -46,6 +46,17 @@ def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 	)
 
 	user.insert(ignore_permissions=True)
+
+	# منح صلاحية القراءة المحدودة على Item (عبر Role مخصص، مش "All")
+	# — لازمة لأن ERPNext بينادي item.check_permission() إجباريًا داخل
+	# Sales Order.validate() (عبر get_item_details) لكل صف فيه item_code،
+	# بلا شرط وبلا استثناء — راجع تحليل biozone-web-security-audit.
+	# الإسناد هنا بس، جوه مسار التسجيل الموثوق، مش بناءً على أي قيمة
+	# جاية من المتصفح، والفحص قبل الإضافة يمنع أي تكرار لو الدالة
+	# اتنادت مرتين على نفس المستخدم لأي سبب.
+	if "Biozone Storefront Customer" not in user.get_roles():
+		user.add_roles("Biozone Storefront Customer")
+
 	frappe.db.commit()
 
 	login_manager = frappe.local.login_manager
