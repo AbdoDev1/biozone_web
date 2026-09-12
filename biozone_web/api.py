@@ -175,7 +175,40 @@ def biozone_confirm_order(items):
 				# ordering_user تلقائيًا. لا تعيين يدوي لـ owner هنا:
 				# set_user_and_timestamp() يتجاهل أي owner صريح.
 				so.insert(ignore_permissions=True)
-				frappe.db.commit()
+
+				# ضمان صريح: owner يجب أن يكون المستخدم الذي أرسل
+				# الطلب. الفحص هنا (داخل نفس المحاولة، قبل أي commit)
+				# عشان أي rollback لاحق في الـ except الخارجي يلغي
+				# الإدراج بالكامل من غير ما يترك أثر جزئي.
+				if so.owner != ordering_user:
+					frappe.log_error(
+						title="Sales Order owner mismatch",
+						message=(
+							f"Expected owner: {ordering_user}\n"
+							f"Actual owner: {so.owner}\n"
+							f"Sales Order: {so.name}"
+						),
+					)
+
+					try:
+						frappe.delete_doc(
+							"Sales Order",
+							so.name,
+							ignore_permissions=True,
+							force=True,
+						)
+					except Exception:
+						frappe.log_error(
+							frappe.get_traceback(),
+							"Failed to delete Sales Order after owner mismatch",
+						)
+
+					frappe.throw(_("تعذر تأكيد الطلب بشكل آمن، يرجى المحاولة مرة أخرى"))
+
+				# لا commit يدوي هنا: النجاح يُترك لـ Frappe يثبّته
+				# تلقائيًا في نهاية الـ request. الـ commit الوحيد
+				# اليدوي في هذه الدالة هو ثبات Customer فوق (مقصود
+				# ومستقل عن مصير Sales Order).
 				break
 
 			except frappe.QueryDeadlockError:
@@ -189,10 +222,6 @@ def biozone_confirm_order(items):
 				time.sleep(0.1 * (attempt + 1))
 
 		if so is None:
-			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
-
-		# ضمان صريح: owner يجب أن يكون المستخدم الذي أرسل الطلب.
-		if so.owner != ordering_user:
 			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
 
 	except Exception:
