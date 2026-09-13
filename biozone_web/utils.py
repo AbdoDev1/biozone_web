@@ -197,6 +197,19 @@ def get_default_warehouse():
 	return warehouse
 
 
+def get_csrf_token_safe() -> str:
+	"""رمز CSRF للصفحات التي تستدعي APIs عبر fetch.
+
+	في طلبات الويب الحقيقية يُرجع الرمز الفعلي. في سياقات بلا جلسة
+	(bench console/اختبارات) يُرجع سلسلة فارغة بدل رمي استثناء، حتى لا
+	تتعطل معاينة الصفحة — نماذج fetch لن تُستخدم هناك أصلًا.
+	"""
+	try:
+		return frappe.sessions.get_csrf_token()
+	except Exception:
+		return ""
+
+
 def get_header_context():
 	"""Shared header state for any www page that includes site_header.html.
 	Call this from the page's get_context() and merge the result in, e.g.:

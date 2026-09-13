@@ -8,7 +8,7 @@ PAGE_SIZE = 20
 def get_context(context):
 	require_staff_access()
 	context.no_cache = 1
-	context.active_page = "staff_items"
+	context.active_page = "items"
 	context.update(get_header_context())
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
 	# الصفحة مش extending من web.html بتاع Frappe (زي باقي صفحات biozone_web)،
@@ -20,8 +20,13 @@ def get_context(context):
 	search_term = (frappe.form_dict.get("q") or "").strip()
 	item_group = frappe.form_dict.get("group")
 	brand = frappe.form_dict.get("brand")
+	# رابط اسم الصنف من شاشة التجهيز (§8) يفتح تفاصيله في تبويب جديد عبر
+	# ?code= — فلتر دقيق على الكود، لا على الاسم.
+	exact_code = (frappe.form_dict.get("code") or "").strip()
 
 	filters = {}
+	if exact_code:
+		filters["item_code"] = exact_code
 	if item_group:
 		filters["item_group"] = item_group
 	if brand:
@@ -74,10 +79,23 @@ def get_context(context):
 
 	discounts_map = _get_active_discounts(item_codes)
 
+	# الباركودات الحالية لكل صنف (للعرض/التعديل في الدرج — بند 4).
+	barcodes_map = {code: [] for code in item_codes}
+	if item_codes:
+		bc_rows = frappe.get_all(
+			"Item Barcode",
+			filters={"parent": ["in", item_codes], "parenttype": "Item"},
+			fields=["parent", "barcode"],
+		)
+		for r in bc_rows:
+			if r.barcode:
+				barcodes_map.setdefault(r.parent, []).append(r.barcode)
+
 	for it in items:
 		it["stock_qty"] = stock_map.get(it["item_code"]) or 0
 		it["price"] = price_map.get(it["item_code"])
 		it["discounts"] = discounts_map.get(it["item_code"], [])
+		it["barcodes"] = barcodes_map.get(it["item_code"], [])
 
 	context.items = items
 	context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")

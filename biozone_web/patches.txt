@@ -6,3 +6,5 @@
 # Patches added in this section will be executed after doctypes are migrated
 biozone_web.patches.v0_0.add_disabled_field_to_customer_group
 biozone_web.patches.v0_0.assign_storefront_role_to_existing_customers
+biozone_web.patches.v0_0.b9_order_prep_fields
+biozone_web.patches.v0_0.b9_invoice_prev_balance

@@ -83,6 +83,27 @@
     }
   }
 
+  function refreshCartBadgeFromStorage() {
+    try {
+      var list = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
+      var badge = document.getElementById('cart-count-badge');
+      if (badge) badge.textContent = list.reduce(function (sum, it) { return sum + (it.quantity || 0); }, 0);
+    } catch (e) {}
+  }
+
+  function refreshAllCatalogControls() {
+    document.querySelectorAll('.catalog-cart-control').forEach(renderCatalogCartControl);
+    refreshCartBadgeFromStorage();
+  }
+
+  // البند 1: مزامنة فورية بين التبويبات — أي تغيير في مفتاح السلة
+  // (إضافة/تصفير بعد طلب ناجح) يحدّث stepper الكتالوج والشارة بلا reload.
+  // ملاحظة: حدث storage يُطلق في التبويبات الأخرى فقط، لا في نفس التبويب
+  // الذي كتب — لذا كل كتابة محلية تحدّث واجهتها مباشرة أيضًا.
+  window.addEventListener('storage', function (e) {
+    if (e && e.key === CART_STORAGE_KEY) refreshAllCatalogControls();
+  });
+
   function renderCatalogCartControl(el) {
     const itemCode = el.dataset.itemCode;
     const items = getCartItemsList();

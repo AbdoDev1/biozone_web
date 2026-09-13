@@ -88,6 +88,8 @@ tailwind.config = {
           تأكيد الطلب
         </button>
         <p class="hidden mt-3 text-sm text-error text-center" id="confirm-order-error"></p>
+        <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="activation-hint"></p>
+        <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="cart-reprice-notice"></p>
         <p class="mt-4 flex items-center justify-center gap-1.5 text-xs text-on-surface-variant">
           <span class="material-symbols-outlined text-base">verified_user</span>
           معاملة آمنة وموثوقة للمنشآت الطبية
@@ -228,6 +230,61 @@ tailwind.config = {
     render();
   }
 
+  // البند 5: أسعار السلة تُعاد حسابها من السيرفر عند كل فتح للصفحة حسب
+  // فئة الطالب الحالية (زائر/غير مفعّل → الجمهور، مفعّل → فئته) — أسعار
+  // localStorage القديمة (من جلسة/فئة سابقة أو تعديل يدوي) لا تُعتمد أبدًا.
+  // الأصناف التي بلا سعر تُحذف من السلة مع تنبيه. أي فشل في النداء يُبقي
+  // الأسعار المحلية مؤقتًا بدل كسر الصفحة (التأكيد نفسه يعيد الحساب سيرفر-سايد).
+  async function repriceFromServer(items) {
+    const outcome = { items: items, removedCount: 0, meta: null, failed: false };
+    if (items.length === 0) return outcome;
+
+    const codes = [];
+    items.forEach((it) => { if (it.item_code && codes.indexOf(it.item_code) === -1) codes.push(it.item_code); });
+
+    try {
+      const res = await fetch('/api/method/biozone_web.api.biozone_get_cart_prices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-CSRF-Token': CSRF_TOKEN,
+        },
+        body: JSON.stringify({ item_codes: codes })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.message || !data.message.prices) throw new Error('reprice failed');
+
+      outcome.meta = data.message;
+      const prices = data.message.prices;
+      const kept = [];
+      items.forEach((it) => {
+        const p = prices[it.item_code];
+        if (p && p.price !== null && p.price !== undefined) {
+          it.price = p.price;
+          kept.push(it);
+        } else {
+          outcome.removedCount += 1;
+        }
+      });
+      outcome.items = kept;
+    } catch (e) {
+      outcome.failed = true;
+    }
+    return outcome;
+  }
+
+  function showActivationHint(meta) {
+    const hintEl = document.getElementById('activation-hint');
+    if (!meta || meta.is_active) {
+      hintEl.classList.add('hidden');
+      return;
+    }
+    hintEl.textContent = meta.is_guest
+      ? 'يمكنك التصفح وملء السلة بحرية. تأكيد الطلب يتطلب تسجيل الدخول وتفعيل فئة حسابك لدى إدارة المتجر.'
+      : 'يمكنك التصفح وملء السلة بحرية. تأكيد الطلب سيُتاح بعد تفعيل فئة حسابك لدى إدارة المتجر.';
+    hintEl.classList.remove('hidden');
+  }
+
   document.getElementById('confirm-order-btn').addEventListener('click', async () => {
     const items = loadCart();
     const errorEl = document.getElementById('confirm-order-error');
@@ -250,6 +307,13 @@ tailwind.config = {
         throw new Error(msg);
       }
       localStorage.removeItem(CART_KEY);
+      // البند 1: تحديث الشارة في نفس التبويب فورًا قبل التحويل —
+      // التبويبات الأخرى تلتقط الحدث عبر مستمع storage تلقائيًا
+      // (removeItem يُطلق storage في التبويبات الأخرى).
+      try {
+        var _b = document.getElementById('cart-count-badge');
+        if (_b) _b.textContent = '0';
+      } catch (e) {}
       window.location.href = (data.message && data.message.redirect) || '/biozone-home';
     } catch (err) {
       errorEl.textContent = err.message;
@@ -258,6 +322,22 @@ tailwind.config = {
   });
 
   render();
+  // البند 1: إذا تغيّرت السلة من تبويب آخر (كتالوج/سلة ثانية/تصفير بعد
+  // طلب)، أعد العرض فورًا بلا reload.
+  window.addEventListener('storage', function (e) {
+    if (e && e.key === CART_KEY) render();
+  });
+  repriceFromServer(loadCart()).then((outcome) => {
+    if (outcome.failed) return;
+    saveCart(outcome.items);
+    render();
+    const noticeEl = document.getElementById('cart-reprice-notice');
+    if (outcome.removedCount > 0) {
+      noticeEl.textContent = 'أُزيلت ' + outcome.removedCount + ' أصناف من السلة لعدم توفر سعرها حاليًا.';
+      noticeEl.classList.remove('hidden');
+    }
+    showActivationHint(outcome.meta);
+  });
 })();
 </script>
 

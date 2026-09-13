@@ -1,0 +1,134 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | تسليم الطلب والفاتورة</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+tailwind.config = { darkMode: "class", theme: { extend: {
+  colors: { primary: "#00685f", "navy-text": "#0b1c30", surface: "#f8f9ff", "surface-subtle": "#eff4ff" },
+  fontFamily: { sans: ['Tajawal', 'sans-serif'] } } } }
+</script>
+<style>
+body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
+@media print {
+  aside, header, nav, .no-print { display: none !important; }
+  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
+  .main-content-wrapper { margin: 0 !important; padding: 0 !important; }
+}
+</style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<main class="flex-1 px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full flex flex-col gap-6 main-content-wrapper">
+
+<!-- شريط التأكيد الرقمي -->
+<div class="no-print bg-white rounded-2xl p-6 shadow-sm border border-surface-subtle flex flex-col gap-5">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-subtle">
+<p class="text-[18px] font-bold">تم إصدار الفاتورة المعتمَدة وخصم المخزون وتسليم الطلب بالكامل.</p>
+<div class="flex items-center gap-2 flex-wrap">
+<button class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all" onclick="window.print()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</button>
+<button class="flex items-center gap-1.5 px-4 py-2.5 bg-surface-subtle hover:bg-surface-container rounded-xl font-bold transition-all" onclick="window.print()" title="إعادة طباعة المستند نفسه"><span class="material-symbols-outlined text-[20px]">content_copy</span>طباعة نسخة إضافية</button>
+<a class="flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="/staff/orders"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-6 gap-2">
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الطلب</span><span class="font-bold mt-1">{{ order_name }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الفاتورة</span><span class="font-bold text-primary mt-1">{{ invoice_name }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col col-span-2 md:col-span-1"><span class="text-xs text-navy-text/60">اسم العميل</span><span class="font-bold mt-1 truncate">{{ customer_name }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col col-span-2 md:col-span-1"><span class="text-xs text-navy-text/60">رقم التسليم</span><span class="font-bold mt-1 truncate">{{ delivery_note or '—' }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">عدد الأصناف</span><span class="font-bold mt-1">{{ items_count }} صنف</span></div>
+<div class="bg-primary/10 p-3 rounded-xl flex flex-col"><span class="text-xs text-primary font-bold">صافي الفاتورة</span><span class="font-bold text-primary mt-1">{{ "{:,.2f}".format(grand_total) }} ج.م</span></div>
+</div>
+</div>
+
+<!-- الفاتورة الورقية (تصميم واحد فقط — إعادة الطباعة تعيد المستند نفسه) -->
+<div class="w-full flex flex-col items-center justify-center">
+<div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
+<div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
+<div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">فاتورة رقم</span><span class="col-span-2 text-center font-bold text-[16px]">{{ invoice_name }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">التاريخ</span><span class="col-span-2 text-center">{{ posting_date }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">اسم العميل</span><span class="col-span-2 font-bold text-[14px]">{{ customer_name }}</span></div>
+<div class="grid grid-cols-3 py-1 px-1"><span class="font-bold col-span-1">العنوان</span><span class="col-span-2 text-[12px]">{{ customer_address }}</span></div>
+<div class="border-t border-dashed border-gray-400 mt-1 pt-1 text-[10px] text-gray-700 flex justify-between"><span>طلب: {{ order_name }}</span><span>تسليم: {{ delivery_note or '—' }}</span></div>
+</div>
+<div class="col-span-8 text-center flex flex-col items-center justify-center">
+<h2 class="text-[24px] font-bold tracking-wide">Bio Zone - بيو زون</h2>
+<p class="text-[14px] font-bold mt-1">للمستلزمات الطبية ومستحضرات التجميل</p>
+<p class="text-[12px] mt-1">فاتورة معتمَدة</p>
+</div>
+</div>
+
+<div class="w-full overflow-x-auto">
+<table class="w-full border-collapse border border-black text-center text-[14px]">
+<thead>
+<tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
+<th class="border border-black py-1 px-1 w-10">م</th>
+<th class="border border-black py-1 px-2 text-right">الصنف</th>
+<th class="border border-black py-1 px-1 w-16">الكمية</th>
+<th class="border border-black py-1 px-1 w-20">السعر</th>
+<th class="border border-black py-1 px-1 w-20">الخصم %</th>
+<th class="border border-black py-1 px-1 w-24">الإجمالي</th>
+</tr>
+</thead>
+<tbody class="text-black">
+{% for it in items %}
+<tr class="border-b border-black">
+<td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
+<td class="border border-black py-1 px-2 text-right font-medium">{{ it.item_name }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ it.qty }}</td>
+<td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.rate) }}</td>
+<td class="border border-black py-1 px-1">{{ "{:g}".format(it.discount_percentage) }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="border-2 border-black border-t-0 text-[13px]">
+<div class="grid grid-cols-12 border-b border-black text-center font-bold">
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100">عدد الأصناف</div>
+<div class="col-span-1 border-l border-black py-1 text-[15px]">{{ items_count }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100">صافي الفاتورة</div>
+<div class="col-span-2 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(grand_total) }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100">الحساب السابق</div>
+<div class="col-span-3 py-1 text-[15px]">{{ "{:,.3f}".format(previous_balance) }}</div>
+</div>
+<div class="grid grid-cols-12 border-b border-black text-center">
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">الرصيد الحالي</div>
+<div class="col-span-2 border-l border-black py-1 font-bold text-[14px]">{{ "{:,.3f}".format(current_balance) }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">المبلغ كتابة</div>
+<div class="col-span-6 py-1 font-bold text-right px-2">{{ amount_words }}</div>
+</div>
+<div class="grid grid-cols-12 text-center text-[12px]">
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">الموظف المؤكِّد</div>
+<div class="col-span-4 border-l border-black py-1 font-bold">{{ confirmed_by }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">وقت الطباعة</div>
+<div class="col-span-4 py-1 font-bold" dir="ltr">{{ print_time }}</div>
+</div>
+</div>
+
+<div class="grid grid-cols-2 gap-6 mt-4 pt-2 border-t border-dashed border-gray-400 text-[13px]">
+<div class="flex flex-col gap-2">
+<span class="font-bold">توقيع المستلم:</span>
+<div class="h-12 border-b border-black border-dashed flex items-end"><span class="text-gray-400 text-[11px]">الاسم والتوقيع: ...............................................</span></div>
+</div>
+<div class="flex flex-col gap-2">
+<span class="font-bold">توقيع الموظف:</span>
+<div class="h-12 border-b border-black border-dashed flex items-end justify-end"><span class="text-gray-400 text-[11px]">{{ confirmed_by }}</span></div>
+</div>
+</div>
+
+<div class="mt-4 pt-1 flex justify-between items-center text-[10px] text-gray-500 border-t border-neutral-200">
+<span>شركة بيو زون للمستلزمات الطبية</span>
+<span>صفحة 1 من 1</span>
+</div>
+</div>
+</div>
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+</body></html>

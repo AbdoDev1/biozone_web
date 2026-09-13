@@ -41,7 +41,9 @@ def execute():
 	for user_email in website_users:
 		user = frappe.get_doc("User", user_email)
 
-		if role_name not in user.get_roles():
+		existing_roles = {r.role for r in user.get("roles", [])}
+
+		if role_name not in existing_roles:
 			user.add_roles(role_name)
 
 	frappe.db.commit()

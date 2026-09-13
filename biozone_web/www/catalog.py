@@ -1,6 +1,10 @@
 import frappe
 
-from biozone_web.utils import get_header_context, redirect_staff_away_from_store
+from biozone_web.utils import (
+    get_effective_item_prices,
+    get_header_context,
+    redirect_staff_away_from_store,
+)
 
 PAGE_SIZE = 20
 ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
@@ -55,14 +59,12 @@ def get_context(context):
     )
 
     item_codes = [i["item_code"] for i in items]
-    prices = frappe.get_all(
-        "Item Price",
-        fields=["item_code", "price_list_rate"],
-        filters={"price_list": "Standard Selling", "item_code": ["in", item_codes]},
-    )
-    price_map = {p["item_code"]: p["price_list_rate"] for p in prices}
+    # البند 5: السعر النهائي حسب فئة الطالب (سيرفر-سايد عبر محرك ERPNext)،
+    # لا السعر الأساسي الخام — الزائر/غير المفعّل يرى سعر الجمهور، والمفعّل
+    # يرى سعر فئته فقط. الأصناف بلا سعر أساسي تبقى price=None (غير متاحة).
+    effective = get_effective_item_prices(item_codes)
     for item in items:
-        item["price"] = price_map.get(item["item_code"])
+        item["price"] = effective.get(item["item_code"], {}).get("price")
 
     # Category chip list: every distinct item_group that has active items.
     categories = [

@@ -1,6 +1,10 @@
 import frappe
 
-from biozone_web.utils import get_header_context, redirect_staff_away_from_store
+from biozone_web.utils import (
+    get_effective_item_prices,
+    get_header_context,
+    redirect_staff_away_from_store,
+)
 
 
 def get_context(context):
@@ -36,14 +40,10 @@ def get_context(context):
         limit_page_length=4,
     )
     item_codes = [i["item_code"] for i in items]
-    prices = frappe.get_all(
-        "Item Price",
-        fields=["item_code", "price_list_rate"],
-        filters={"price_list": "Standard Selling", "item_code": ["in", item_codes]},
-    )
-    price_map = {p["item_code"]: p["price_list_rate"] for p in prices}
+    # البند 5: نفس تسعير الفئة المستخدم في /catalog (سيرفر-سايد).
+    effective = get_effective_item_prices(item_codes)
     for item in items:
-        item["price"] = price_map.get(item["item_code"])
+        item["price"] = effective.get(item["item_code"], {}).get("price")
     context.featured_items = items
 
     return context

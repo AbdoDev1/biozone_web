@@ -1,0 +1,378 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>بيوزون | تجهيز وفحص الطلب بالباركود</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+tailwind.config = { darkMode: "class", theme: { extend: {
+  colors: { primary: "#00685f", "primary-accent": "#008378", "navy-text": "#0b1c30", surface: "#f8f9ff", "surface-subtle": "#eff4ff", "surface-container": "#e5eeff", "alert-red": "#ba1a1a", "alert-bg": "#ffdad6" },
+  fontFamily: { sans: ['Tajawal', 'sans-serif'] } } } }
+</script>
+<style>
+body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b1c30; -webkit-font-smoothing: antialiased; }
+.resizable-table { table-layout: fixed; width: 100%; min-width: 1080px; border-collapse: separate; border-spacing: 0; }
+.resizable-th { position: relative; background-color: #f1f5fd; border-bottom: 2px solid #d3e4fe; }
+.resizer { position: absolute; top: 0; left: 0; width: 10px; bottom: 0; cursor: col-resize; user-select: none; z-index: 20; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.resizer::after { content: ''; width: 3px; height: 60%; background-color: #cbd5e1; border-radius: 2px; transition: all 0.15s ease-in-out; }
+.resizer:hover::after, .resizer.resizing::after { background-color: #00685f; height: 90%; width: 4px; }
+body.is-resizing { cursor: col-resize !important; user-select: none !important; }
+body.is-resizing * { cursor: col-resize !important; }
+</style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<main class="flex-1 p-4 sm:p-6 space-y-5 max-w-[1400px] w-full mx-auto">
+
+<!-- بيانات الطلب وإجراءات العودة -->
+<section class="bg-white border border-surface-container rounded-xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-sm">
+<div class="flex items-center flex-wrap gap-2.5">
+<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono">{{ order_name }}</span></div>
+<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name }}</span></div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-navy-text/70 text-xs font-bold">{{ state }}</span>
+</div>
+<div class="flex items-center gap-2.5 w-full lg:w-auto">
+<a href="/staff/orders" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
+</div>
+</section>
+
+<!-- عداد الإنجاز على مستوى الصنف -->
+<section class="bg-white border border-surface-container rounded-xl p-5 shadow-sm">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center border border-primary/20"><span class="material-symbols-outlined text-[28px]">fact_check</span></div>
+<div>
+<h2 class="text-base font-bold">معدل إنجاز فحص الأصناف وتأكيدها</h2>
+<p class="text-xs text-navy-text/60 mt-0.5">الأصناف المؤكدة: <strong class="text-primary text-sm" id="metricRatioText">{{ progress_text }}</strong></p>
+</div>
+</div>
+<div class="flex items-baseline gap-2 bg-surface-subtle px-4 py-2 rounded-lg border border-surface-container">
+<span class="text-3xl font-extrabold text-primary" id="metricPercentText">{{ percent }}%</span>
+<span class="text-xs font-semibold text-navy-text/60">من الإجمالي</span>
+</div>
+</div>
+<div class="mt-4 w-full bg-surface-subtle h-2 rounded-full overflow-hidden"><div class="bg-primary h-full transition-all duration-500 rounded-full" id="progressBar" style="width:{{ percent }}%"></div></div>
+</section>
+
+<!-- منطقة استقبال الباركود -->
+<section class="bg-white border border-primary/30 rounded-xl p-5 shadow-sm">
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
+<div class="flex-1 relative">
+<div class="absolute inset-y-0 right-3.5 flex items-center pointer-events-none text-primary"><span class="material-symbols-outlined text-[22px]">barcode_scanner</span></div>
+<input autocomplete="off" autofocus id="barcodeInput" dir="ltr" onkeydown="if(event.key==='Enter')processEnteredBarcode()" placeholder="وجّه الماسح الضوئي نحو المنتج ثم اضغط إدخال..." type="text"
+class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 rounded-lg text-sm font-mono font-bold focus:border-primary focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all">
+</div>
+<button onclick="processEnteredBarcode()" type="button" class="px-5 py-3 bg-primary hover:bg-primary-accent text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all whitespace-nowrap"><span class="material-symbols-outlined text-[18px]">check_circle</span>تأكيد الباركود</button>
+</div>
+<p class="text-[11px] text-navy-text/50 mt-2">مسحة واحدة ناجحة تؤكد الصنف بأكمله بغض النظر عن الكمية المطلوبة.</p>
+</section>
+
+<!-- جدول الأصناف -->
+<section class="bg-white border border-surface-container rounded-xl shadow-sm overflow-hidden">
+<div class="px-4 py-2 bg-surface-subtle/60 border-b border-surface-container flex items-center justify-between text-[11px] text-navy-text/60">
+<span class="flex items-center gap-1.5 font-medium"><span class="material-symbols-outlined text-[15px] text-primary">drag_indicator</span>يمكن سحب الحافة الفاصلة بين الأعمدة لتغيير عرضها</span>
+<span class="font-mono" id="itemsCountLabel">{{ items|length }} عناصر</span>
+</div>
+<div class="overflow-x-auto w-full">
+<table class="resizable-table text-right text-xs" id="itemsTable">
+<thead>
+<tr class="font-bold text-[12px]">
+<th class="resizable-th py-3.5 px-3 text-center" data-column="index" style="width:70px;min-width:55px;"><span>#</span><div class="resizer"></div></th>
+<th class="resizable-th py-3.5 px-4" data-column="item" style="width:340px;min-width:220px;"><span>اسم الصنف والكود</span><div class="resizer"></div></th>
+<th class="resizable-th py-3.5 px-4" data-column="barcode" style="width:230px;min-width:170px;"><span>الباركود</span><div class="resizer"></div></th>
+<th class="resizable-th py-3.5 px-4 text-center" data-column="quantity" style="width:160px;min-width:130px;"><div class="flex flex-col items-center"><span>الكمية المطلوبة</span><span class="text-[10px] text-navy-text/50 font-normal">(معلومة عرض فقط)</span></div><div class="resizer"></div></th>
+<th class="resizable-th py-3.5 px-4 text-center" data-column="status" style="width:180px;min-width:140px;"><span>الحالة</span><div class="resizer"></div></th>
+<th class="py-3.5 px-4 text-center" style="width:90px;min-width:75px;"><span>حذف</span></th>
+</tr>
+</thead>
+<tbody id="itemsTableBody">
+{% for it in items %}
+<tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name }}">
+<td class="py-3 px-3 text-center text-navy-text/50 font-mono">{{ it.idx }}</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/items?code={{ it.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد"><span>{{ it.item_name }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
+<span class="text-[10px] text-primary font-mono mt-0.5">كود الصنف: {{ it.item_code }}</span>
+</div>
+</td>
+<td class="py-3 px-4">
+{% if it.barcodes %}
+<div class="flex flex-col items-start gap-1.5">
+{% for bc in it.barcodes %}
+<div class="inline-flex items-center px-3 py-1 rounded-md bg-surface-subtle border border-surface-container font-mono font-bold text-xs tracking-wider" dir="ltr"><span>{{ bc }}</span></div>
+{% endfor %}
+</div>
+{% else %}
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-subtle border border-dashed border-navy-text/20 text-navy-text/50 text-[11px]"><span class="material-symbols-outlined text-[14px]">info</span><span class="font-medium">لا يوجد باركود مسجل</span></div>
+{% endif %}
+</td>
+<td class="py-3 px-4 text-center">
+<div class="inline-flex items-center gap-1.5 bg-surface-subtle px-2.5 py-1 rounded-lg">
+<span class="font-bold text-xs" id="qty-{{ it.name }}">{{ it.qty }} {{ it.uom }}</span>
+<button class="text-navy-text/50 hover:text-primary p-0.5 rounded transition-colors" onclick="openEditQtyModal('{{ it.name }}')" title="تعديل الكمية" type="button"><span class="material-symbols-outlined text-[15px]">edit</span></button>
+</div>
+</td>
+<td class="py-3 px-4 text-center" id="status-{{ it.name }}">
+{% if it.confirmed %}
+<div class="flex flex-col items-center gap-0.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300"><span class="material-symbols-outlined text-[14px]">check_circle</span>تم التأكيد</span>
+<span class="text-[10px] text-navy-text/50">{{ it.confirmed_by }}</span>
+</div>
+{% else %}
+<div class="flex flex-col items-center gap-1.5">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-[11px] font-bold"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>لم يُفحص بعد</span>
+<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect('{{ it.name }}')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button>
+</div>
+{% endif %}
+</td>
+<td class="py-3 px-4 text-center">
+<button class="p-1.5 text-navy-text/40 hover:text-alert-red hover:bg-alert-bg/40 rounded-lg transition-colors" onclick="openDeleteItemModal('{{ it.name }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- ملاحظة الانتباه (داخل صفحة الطلب فقط) -->
+<section class="bg-white border border-surface-container rounded-xl p-5 shadow-sm">
+<h3 class="text-sm font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-amber-text">warning</span>متابعة خاصة بالطلب</h3>
+<div class="flex flex-col sm:flex-row gap-3">
+<label class="inline-flex items-center gap-2 text-xs font-bold cursor-pointer"><input type="checkbox" id="attentionCheck" {% if needs_attention %}checked{% endif %} class="rounded text-primary focus:ring-primary">يحتاج هذا الطلب إلى انتباه</label>
+<input id="attentionNote" value="{{ attention_note }}" placeholder="تفاصيل المشكلة (تظهر هنا فقط، وليست في القائمة)..." class="flex-1 text-xs p-2.5 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary">
+<button onclick="saveAttention()" type="button" class="px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-colors">حفظ</button>
+</div>
+</section>
+
+<!-- زر التأكيد النهائي -->
+<section class="bg-white border border-surface-container rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+<p class="text-xs text-navy-text/60">عند اكتمال تأكيد كل الأصناف يُتاح زر التسليم، فيُنشأ التسليم والفاتورة المعتمَدة معًا في نفس اللحظة.</p>
+<button id="btnFinalConfirmation" onclick="executeFinalDelivery()" type="button" {% if confirmed != total or total == 0 %}disabled{% endif %}
+class="px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all {% if confirmed == total and total > 0 %}bg-primary hover:bg-primary-accent text-white shadow-md cursor-pointer{% else %}bg-surface-container text-navy-text/50 opacity-60 cursor-not-allowed{% endif %}">
+<span class="material-symbols-outlined text-[20px]">task_alt</span>تأكيد التسليم وإنشاء الفاتورة</button>
+</section>
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+
+<!-- مودال تعديل الكمية -->
+<div class="fixed inset-0 z-50 bg-navy-text/50 backdrop-blur-sm hidden items-center justify-center p-4" id="editQtyModal">
+<div class="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl space-y-4">
+<h3 class="text-sm font-bold">تعديل كمية الصنف</h3>
+<div class="space-y-3">
+<div><label class="block text-xs font-bold mb-1.5">الكمية الجديدة</label>
+<input class="w-full text-sm font-bold p-2.5 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary" id="editQtyInput" min="1" step="any" type="number"></div>
+<p class="text-[11px] text-navy-text/60 bg-surface-subtle p-2 rounded-lg">تعديل الكمية لا يؤثر على حالة التأكيد الحالية للصنف، ويُسجَّل من قام به تلقائيًا.</p>
+</div>
+<div class="flex items-center justify-end gap-2 pt-2 border-t border-surface-subtle">
+<button class="px-3 py-1.5 bg-surface-subtle text-navy-text text-xs font-bold rounded-lg hover:bg-surface-container transition-colors" onclick="closeModal('editQtyModal')" type="button">إلغاء</button>
+<button class="px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-accent transition-colors" onclick="saveEditedQuantity()" type="button">حفظ الكمية</button>
+</div>
+</div>
+</div>
+
+<!-- مودال حذف الصنف -->
+<div class="fixed inset-0 z-50 bg-navy-text/50 backdrop-blur-sm hidden items-center justify-center p-4" id="deleteItemModal">
+<div class="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+<h3 class="text-base font-bold">حذف الصنف من الطلب</h3>
+<p class="text-xs leading-relaxed bg-surface-subtle p-3.5 rounded-lg border border-surface-container">هل تريد حذف هذا الصنف من الطلب؟ لا يمكن التراجع عن هذا الإجراء، وسيُحدَّث مؤشر الإنجاز فورًا.</p>
+<div class="flex items-center justify-end gap-2.5 pt-2">
+<button class="px-4 py-2 bg-surface-subtle text-navy-text text-xs font-bold rounded-lg hover:bg-surface-container transition-colors" onclick="closeModal('deleteItemModal')" type="button">تراجع</button>
+<button class="px-4 py-2 bg-alert-red text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors" onclick="confirmDeleteItem()" type="button">تأكيد الحذف</button>
+</div>
+</div>
+</div>
+
+<div class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none" id="toastContainer"></div>
+
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+const ORDER_NAME = {{ order_name|tojson }};
+let ITEMS = {{ items_json }};
+let activeRow = null;
+
+function apiCall(method, args) {
+  return fetch('/api/method/biozone_web.api.' + method, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+    body: JSON.stringify(args),
+  }).then(async (res) => {
+    const data = await res.json();
+    if (!res.ok || (data.message && data.message.ok === false)) {
+      const msg = (data.message && data.message.error) || data.exception || 'تعذر تنفيذ العملية';
+      throw new Error(msg);
+    }
+    return data.message;
+  });
+}
+
+function refreshFromPayload(p) {
+  if (!p || !p.ok) return;
+  ITEMS = p.items || ITEMS;
+  document.getElementById('metricRatioText').innerText = p.progress_text;
+  document.getElementById('metricPercentText').innerText = p.percent + '%';
+  document.getElementById('progressBar').style.width = p.percent + '%';
+  document.getElementById('itemsCountLabel').innerText = p.total + ' عناصر';
+  const btn = document.getElementById('btnFinalConfirmation');
+  if (p.confirmed === p.total && p.total > 0) {
+    btn.disabled = false;
+    btn.className = "px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all bg-primary hover:bg-primary-accent text-white shadow-md cursor-pointer";
+  } else {
+    btn.disabled = true;
+    btn.className = "px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all bg-surface-container text-navy-text/50 opacity-60 cursor-not-allowed";
+  }
+  // تحديث صفوف الجدول دون إعادة تحميل كاملة — تأكيد واحد فقط بلا تمييز
+  // ماسح/يدوي (الهوية من الجلسة، تُعرض confirmed_by فقط).
+  (p.items || []).forEach((it) => {
+    const statusCell = document.getElementById('status-' + it.name);
+    const row = document.getElementById('row-' + it.name);
+    const qtyEl = document.getElementById('qty-' + it.name);
+    if (qtyEl) qtyEl.innerText = it.qty + ' ' + (it.uom || '');
+    if (!statusCell || !row) return;
+    if (it.confirmed) {
+      row.classList.remove('bg-amber-50/30');
+      const by = (it.confirmed_by || '').replace(/</g, '&lt;');
+      statusCell.innerHTML = '<div class="flex flex-col items-center gap-0.5">'
+        + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300"><span class="material-symbols-outlined text-[14px]">check_circle</span>تم التأكيد</span>'
+        + '<span class="text-[10px] text-navy-text/50">' + by + '</span></div>';
+    } else {
+      row.classList.add('bg-amber-50/30');
+      statusCell.innerHTML = '<div class="flex flex-col items-center gap-1.5">'
+        + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-[11px] font-bold"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>لم يُفحص بعد</span>'
+        + '<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect(\'' + it.name + '\')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button></div>';
+    }
+  });
+  // حذف الصفوف المحذوفة من العرض
+  const alive = new Set((p.items || []).map((it) => 'row-' + it.name));
+  document.querySelectorAll('#itemsTableBody tr').forEach((tr) => {
+    if (!alive.has(tr.id)) tr.remove();
+  });
+  const input = document.getElementById('barcodeInput');
+  if (input) input.focus();
+}
+
+async function processEnteredBarcode() {
+  const input = document.getElementById('barcodeInput');
+  const val = (input.value || '').trim();
+  if (!val) return;
+  input.value = '';
+  try {
+    const p = await apiCall('staff_confirm_item_barcode', { order_name: ORDER_NAME, barcode: val });
+    if (p.already) showToast('صنف مؤكد مسبقًا', 'هذا الصنف مسجل ومكتمل مسبقًا في هذا الطلب.', 'info');
+    else showToast('تم بنجاح', 'تم التعرف على الصنف وتأكيده بنجاح.', 'success');
+    refreshFromPayload(p);
+  } catch (err) {
+    showToast('تعذر التأكيد', err.message, 'error');
+    input.focus();
+  }
+}
+
+async function confirmManualDirect(row) {
+  // تأكيد واحد بضغطة واحدة — بلا مودال وبلا اسم/سبب (الهوية من الجلسة).
+  try {
+    const p = await apiCall('staff_confirm_item_manual', { order_name: ORDER_NAME, so_detail: row });
+    if (p.already) showToast('مؤكد مسبقًا', 'هذا الصنف مؤكد بالفعل في هذا الطلب.', 'info');
+    else showToast('تم التأكيد', 'تم تأكيد الصنف وتوثيقه تلقائيًا.', 'success');
+    refreshFromPayload(p);
+  } catch (err) { showToast('تعذر التأكيد', err.message, 'error'); }
+}
+
+function openEditQtyModal(row) {
+  activeRow = row;
+  const it = ITEMS.find((x) => x.name === row);
+  document.getElementById('editQtyInput').value = it ? it.qty : 1;
+  openModal('editQtyModal');
+}
+async function saveEditedQuantity() {
+  const v = parseFloat(document.getElementById('editQtyInput').value);
+  if (!(v > 0)) { showToast('كمية غير صحيحة', 'من فضلك أدخل كمية أكبر من صفر.', 'error'); return; }
+  try {
+    const p = await apiCall('staff_update_item_qty', { order_name: ORDER_NAME, so_detail: activeRow, new_qty: v });
+    closeModal('editQtyModal');
+    showToast('تم تحديث الكمية', 'تم تعديل الكمية دون تغيير حالة التأكيد.', 'success');
+    refreshFromPayload(p);
+  } catch (err) { showToast('تعذر التعديل', err.message, 'error'); }
+}
+
+function openDeleteItemModal(row) { activeRow = row; openModal('deleteItemModal'); }
+async function confirmDeleteItem() {
+  try {
+    const p = await apiCall('staff_delete_item', { order_name: ORDER_NAME, so_detail: activeRow });
+    closeModal('deleteItemModal');
+    showToast('تم حذف الصنف', 'حُذف الصنف وحُدّث مؤشر الإنجاز فورًا.', 'warning');
+    refreshFromPayload(p);
+  } catch (err) { showToast('تعذر الحذف', err.message, 'error'); }
+}
+
+async function saveAttention() {
+  const checked = document.getElementById('attentionCheck').checked ? 1 : 0;
+  const note = document.getElementById('attentionNote').value;
+  try {
+    await apiCall('staff_set_order_attention', { order_name: ORDER_NAME, needs_attention: checked, note: note });
+    showToast('تم الحفظ', 'حُدّثت حالة المتابعة الخاصة للطلب.', 'success');
+  } catch (err) { showToast('تعذر الحفظ', err.message, 'error'); }
+}
+
+async function executeFinalDelivery() {
+  if (!window.confirm('تأكيد تسليم الطلب ' + ORDER_NAME + '؟ سيُنشأ التسليم والفاتورة المعتمَدة معًا في نفس اللحظة.')) return;
+  const btn = document.getElementById('btnFinalConfirmation');
+  btn.disabled = true;
+  try {
+    const r = await apiCall('staff_confirm_delivery', { order_name: ORDER_NAME });
+    window.location.href = r.redirect || ('/staff/order-delivery?order=' + ORDER_NAME + '&invoice=' + (r.sales_invoice || ''));
+  } catch (err) {
+    showToast('تعذر التسليم', err.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+
+function showToast(title, desc, type) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  let border = 'border-primary/30', icon = 'info', color = 'text-primary';
+  if (type === 'error') { border = 'border-red-300'; icon = 'error'; color = 'text-red-600'; }
+  else if (type === 'warning') { border = 'border-amber-300'; icon = 'warning'; color = 'text-amber-600'; }
+  else if (type === 'success') { border = 'border-emerald-300'; icon = 'task_alt'; color = 'text-emerald-600'; }
+  toast.className = 'pointer-events-auto flex items-center gap-3 bg-white p-3.5 rounded-xl border ' + border + ' shadow-xl min-w-[280px] max-w-sm';
+  toast.innerHTML = '<span class="material-symbols-outlined ' + color + ' text-[22px]">' + icon + '</span><div class="flex flex-col text-xs"><span class="font-bold">' + title + '</span><span class="text-navy-text/60">' + desc + '</span></div>';
+  container.appendChild(toast);
+  setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+(function initResizableColumns() {
+  const table = document.getElementById('itemsTable');
+  if (!table) return;
+  table.querySelectorAll('.resizer').forEach(resizer => {
+    const th = resizer.parentElement;
+    let startX = 0, startWidth = 0;
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startX = e.pageX;
+      startWidth = th.getBoundingClientRect().width;
+      resizer.classList.add('resizing');
+      document.body.classList.add('is-resizing');
+      const onMove = (ev) => {
+        let nw = Math.round(startWidth + (startX - ev.pageX));
+        nw = Math.max(55, Math.min(800, nw));
+        th.style.width = nw + 'px';
+        th.style.minWidth = nw + 'px';
+      };
+      const onUp = () => {
+        resizer.classList.remove('resizing');
+        document.body.classList.remove('is-resizing');
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  });
+})();
+document.addEventListener('DOMContentLoaded', () => { const i = document.getElementById('barcodeInput'); if (i) i.focus(); });
+</script>
+</body></html>
