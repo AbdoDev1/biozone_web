@@ -51,6 +51,27 @@
     .col-resizer:hover::after, .col-resizer.resizing::after {
       background-color: #00685f; width: 3px; top: 0; bottom: 0;
     }
+    /* Sticky order-number column (RTL: the first column, pinned to the
+       inline-start = physical right edge) so the COMPLETE order number stays
+       visible while the remaining columns scroll underneath it — including
+       when the desktop sidebar is expanded and the table is wider than its
+       scroll container.
+       Width basis (measured, bold 14px mono): longest realistic order number
+       SAL-ORD-2026-03301 = 151.23px at 18 chars; the naming-series counter
+       is unbounded, so sizing uses a 19-char growth string SAL-ORD-2026-100000
+       = 159.64px + 2 x 20px cell padding (px-5, computed) + 0 border + 8px
+       safety margin (~1 char: sub-pixel rounding + cross-face variance) =
+       207.64px, rounded up to the 208px used below.
+       z-index 25 = above the sibling columns' .col-resizer (20) so the
+       handles never paint over the sticky column, below the sticky page
+       header bar (30) so the table still scrolls vertically under it, and
+       below the mobile drawer backdrop (40) and the sidebar (50). */
+    .resizable-table th.col-order, .resizable-table td.col-order {
+      position: sticky; inset-inline-start: 0; z-index: 25;
+      background-color: #ffffff; /* opaque: masks the columns scrolling underneath */
+    }
+    .resizable-table thead th.col-order { background-color: #f5f8ff; } /* surface-subtle/60 over white: header row tint */
+    .resizable-table tbody tr:hover td.col-order { background-color: #f9fbff; } /* surface-subtle/40 over white: row hover tint */
     body.is-resizing { cursor: col-resize !important; user-select: none !important; }
     body.is-resizing * { cursor: col-resize !important; }
   </style>
@@ -147,7 +168,7 @@
 <table class="w-full text-right resizable-table min-w-[980px]" id="ordersTable">
 <thead>
 <tr class="bg-surface-subtle/60 text-navy-text/60 text-xs border-b border-surface-subtle">
-<th class="resizable-th py-3.5 px-5 font-bold" data-min="130" data-max="240" style="width:150px;"><div class="truncate">رقم الطلب</div><div class="col-resizer" title="اسحب لتغيير عرض العمود"></div></th>
+<th class="resizable-th col-order py-3.5 px-5 font-bold" data-min="208" data-max="380" style="width:208px;"><div class="truncate">رقم الطلب</div><div class="col-resizer" title="اسحب لتغيير عرض العمود"></div></th>
 <th class="resizable-th py-3.5 px-5 font-bold" data-min="170" data-max="360" style="width:230px;"><div class="truncate">العميل</div><div class="col-resizer" title="اسحب لتغيير عرض العمود"></div></th>
 <th class="resizable-th py-3.5 px-5 font-bold" data-min="130" data-max="240" style="width:160px;"><div class="truncate">تاريخ الطلب</div><div class="col-resizer" title="اسحب لتغيير عرض العمود"></div></th>
 <th class="resizable-th py-3.5 px-5 font-bold text-center" data-min="100" data-max="200" style="width:120px;"><div class="truncate">الأصناف</div><div class="col-resizer" title="اسحب لتغيير عرض العمود"></div></th>
@@ -158,7 +179,7 @@
 <tbody class="text-sm text-navy-text divide-y divide-surface-subtle">
 {% for so in orders %}
 <tr class="hover:bg-surface-subtle/40 transition-colors">
-<td class="py-4 px-5 whitespace-nowrap">
+<td class="col-order py-4 px-5 whitespace-nowrap">
 {% if so.docstatus == 1 %}
 <span class="font-mono font-bold text-navy-text/70">{{ so.name }}</span>
 {% else %}
@@ -254,7 +275,19 @@ document.getElementById('filterToggleBtn').addEventListener('click', () => {
     const saved = JSON.parse(localStorage.getItem('biozone_orders_col_widths'));
     if (Array.isArray(saved)) {
       const ths = table.querySelectorAll('th');
-      saved.forEach((w, i) => { if (ths[i] && w) { ths[i].style.width = w; ths[i].style.minWidth = w; } });
+      saved.forEach((w, i) => {
+        if (!ths[i] || !w) return;
+        // Clamp at apply-time to the column's data-min — the same minimum the
+        // drag handler enforces — so a persisted or hand-edited narrower value
+        // can never shrink the order-number column below the width that fits a
+        // complete order number. Only the applied width is clamped; the stored
+        // value is left as-is, matching this table's existing design where the
+        // write path persists exactly what a drag produced (already clamped).
+        const min = parseInt(ths[i].dataset.min || '100', 10);
+        const width = Math.max(parseInt(String(w), 10) || min, min);
+        ths[i].style.width = width + 'px';
+        ths[i].style.minWidth = width + 'px';
+      });
     }
   } catch (err) {}
 })();

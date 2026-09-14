@@ -21,7 +21,7 @@
 </a>
 </nav>
 <script>
-    // Sidebar Drawer Toggle for Mobile and Tablet
+    // Sidebar Drawer Toggle for Mobile and Tablet (unchanged by desktop collapse below)
     function toggleSidebar(open) {
       const sidebar = document.getElementById('sidebar');
       const backdrop = document.getElementById('drawer-backdrop');
@@ -32,5 +32,56 @@
         sidebar.classList.add('max-lg:translate-x-full');
         backdrop.classList.add('hidden');
       }
+      syncSidebarAria();
+    }
+
+    // Desktop sidebar collapse — persisted per browser via localStorage.
+    // Independent from the mobile drawer above: this only ever toggles the
+    // `sidebar-collapsed` body class (styled under min-width:1024px), while
+    // toggleSidebar() only touches `max-lg:translate-x-full` (below lg).
+    var BIOZONE_SIDEBAR_KEY = 'biozone-sidebar-collapsed';
+    // Both toggle buttons (desktop edge button `#sidebar-edge-toggle` and the
+    // mobile header button `#sidebar-toggle-mobile`) expose the SAME
+    // `aria-expanded` value: "true" = the sidebar itself is currently expanded.
+    // Every state-change path funnels through here so the two can never drift:
+    // toggleDesktopSidebar(), toggleSidebar(), and the initial
+    // applyDesktopSidebar() read on page load. Below lg the drawer decides
+    // (the collapsed class has no visual effect there); at/above lg the drawer
+    // is always docked so only the collapsed class decides.
+    function sidebarIsExpanded() {
+      if (document.body.classList.contains('sidebar-collapsed')) return false;
+      if (window.matchMedia && window.matchMedia('(min-width: 1024px)').matches) return true;
+      const sidebar = document.getElementById('sidebar');
+      return !!sidebar && !sidebar.classList.contains('max-lg:translate-x-full');
+    }
+    function syncSidebarAria() {
+      const value = sidebarIsExpanded() ? 'true' : 'false';
+      ['sidebar-edge-toggle', 'sidebar-toggle-mobile'].forEach(function (id) {
+        const btn = document.getElementById(id);
+        if (btn) btn.setAttribute('aria-expanded', value);
+      });
+    }
+    function applyDesktopSidebar() {
+      try {
+        if (localStorage.getItem(BIOZONE_SIDEBAR_KEY) === '1') {
+          document.body.classList.add('sidebar-collapsed');
+        } else {
+          document.body.classList.remove('sidebar-collapsed');
+        }
+      } catch (e) { /* storage unavailable (private mode): stay expanded */ }
+      syncSidebarAria();
+    }
+    function toggleDesktopSidebar() {
+      var collapsed = document.body.classList.toggle('sidebar-collapsed');
+      try {
+        localStorage.setItem(BIOZONE_SIDEBAR_KEY, collapsed ? '1' : '0');
+      } catch (e) { /* storage unavailable: keep the in-memory toggle only */ }
+      syncSidebarAria();
+    }
+    applyDesktopSidebar();
+    // A viewport crossing lg: re-derive both buttons' labels from live state
+    // (e.g. drawer open on mobile, then resized to desktop).
+    if (window.matchMedia && window.matchMedia('(min-width: 1024px)').addEventListener) {
+      window.matchMedia('(min-width: 1024px)').addEventListener('change', syncSidebarAria);
     }
 </script>
