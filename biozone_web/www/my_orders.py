@@ -2,9 +2,7 @@ import frappe
 
 from biozone_web.utils import (
 	find_customer_for_current_user,
-	get_header_context,
 	is_unique_customer_binding,
-	redirect_staff_away_from_store,
 )
 
 # تسمية عربية لحالات Sales Order القياسية في ERPNext، عشان تتعرض للعميل
@@ -35,16 +33,19 @@ STATUS_STYLES = {
 
 
 def get_context(context):
-	redirect_staff_away_from_store()
+	# أُعيد توجيه المسار القديم إلى /account/orders (B10) — الملف باقٍ
+	# عمدًا حتى لا ينكسر أي رابط قديم محفوظ، والمنطق نفسه يعيش ويُستخدَم
+	# من هناك عبر build_customer_orders_list (بلا تكرار).
+	frappe.local.flags.redirect_location = "/account/orders"
+	raise frappe.Redirect
 
-	context.no_cache = 1
-	context.active_page = None
-	context.update(get_header_context())
 
-	if frappe.session.user == "Guest":
-		frappe.local.flags.redirect_location = "/login"
-		raise frappe.Redirect
+def build_customer_orders_list():
+	"""يبني قائمة طلبات المستخدم الحالي بنفس الصلاحيات والتسميات دائمًا.
 
+	يُستخدم من /account/orders (ومن أي مسار لاحق) — المصدر الوحيد لمنطق
+	القائمة حتى لا تتكرر نسخه. يُرجع (orders, orders_count).
+	"""
 	# الربط بين المستخدم والـCustomer بيتم عبر جدول Portal User الفرعي
 	# (find_customer_for_current_user)، مش بافتراض Customer.name == email
 	# القديم المكسور — نفس الإصلاح اللي اتطبق على
@@ -76,6 +77,4 @@ def get_context(context):
 				}
 			)
 
-	context.orders = orders
-	context.orders_count = len(orders)
-	return context
+	return orders, len(orders)

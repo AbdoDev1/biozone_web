@@ -41,10 +41,21 @@ def get_context(context):
             ["item_code", "like", f"%{search_term}%"],
         ]
 
-    # Count first (cheap — only item_code) so we know how many pages exist,
-    # then clamp the requested page into range before fetching the real rows.
-    matching_codes = frappe.get_all("Item", fields=["item_code"], filters=filters, or_filters=or_filters)
-    total_count = len(matching_codes)
+    # Count via SQL COUNT(*) — never materialize the full code list just
+    # to count it. Same filters as the page query below (incl. the OR
+    # search), so total_pages clamping is unchanged.
+    count_params = {}
+    count_where = "disabled = 0"
+    if selected_category:
+        count_where += " and item_group = %(category)s"
+        count_params["category"] = selected_category
+    if search_term:
+        count_where += " and (item_name like %(term)s or item_code like %(term)s)"
+        count_params["term"] = f"%{search_term}%"
+    total_count = frappe.db.sql(
+        f"select count(*) from `tabItem` where {count_where}",
+        count_params,
+    )[0][0]
     total_pages = max((total_count + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(page, total_pages)
 

@@ -314,6 +314,92 @@ def assert_can_view_sales_order(so, user=None):
 		)
 
 
+def _customer_has_field(fieldname):
+	"""حارس نشر عام: هل حقل معيَّن موجود على Customer؟
+
+	الكود قد يُنشر قبل تشغيل bench migrate الذي ينشئ الحقل. الفحص هنا
+	يتيح للكود العمل بأمان في الفترة البينية (يتجاهل الحقل) بدل رمي
+	استثناء.
+	"""
+	try:
+		return bool(frappe.get_meta("Customer").has_field(fieldname))
+	except Exception:
+		return False
+
+
+def customer_has_staff_review_field():
+	"""هل حقل مراجعة الفئة موجود على Customer؟"""
+	return _customer_has_field("staff_category_reviewed")
+
+
+def customer_has_category_assigned_field():
+	"""هل حقل التعيين الإداري للفئة موجود على Customer؟"""
+	return _customer_has_field("category_assigned_by_staff")
+
+
+def create_customer_for_user(user_email, full_name=None):
+	"""ينشئ Customer مرتبطًا ببريد صريح، بنفس قيم وحماية المسار الكسول.
+
+	الربط يتم عبر جدول Portal User الفرعي على Customer — نفس الآلية التي
+	يتوقعها find_customer_for_current_user (البحث في Portal User بشرط
+	user + parenttype = Customer)، فيجده get_or_create لاحقًا بلا تكرار.
+
+	القيم مطابقة لمسار الإنشاء الكسول: customer_name من الاسم الكامل،
+	customer_type = Individual، customer_group = الفئة الافتراضية
+	(الجمهور حاليًا)، territory = الافتراضية، category_assigned_by_staff
+	= 0 (غير معيَّن إداريًا — يظهر في قائمة انتظار الموظف).
+
+	آمنة للتكرار: لو ربط موجود بالفعل تُرجع اسمه بلا إنشاء جديد (نفس
+	حماية التحقق البعدي من سباق التزامن المستخدمة في المسار الكسول).
+	"""
+	user_email = (user_email or "").strip().lower()
+
+	if not user_email or user_email == "Guest":
+		frappe.throw(_("يجب تسجيل الدخول أولًا"))
+
+	existing = frappe.db.get_value(
+		"Portal User", {"user": user_email, "parenttype": "Customer"}, "parent"
+	)
+	if existing:
+		return existing
+
+	full_name = full_name or frappe.db.get_value("User", user_email, "full_name") or user_email
+
+	new_customer = {
+		"doctype": "Customer",
+		"customer_name": full_name,
+		"customer_type": "Individual",
+		"customer_group": get_default_customer_group(),
+		"territory": get_default_territory(),
+		"portal_users": [{"user": user_email}],
+	}
+	if customer_has_staff_review_field():
+		new_customer["staff_category_reviewed"] = 0
+	if customer_has_category_assigned_field():
+		new_customer["category_assigned_by_staff"] = 0
+
+	customer = frappe.get_doc(new_customer)
+	customer.insert(ignore_permissions=True)
+
+	# حماية بسيطة من سباق التزامن (طلبين متزامنين لأول مرة لنفس
+	# المستخدم قبل ما أي ربط يتعمل): تحقق بعدي، مش lock حقيقي — لو حصل
+	# سباق فعلي، ناخد أقدم Customer اتعمل ونمسح الزيادة اللي إحنا
+	# عملناها دلوقتي.
+	all_matches = frappe.get_all(
+		"Portal User",
+		filters={"user": user_email, "parenttype": "Customer"},
+		fields=["parent", "creation"],
+		order_by="creation asc",
+	)
+	if len(all_matches) > 1:
+		canonical = all_matches[0].parent
+		if canonical != customer.name:
+			frappe.delete_doc("Customer", customer.name, ignore_permissions=True, force=True)
+			return canonical
+
+	return customer.name
+
+
 def get_or_create_customer_for_current_user():
 	"""يرجع اسم الـCustomer المرتبط بالمستخدم الحالي، وينشئ واحد جديد لو
 	مفيش. الربط دلوقتي عن طريق جدول Portal User الفرعي على Customer
@@ -334,41 +420,7 @@ def get_or_create_customer_for_current_user():
 	if user_email == "Guest":
 		frappe.throw(_("يجب تسجيل الدخول أولًا"))
 
-	customer_name = find_customer_for_current_user()
-	if customer_name:
-		return customer_name
-
-	full_name = frappe.db.get_value("User", user_email, "full_name") or user_email
-
-	customer = frappe.get_doc(
-		{
-			"doctype": "Customer",
-			"customer_name": full_name,
-			"customer_type": "Individual",
-			"customer_group": get_default_customer_group(),
-			"territory": get_default_territory(),
-			"portal_users": [{"user": user_email}],
-		}
-	)
-	customer.insert(ignore_permissions=True)
-
-	# حماية بسيطة من سباق التزامن (طلبين متزامنين لأول مرة لنفس
-	# المستخدم قبل ما أي ربط يتعمل): تحقق بعدي، مش lock حقيقي — لو حصل
-	# سباق فعلي، ناخد أقدم Customer اتعمل ونمسح الزيادة اللي إحنا
-	# عملناها دلوقتي.
-	all_matches = frappe.get_all(
-		"Portal User",
-		filters={"user": user_email, "parenttype": "Customer"},
-		fields=["parent", "creation"],
-		order_by="creation asc",
-	)
-	if len(all_matches) > 1:
-		canonical = all_matches[0].parent
-		if canonical != customer.name:
-			frappe.delete_doc("Customer", customer.name, ignore_permissions=True, force=True)
-			return canonical
-
-	return customer.name
+	return create_customer_for_user(user_email)
 
 
 def get_default_customer_group():

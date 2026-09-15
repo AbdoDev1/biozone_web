@@ -5,7 +5,6 @@
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
 tailwind.config = { darkMode: "class", theme: { extend: {
@@ -14,10 +13,14 @@ tailwind.config = { darkMode: "class", theme: { extend: {
 </script>
 <style>
 body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
+/* ارتفاع ثابت لمنطقة بنود الفاتورة حتى يبقى ملخص الإجماليات في نفس
+   الموضع مهما قلّ عدد الأصناف (حتى صنف واحد) — شاشة وطباعة معًا. */
+.invoice-items { min-height: 300px; }
 @media print {
   aside, header, nav, .no-print { display: none !important; }
   .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
   .main-content-wrapper { margin: 0 !important; padding: 0 !important; }
+  .invoice-items { min-height: 300px; }
 }
 </style>
 </head>
@@ -62,12 +65,12 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 </div>
 </div>
 
-<div class="w-full overflow-x-auto">
+<div class="w-full overflow-x-auto invoice-items">
 <table class="w-full border-collapse border border-black text-center text-[14px]">
 <thead>
 <tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
 <th class="border border-black py-1 px-1 w-10">م</th>
-<th class="border border-black py-1 px-2 text-right">الصنف</th>
+<th class="border border-black py-1 px-2 text-center">الصنف</th>
 <th class="border border-black py-1 px-1 w-16">الكمية</th>
 <th class="border border-black py-1 px-1 w-20">السعر</th>
 <th class="border border-black py-1 px-1 w-20">الخصم %</th>
@@ -78,7 +81,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 {% for it in items %}
 <tr class="border-b border-black">
 <td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
-<td class="border border-black py-1 px-2 text-right font-medium">{{ it.item_name }}</td>
+<td class="border border-black py-1 px-2 text-center font-medium">{{ it.item_name }}</td>
 <td class="border border-black py-1 px-1 font-bold">{{ it.qty }}</td>
 <td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.rate) }}</td>
 <td class="border border-black py-1 px-1">{{ "{:g}".format(it.discount_percentage) }}</td>
@@ -96,11 +99,11 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="col-span-2 border-l border-black py-1 bg-neutral-100">صافي الفاتورة</div>
 <div class="col-span-2 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(grand_total) }}</div>
 <div class="col-span-2 border-l border-black py-1 bg-neutral-100">الحساب السابق</div>
-<div class="col-span-3 py-1 text-[15px]">{{ "{:,.3f}".format(previous_balance) }}</div>
+<div class="col-span-3 py-1 text-[15px]">{{ "{:,.2f}".format(previous_balance) }}</div>
 </div>
 <div class="grid grid-cols-12 border-b border-black text-center">
 <div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">الرصيد الحالي</div>
-<div class="col-span-2 border-l border-black py-1 font-bold text-[14px]">{{ "{:,.3f}".format(current_balance) }}</div>
+<div class="col-span-2 border-l border-black py-1 font-bold text-[14px]">{{ "{:,.2f}".format(current_balance) }}</div>
 <div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">المبلغ كتابة</div>
 <div class="col-span-6 py-1 font-bold text-right px-2">{{ amount_words }}</div>
 </div>

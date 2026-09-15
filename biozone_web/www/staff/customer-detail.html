@@ -1,0 +1,158 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>تفاصيل العميل - بيوزون (/staff/customers)</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6",
+            "amber-text": "#92400e"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 relative" id="main-content">
+<!-- عنوان الصفحة والوصف -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<div>
+<h2 class="text-2xl sm:text-3xl font-extrabold text-navy-text tracking-tight">تفاصيل العميل</h2>
+<p class="text-sm sm:text-base text-navy-text/60 mt-1 font-medium">عرض قراءة فقط لبيانات العميل وفواتيره.</p>
+</div>
+<a class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-navy-text border border-surface-container hover:bg-surface-subtle transition-colors inline-flex items-center gap-1.5" href="/staff/customers">
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+العودة إلى العملاء
+</a>
+</div>
+
+<!-- بطاقة العميل -->
+<section aria-label="بيانات العميل" class="bg-white rounded-2xl shadow-sm p-5 border border-surface-container">
+<div class="flex items-center gap-2 flex-wrap">
+<h3 class="text-lg font-extrabold text-navy-text leading-tight">{{ customer_display_name }}</h3>
+{% if customer_group == 'الجمهور' %}
+<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10">{{ customer_group }}</span>
+{% else %}
+<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{{ customer_group }}</span>
+{% endif %}
+{% if reviewed %}
+<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">تمت المراجعة</span>
+{% else %}
+<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text">بانتظار المراجعة</span>
+{% endif %}
+</div>
+<p class="text-xs font-mono text-navy-text/50 mt-1">{{ customer_code }}</p>
+<p class="text-xs text-navy-text/50 mt-1">{{ email + ' — ' if email else '' }}منذ {{ created_display }}</p>
+</section>
+
+<!-- الملخص المالي -->
+<section aria-label="الملخص المالي" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+<div class="bg-white rounded-xl p-4 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي الفواتير</p>
+<p class="text-lg font-black text-navy-text mt-0.5">{{ invoice_count }} فواتير</p>
+</div>
+<div class="bg-white rounded-xl p-4 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي المشتريات</p>
+<p class="text-lg font-black text-navy-text mt-0.5">{{ billed_display }}</p>
+</div>
+<div class="bg-white rounded-xl p-4 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي المدفوع</p>
+<p class="text-lg font-black text-navy-text mt-0.5">{{ paid_display }}</p>
+</div>
+<div class="bg-white rounded-xl p-4 border border-alert-bg/60">
+<p class="text-[11px] font-bold text-alert-red">المديونية الحالية</p>
+<p class="text-lg font-black text-alert-red mt-0.5">{{ outstanding_display }}</p>
+</div>
+</section>
+
+<!-- الفواتير -->
+<section aria-label="فواتير العميل" class="bg-white rounded-2xl shadow-sm border border-surface-container overflow-hidden flex flex-col">
+<div class="flex items-center justify-between px-5 py-4 border-b border-surface-container">
+<h4 class="text-sm font-extrabold text-navy-text">الفواتير المرحّلة</h4>
+<span class="text-xs text-navy-text/40">سجل المعاملات</span>
+</div>
+{% if invoices %}
+<div class="overflow-x-auto w-full">
+<table class="w-full text-right border-collapse min-w-[600px]">
+<thead>
+<tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold border-b border-surface-container select-none">
+<th class="py-3 px-5" scope="col">الفاتورة</th>
+<th class="py-3 px-5" scope="col">التاريخ</th>
+<th class="py-3 px-5" scope="col">الإجمالي</th>
+<th class="py-3 px-5" scope="col">المستحق</th>
+<th class="py-3 px-5" scope="col">الحالة</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container text-sm">
+{% for inv in invoices %}
+<tr class="hover:bg-surface/60 transition-colors">
+<td class="py-3 px-5 font-bold font-mono text-xs">{{ inv.name }}</td>
+<td class="py-3 px-5 text-navy-text/70">{{ inv.date_display }}</td>
+<td class="py-3 px-5 font-bold">{{ inv.total_display }}</td>
+<td class="py-3 px-5">{{ inv.outstanding_display }}</td>
+<td class="py-3 px-5">
+{% if 'paid' in inv.status|lower or ('مسددة' in inv.status and 'جزئي' not in inv.status and 'غير' not in inv.status) %}
+<span class="inline-block text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700">{{ inv.status }}</span>
+{% elif 'overdue' in inv.status|lower or 'متأخر' in inv.status or 'غير مسددة' in inv.status %}
+<span class="inline-block text-[10px] px-2 py-0.5 rounded-full font-bold bg-alert-bg text-alert-red">{{ inv.status }}</span>
+{% elif 'part' in inv.status|lower or 'جزئي' in inv.status %}
+<span class="inline-block text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-text">{{ inv.status }}</span>
+{% else %}
+<span class="inline-block text-[10px] px-2 py-0.5 rounded-full font-bold bg-surface-subtle text-navy-text/60">{{ inv.status }}</span>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<div class="py-16 px-4 text-center">
+<div class="flex flex-col items-center justify-center text-navy-text/40">
+<span class="material-symbols-outlined text-5xl mb-2 text-navy-text/30">receipt</span>
+<p class="text-base font-bold text-navy-text/80">لا توجد فواتير مسجلة لهذا العميل حتى الآن</p>
+<p class="text-xs text-navy-text/50 mt-1">ستظهر الفواتير المرحّلة هنا فور إنشائها.</p>
+</div>
+</div>
+{% endif %}
+<div class="px-5 py-4 border-t border-surface-container bg-surface">
+<a class="block w-full py-2.5 bg-primary hover:bg-primary-accent text-white font-bold text-xs sm:text-sm rounded-xl transition-colors text-center focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/orders?customer={{ customer_code | urlencode }}">عرض جميع الفواتير</a>
+</div>
+</section>
+
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+</body></html>

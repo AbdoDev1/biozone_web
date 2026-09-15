@@ -5,7 +5,6 @@
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
     tailwind.config = {
@@ -38,6 +37,20 @@
       -webkit-font-smoothing: antialiased;
     }
   </style>
+<style data-purpose="stock-table-deterministic">
+/* Deterministic geometry for #stock-management-table — plain CSS on purpose,
+   duplicated as Tailwind utilities on the elements (same values both layers),
+   so no single CSS source failing can take the geometry down alone.
+   NOTE: an earlier fix-v2 iteration also pinned the name column with
+   position:sticky. That pinning was removed together with the items-table pin:
+   with page structure verified correct, horizontal overflow stays contained
+   in .stock-table-scroll with no sidebar overlap, so the pin is unnecessary. */
+#stock-management-table { table-layout: fixed; width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 0; }
+#stock-management-table thead th.col-name { background: #ffffff; }
+#stock-management-table tbody td.col-name { background: #ffffff; }
+#stock-management-table .cell-truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.stock-table-scroll { overflow-x: auto; }
+</style>
 </head>
 {% include "biozone_web/templates/includes/staff_shell_top.html" %}
 <!-- Page Content Container -->
@@ -101,23 +114,23 @@
 </div>
 
 <!-- Desktop/Tablet table -->
-<div class="hidden sm:block bg-white rounded-2xl shadow-sm overflow-x-auto">
-<table class="w-full text-right border-collapse min-w-[640px]">
+<div class="hidden sm:block bg-white rounded-2xl shadow-sm overflow-x-auto stock-table-scroll">
+<table class="w-full text-right table-fixed min-w-[640px]" id="stock-management-table">
 <thead>
 <tr class="border-b border-surface-subtle text-xs text-navy-text/50">
-<th class="py-3 px-4 font-bold">اسم الصنف</th>
-<th class="py-3 px-4 font-bold">الكود</th>
-<th class="py-3 px-4 font-bold">الكمية الحالية</th>
-<th class="py-3 px-4 font-bold lg:max-xl:hidden">الحد الأدنى</th>
-<th class="py-3 px-4 font-bold">الحالة</th>
-<th class="py-3 px-4 font-bold text-left">إجراء سريع</th>
+<th class="py-3 px-4 font-bold col-name bg-white">اسم الصنف</th>
+<th class="py-3 px-4 font-bold" style="width:120px;">الكود</th>
+<th class="py-3 px-4 font-bold" style="width:120px;">الكمية الحالية</th>
+<th class="py-3 px-4 font-bold lg:max-xl:hidden" style="width:110px;">الحد الأدنى</th>
+<th class="py-3 px-4 font-bold" style="width:120px;">الحالة</th>
+<th class="py-3 px-4 font-bold text-left" style="width:70px;">إجراء سريع</th>
 </tr>
 </thead>
 <tbody class="divide-y divide-surface-subtle">
 {% for row in stock_rows %}
 <tr class="hover:bg-surface transition-colors">
-<td class="py-3.5 px-4 font-bold text-navy-text">{{ row.item_name }}</td>
-<td class="py-3.5 px-4 text-navy-text/60 font-mono text-sm">{{ row.item_code }}</td>
+<td class="py-3.5 px-4 font-bold text-navy-text col-name bg-white"><div class="cell-truncate truncate"><a class="hover:text-primary hover:underline transition-colors inline-flex items-center gap-1.5" href="/staff/items?code={{ row.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name }}<span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a></div></td>
+<td class="py-3.5 px-4 text-navy-text/60 font-mono text-sm"><div class="cell-truncate truncate">{{ row.item_code }}</div></td>
 <td class="py-3.5 px-4 font-bold text-navy-text">{{ row.actual_qty|int }} <span class="text-xs font-normal text-navy-text/50">{{ row.stock_uom }}</span></td>
 <td class="py-3.5 px-4 text-navy-text/50 text-sm lg:max-xl:hidden">{{ row.reorder_level|int if row.reorder_level else "—" }}</td>
 <td class="py-3.5 px-4">
@@ -147,7 +160,7 @@
 {% for row in stock_rows %}
 <div class="bg-white rounded-xl p-4 shadow-sm flex items-start justify-between gap-3">
 <div class="flex flex-col gap-1 min-w-0">
-<span class="font-bold text-navy-text text-sm truncate">{{ row.item_name }}</span>
+<span class="font-bold text-navy-text text-sm truncate"><a class="hover:text-primary hover:underline transition-colors" href="/staff/items?code={{ row.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name }}</a></span>
 <span class="text-xs text-navy-text/50 font-mono">{{ row.item_code }}</span>
 <div class="flex items-center gap-2 mt-1">
 <span class="font-bold text-navy-text">{{ row.actual_qty|int }} {{ row.stock_uom }}</span>

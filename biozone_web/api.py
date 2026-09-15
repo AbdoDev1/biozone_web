@@ -55,6 +55,17 @@ def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 	if "Biozone Storefront Customer" not in existing_roles:
 		user.add_roles("Biozone Storefront Customer")
 
+	# إنشاء Customer فور التسجيل (بنفس قيم المسار الكسول عبر
+	# create_customer_for_user: نفس ربط Portal User الذي يجده
+	# find_customer_for_current_user، ونفس الفئة الافتراضية، مع
+	# staff_category_reviewed = 0 ليظهر فورًا في /staff/customers).
+	# قبل commit عمدًا: سياسة ذرّية مطابقة لمسار التسجيل الحالي
+	# (commit واحد أدناه) — أي فشل هنا يُلغي التسجيل كله بلا مستخدم
+	# يتيم بلا عميل. الدالة آمنة للتكرار (تُرجع الربط الموجود).
+	from biozone_web.utils import create_customer_for_user
+
+	create_customer_for_user(email, full_name=full_name)
+
 	frappe.db.commit()
 
 	login_manager = frappe.local.login_manager
@@ -393,48 +404,36 @@ def _set_customer_account_type(customer, customer_group):
 
 	doc = frappe.get_doc("Customer", customer)
 
-	if doc.customer_group != customer_group:
-		doc.customer_group = customer_group
-		doc.save(ignore_permissions=True)
-		frappe.db.commit()
+	# كتابة غير مشروطة عند نجاح الفحوصات: أي استدعاء ناجح من الموظف —
+	# تغيير فئة، أو اعتماد "الجمهور" صراحة بإرسالها كقيمة — يُسجَّل
+	# كتعيين إداري (category_assigned_by_staff = 1) حتى لو الفئة المختارة
+	# مطابقة للفئة الحالية. (حارسا الحقلين للفترة البينية قبل migrate فقط.)
+	from biozone_web.utils import (
+		customer_has_category_assigned_field,
+		customer_has_staff_review_field,
+	)
+
+	doc.customer_group = customer_group
+	if customer_has_category_assigned_field():
+		doc.category_assigned_by_staff = 1
+	if customer_has_staff_review_field():
+		doc.staff_category_reviewed = 1
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
 
 	return {
 		"customer": doc.name,
 		"customer_group": doc.customer_group,
-	}
-
-
-@frappe.whitelist()
-def get_customer_account_info():
-	if frappe.session.user == "Guest":
-		frappe.throw(
-			_("يجب تسجيل الدخول أولًا"),
-			frappe.PermissionError,
-		)
-
-	from biozone_web.utils import get_or_create_customer_for_current_user
-
-	customer = get_or_create_customer_for_current_user()
-
-	customer_group = frappe.db.get_value(
-		"Customer",
-		customer,
-		"customer_group",
-	)
-
-	return {
-		"customer": customer,
-		"customer_group": customer_group,
+		"category_assigned_by_staff": frappe.utils.cint(doc.get("category_assigned_by_staff")),
+		"staff_category_reviewed": frappe.utils.cint(doc.get("staff_category_reviewed")),
 	}
 
 
 @frappe.whitelist()
 def get_available_account_types():
-	if frappe.session.user == "Guest":
-		frappe.throw(
-			_("يجب تسجيل الدخول أولًا"),
-			frappe.PermissionError,
-		)
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
 
 	return frappe.get_all(
 		"Customer Group",
@@ -445,12 +444,68 @@ def get_available_account_types():
 
 
 @frappe.whitelist()
-def staff_set_customer_account_type(customer, customer_group):
+def staff_set_customer_account_type(customer=None, customer_group=None, updates=None):
 	from biozone_web.utils import require_staff_access
 
 	require_staff_access()
 
+	if updates is not None:
+		return _set_customer_account_types_batch(updates)
+
 	return _set_customer_account_type(customer, customer_group)
+
+
+def _set_customer_account_types_batch(updates):
+	"""حفظ دفعي لفئات العملاء عبر نفس مسار الصف الواحد.
+
+	يقبل قائمة عناصر [{customer, customer_group}] (أو نفسها كنص JSON).
+	كل صف يُتحقق منه ويُحفظ مستقلًا عبر _set_customer_account_type —
+	فشل صف لا يمنع باقي الصفوف (نتائج جزئية لكل صف، بلا معاملة ذرية
+	عابرة للصفوف — نفس استقلالية الحفظ المتتابع المستخدمة في صفحات
+	الموظف الأخرى). أي خطأ في صف يُلفّ معامله الخاص (rollback) وتُمسح
+	رسائله حتى لا تتسرب لرد الصفوف التالية.
+	"""
+	if isinstance(updates, str):
+		updates = frappe.parse_json(updates)
+
+	if not isinstance(updates, (list, tuple)):
+		frappe.throw(_("صيغة الدفعة غير صالحة"))
+
+	results = []
+	for item in updates:
+		item = item or {}
+		name = (item.get("customer") or "").strip()
+		group = (item.get("customer_group") or "").strip()
+		if not name or not group:
+			results.append(
+				{
+					"ok": False,
+					"customer": name or None,
+					"error": _("بيانات الصف غير مكتملة"),
+				}
+			)
+			continue
+		try:
+			saved = _set_customer_account_type(name, group)
+			results.append({"ok": True, **saved})
+		except Exception as e:
+			frappe.db.rollback()
+			frappe.clear_messages()
+			results.append(
+				{
+					"ok": False,
+					"customer": name,
+					"error": str(e) or _("تعذر حفظ هذا الصف"),
+				}
+			)
+
+	updated = sum(1 for r in results if r.get("ok"))
+	return {
+		"ok": True,
+		"updated": updated,
+		"failed": len(results) - updated,
+		"results": results,
+	}
 
 
 def _sync_item_barcodes(doc, new_barcodes: list):
@@ -486,6 +541,9 @@ def staff_save_item(
 	barcodes: قائمة نصوص (تُطبَّع وتُفرَّغ وتُزال تكراراتها). التحديث
 	بالفرق: إضافة الصفوف الجديدة وحذف المحذوفة فقط عبر doc.append/
 	إزالة الصفوف ثم save — بلا كتابة مباشرة في DB.
+	مفتاح barcodes الغائب (None — واجهة قديمة مخزنة لم ترسله) يعني
+	"لا تلمس الباركودات الموجودة"، بينما القائمة الفارغة الصريحة []
+	تعني "امسح الكل عمدًا". لا يُخلط بين الحالتين أبدًا.
 	التحقق: BARCODE_CONFLICT_WITH_OTHER_ITEM عند تسجيل باركود مسجّل
 	لصنف مختلف (نفس قاعدة تصميم الاستيراد بالجملة).
 	"""
@@ -503,6 +561,10 @@ def staff_save_item(
 		}
 
 	# تطبيع قائمة الباركودات: نصوص مقصوصة بلا فراغات ولا تكرار.
+	# الغياب (None) ≠ الإفراغ الصريح ([]): المفتاح الغائب يعني أن الواجهة
+	# لم ترسل أي بيانات باركود (نسخة قديمة مخزنة) فتُترك الصفوف الموجودة
+	# كما هي؛ أما [] المرسلة صراحة فتعني مسح الكل عمدًا.
+	barcodes_provided = barcodes is not None
 	if barcodes is None:
 		barcodes = []
 	elif isinstance(barcodes, str):
@@ -559,11 +621,16 @@ def staff_save_item(
 		doc.item_group = item_group
 		doc.brand = brand or None
 
-		if stock_uom:
-			doc.stock_uom = stock_uom
-
 		doc.disabled = frappe.utils.cint(disabled)
-		_sync_item_barcodes(doc, new_barcodes)
+		# حارس الوحدة: لا تُكتب إلا قيمة مرسلة فعلًا ومختلفة عن الحالية،
+		# حتى لا يطلق كل حفظ فحص check_stock_uom_with_bin أو فحص الرابط
+		# على قيمة قديمة/افتراضية من الواجهة (سبب الـ417 العام السابق).
+		submitted_uom = (stock_uom or "").strip()
+		if submitted_uom and submitted_uom != doc.stock_uom:
+			doc.stock_uom = submitted_uom
+		# المزامنة فقط عند إرسال المفتاح فعلًا — الغائب يترك الموجود.
+		if barcodes_provided:
+			_sync_item_barcodes(doc, new_barcodes)
 		doc.save(ignore_permissions=True)
 
 	else:

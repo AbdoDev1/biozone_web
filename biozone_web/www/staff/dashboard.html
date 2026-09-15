@@ -5,7 +5,6 @@
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
     tailwind.config = {
@@ -90,7 +89,7 @@
 
 </div>
 <!-- Action Links (Minimal, airy, fast-scan) -->
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 <a class="group bg-white hover:bg-surface-subtle transition-all duration-200 p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm" href="/staff/items">
 <div class="flex items-center gap-3.5">
 <div class="w-10 h-10 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
@@ -106,6 +105,24 @@
 <span class="material-symbols-outlined text-xl">sync_alt</span>
 </div>
 <span class="text-base font-bold text-navy-text group-hover:text-primary transition-colors">سجل حركات المخزون</span>
+</div>
+<span class="material-symbols-outlined text-navy-text/40 group-hover:text-primary group-hover:-translate-x-1 transition-all text-xl">arrow_back</span>
+</a>
+<a class="group bg-white hover:bg-surface-subtle transition-all duration-200 p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm" href="/staff/orders">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">receipt_long</span>
+</div>
+<span class="text-base font-bold text-navy-text group-hover:text-primary transition-colors">تجهيز الطلبات</span>
+</div>
+<span class="material-symbols-outlined text-navy-text/40 group-hover:text-primary group-hover:-translate-x-1 transition-all text-xl">arrow_back</span>
+</a>
+<a class="group bg-white hover:bg-surface-subtle transition-all duration-200 p-4 sm:p-5 rounded-2xl flex items-center justify-between shadow-sm" href="/staff/pricing">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">sell</span>
+</div>
+<span class="text-base font-bold text-navy-text group-hover:text-primary transition-colors">التسعير</span>
 </div>
 <span class="material-symbols-outlined text-navy-text/40 group-hover:text-primary group-hover:-translate-x-1 transition-all text-xl">arrow_back</span>
 </a>
@@ -184,8 +201,14 @@
 {% endfor %}
 </div>
 </div>
+<!-- NOTE (layout guard): .sidebar-main is opened once in staff_shell_top.html
+  and intentionally stays open until the end of <body> (it is never closed in
+  a page template). A stray </div> here would fail silently — no server or
+  console error — and close .sidebar-main early, ejecting all following
+  content out of its intended layout position. Keep this file's div balance
+  exact: the content <div> above is already closed, so </main> must come next
+  with no extra </div> in between. -->
 </main>
-</div>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 <!-- Interactive Slide-in Detail Drawer for Movement Details -->
 <div class="fixed inset-0 bg-navy-text/30 backdrop-blur-sm z-50 hidden transition-opacity duration-300" id="detail-drawer-backdrop" onclick="closeMovementDrawer()"></div>

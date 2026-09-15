@@ -1,0 +1,797 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>العملاء - بيوزون (/staff/customers)</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#00685f",
+            "primary-accent": "#008378",
+            "navy-text": "#0b1c30",
+            surface: "#f8f9ff",
+            "surface-subtle": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "alert-red": "#ba1a1a",
+            "alert-bg": "#ffdad6",
+            "amber-text": "#92400e"
+          },
+          fontFamily: {
+            sans: ['Tajawal', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9ff;
+      color: #0b1c30;
+      -webkit-font-smoothing: antialiased;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* تثبيت عمود اسم العميل في اتجاه RTL */
+    .sticky-col-right {
+      position: sticky;
+      right: 0;
+      z-index: 10;
+      background-color: #ffffff;
+    }
+    thead .sticky-col-right {
+      background-color: #eff4ff;
+    }
+    /* الظل والفصل للعمود الثابت في RTL */
+    .sticky-shadow {
+      box-shadow: -4px 0 6px -2px rgba(11, 28, 48, 0.05);
+      border-left: 1px solid #e5eeff;
+    }
+    /* شريط التمرير المخصص */
+    ::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #eff4ff;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbdbf5;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00685f;
+    }
+  </style>
+</head>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<!-- Page Content Container -->
+<main class="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 relative" id="main-content">
+<!-- حاوية الإشعارات العلوية الموضعية (Toasts Container) -->
+<div aria-live="polite" class="space-y-3 z-30" id="toast-container">
+</div>
+<!-- 1. عنوان الصفحة والوصف -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<div>
+<h2 class="text-2xl sm:text-3xl font-extrabold text-navy-text tracking-tight">العملاء</h2>
+<p class="text-sm sm:text-base text-navy-text/60 mt-1 font-medium">مراجعة فئات العملاء الجدد وإدارة فئات جميع العملاء.</p>
+</div>
+</div>
+
+{% if not has_review_field %}
+<div class="bg-alert-bg/60 border border-alert-red/30 text-alert-red text-sm font-bold rounded-xl px-4 py-3">
+لم يتم إنشاء حقل المراجعة بعد — يرجى تنفيذ الترحيل أولًا ثم إعادة تحميل الصفحة.
+</div>
+{% endif %}
+
+<!-- 2. بطاقات الإحصاءات الأربعة (Stat Cards) -->
+<section aria-label="ملخص إحصاءات العملاء" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
+<div>
+<p class="text-xs font-bold text-navy-text/50">إجمالي العملاء</p>
+<p class="text-2xl font-extrabold text-navy-text mt-1">{{ stats.customer_display }}</p>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">group</span>
+</div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
+<div>
+<p class="text-xs font-bold text-navy-text/50">إجمالي الفواتير</p>
+<p class="text-2xl font-extrabold text-navy-text mt-1">{{ stats.invoice_display }}</p>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">receipt_long</span>
+</div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
+<div>
+<p class="text-xs font-bold text-navy-text/50">إجمالي المبيعات</p>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="text-2xl font-extrabold text-navy-text">{{ stats.sales_display }}</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">payments</span>
+</div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border {% if stats.has_debt %}border-alert-bg{% else %}border-surface-container{% endif %} flex items-center justify-between relative overflow-hidden">
+<div>
+<div class="flex items-center gap-1.5">
+<p class="text-xs font-bold {% if stats.has_debt %}text-alert-red{% else %}text-navy-text/50{% endif %}">إجمالي المديونية</p>
+{% if stats.has_debt %}
+<span class="text-[10px] bg-alert-bg text-alert-red px-1.5 py-0.5 rounded-full font-bold">مستحقة</span>
+{% endif %}
+</div>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="text-2xl font-extrabold {% if stats.has_debt %}text-alert-red{% else %}text-navy-text{% endif %}">{{ stats.debt_display }}</span>
+</div>
+</div>
+<div class="w-12 h-12 rounded-xl {% if stats.has_debt %}bg-alert-bg text-alert-red{% else %}bg-surface-subtle text-primary{% endif %} flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">account_balance_wallet</span>
+</div>
+</div>
+</section>
+
+<!-- 3. شريط البحث والفلاتر -->
+<section aria-label="أدوات البحث والفلترة" class="bg-white rounded-2xl shadow-sm p-4 space-y-3.5 border border-surface-container">
+<form class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3" method="get" action="/staff/customers">
+<input name="show" type="hidden" value="{{ show }}">
+<div class="relative flex-1">
+<label class="sr-only" for="customer-search-input">بحث بالاسم أو كود العميل</label>
+<span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-navy-text/40 pointer-events-none text-xl">search</span>
+<input class="w-full pl-4 pr-11 py-2.5 bg-surface text-navy-text text-sm rounded-xl border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-navy-text/40 font-medium" id="customer-search-input" name="q" placeholder="بحث بالاسم أو كود العميل..." type="search" value="{{ search_term or '' }}">
+</div>
+<div class="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-xl border border-surface-container shrink-0">
+<label class="text-xs font-bold text-navy-text/60 shrink-0" for="category-filter-select">الفئة:</label>
+<select class="bg-transparent border-0 text-xs sm:text-sm font-bold text-navy-text focus:ring-0 cursor-pointer py-1 pr-1 pl-6" id="category-filter-select" name="group" onchange="this.form.submit()">
+<option value="all" {% if selected_group == 'all' %}selected{% endif %}>جميع الفئات</option>
+{% for g in groups %}
+<option value="{{ g.name }}" {% if g.name == selected_group %}selected{% endif %}>{{ g.name }}</option>
+{% endfor %}
+</select>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="flex-1 lg:flex-none px-5 py-2.5 bg-primary hover:bg-primary-accent text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 active:scale-[0.99]" type="submit">
+<span class="material-symbols-outlined text-lg">search</span>
+<span>بحث</span>
+</button>
+<a class="flex-1 lg:flex-none px-4 py-2.5 bg-white hover:bg-surface-subtle text-navy-text/70 text-sm font-bold rounded-xl border border-surface-container transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}">
+<span class="material-symbols-outlined text-base">refresh</span>
+<span>إعادة ضبط</span>
+</a>
+</div>
+</form>
+<div aria-label="تصفية حالة المراجعة" class="flex items-center gap-2 pt-2.5 border-t border-surface-container flex-wrap">
+{% if show == 'unreviewed' %}
+<span aria-current="true" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all">
+<span class="material-symbols-outlined text-base">pending_actions</span>
+<span>بانتظار المراجعة</span>
+<span aria-live="polite" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight" id="pending-count-badge">{{ unreviewed_count }}</span>
+</span>
+{% else %}
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=unreviewed&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}">
+<span class="material-symbols-outlined text-base text-navy-text/50">pending_actions</span>
+<span>بانتظار المراجعة</span>
+<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight">{{ unreviewed_count }}</span>
+</a>
+{% endif %}
+{% if show == 'all' %}
+<span aria-current="true" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all">
+<span class="material-symbols-outlined text-base">groups</span>
+<span>جميع العملاء</span>
+</span>
+{% else %}
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=all&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}">
+<span class="material-symbols-outlined text-base text-navy-text/50">groups</span>
+<span>جميع العملاء</span>
+</a>
+{% endif %}
+</div>
+</section>
+
+<!-- 4. جدول العملاء -->
+<section aria-label="جدول بيانات العملاء" class="bg-white rounded-2xl shadow-sm border border-surface-container overflow-hidden flex flex-col">
+<div class="overflow-x-auto w-full">
+<table class="w-full text-right border-collapse min-w-[650px]">
+<thead>
+<tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold border-b border-surface-container uppercase tracking-wider select-none">
+<th class="py-3.5 px-5 sticky-col-right sticky-shadow min-w-[240px]" scope="col">اسم العميل</th>
+<th class="py-3.5 px-5 min-w-[280px]" scope="col">الفئة</th>
+<th class="py-3.5 px-5" scope="col">المديونية</th>
+<th class="py-3.5 px-5 w-48" scope="col">آخر فاتورة</th>
+<th class="py-3.5 px-5" scope="col">إجراء</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container text-sm" id="customers-table-body">
+{% for c in customers %}
+<tr class="hover:bg-surface/60 transition-colors group relative" data-row="{{ c.name }}" id="customer-row-{{ loop.index }}">
+<td class="py-4 px-5 sticky-col-right sticky-shadow align-middle relative">
+<div class="flex items-start justify-between gap-2">
+<button type="button" onclick="openCustomerDrawer({{ c.name|tojson }})" class="text-right group-hover:text-primary transition-colors focus:outline-none focus:underline">
+<p class="font-bold text-navy-text text-sm leading-snug group-hover:text-primary"><a href="/staff/customers/{{ c.name | urlencode }}" onclick="event.stopPropagation()">{{ c.customer_name }}</a></p>
+<p class="text-xs font-mono text-navy-text/40 mt-1">{{ c.name }}</p>
+</button>
+<button type="button" onclick="openCustomerDrawer({{ c.name|tojson }})" class="text-navy-text/40 hover:text-primary p-1 rounded-lg hover:bg-surface-subtle transition-colors shrink-0" aria-label="عرض تفاصيل العميل">
+<span class="material-symbols-outlined text-lg">info</span>
+</button>
+</div>
+</td>
+<td class="py-4 px-5 align-middle">
+<div class="space-y-2">
+<div class="flex items-center gap-2 flex-wrap" data-current-badge="{{ c.name }}">
+<span class="text-xs font-medium text-navy-text/50">الحالية:</span>
+{% if c.customer_group == 'الجمهور' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10">{{ c.customer_group }}</span>
+{% else %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{{ c.customer_group }}</span>
+{% endif %}
+{% if show == 'all' %}
+{% if c.reviewed %}
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary" data-review-badge="{{ c.name }}">تمت المراجعة</span>
+{% else %}
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text" data-review-badge="{{ c.name }}">بانتظار المراجعة</span>
+{% endif %}
+{% endif %}
+</div>
+<div class="w-full max-w-[210px]">
+{% if show == 'unreviewed' %}
+<label for="select-cat-{{ loop.index }}" class="sr-only">تغيير فئة {{ c.customer_name }}</label>
+<select id="select-cat-{{ loop.index }}" data-current="{{ c.customer_group }}" data-customer="{{ c.name }}" onchange="handleCategoryChange(this)" class="w-full px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer">
+{% for g in groups %}
+<option value="{{ g.name }}" {% if g.name == c.customer_group %}selected{% endif %}>{{ g.name }}</option>
+{% endfor %}
+</select>
+{% endif %}
+<div class="hidden items-center gap-1 mt-1.5 text-alert-red text-xs font-bold" data-row-error="{{ c.name }}">
+<span class="material-symbols-outlined text-sm">error</span>
+<span data-row-error-text="{{ c.name }}"></span>
+</div>
+<div class="hidden items-center gap-1 mt-1.5 text-primary-accent text-xs font-bold" data-row-modified="{{ c.name }}">
+<span class="material-symbols-outlined text-sm">edit</span>
+<span>تعديل غير محفوظ</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-4 px-5 align-middle">
+<div class="font-bold text-navy-text">{{ c.outstanding_display }}</div>
+<div class="text-xs text-navy-text/40">{{ c.invoice_count }} فاتورة</div>
+</td>
+<td class="py-4 px-5 align-middle">
+{% if c.last_invoice %}
+<div>
+<p class="font-bold text-navy-text font-mono text-xs leading-tight">{{ c.last_invoice.name }}</p>
+<p class="text-navy-text/50 text-xs mt-1 leading-tight">{{ c.last_invoice.date_display }}</p>
+</div>
+{% else %}
+<span class="text-navy-text/40 text-xs font-medium">لا توجد فواتير</span>
+{% endif %}
+</td>
+<td class="py-4 px-5 align-middle whitespace-nowrap">
+<div class="flex flex-col items-start gap-1.5">
+<button class="text-xs font-bold text-primary hover:underline" onclick="openCustomerDrawer({{ c.name|tojson }})" type="button">التفاصيل</button>
+{% if show == 'unreviewed' and c.customer_group == public_group %}
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name }}" onclick="approveAsPublic({{ c.name|tojson }})" type="button">
+<span class="material-symbols-outlined text-sm">verified</span>
+اعتماد كجمهور
+</button>
+{% endif %}
+</div>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<div class="hidden py-16 px-4 text-center border-t border-surface-container" id="no-results-container">
+{% if not customers %}
+{% if show == 'unreviewed' and not search_term and selected_group == 'all' %}
+<div class="flex flex-col items-center justify-center text-navy-text/40 py-6">
+<span class="material-symbols-outlined text-5xl mb-2 text-primary/40">check_circle</span>
+<p class="text-base font-bold text-navy-text/80">لا يوجد عملاء بانتظار المراجعة</p>
+<p class="text-xs text-navy-text/50 mt-1">تمت مراجعة واعتماد جميع فئات العملاء بنجاح.</p>
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center text-navy-text/40 py-6">
+<span class="material-symbols-outlined text-5xl mb-2 text-navy-text/30">search_off</span>
+<p class="text-base font-bold text-navy-text/80">لا توجد نتائج مطابقة</p>
+<p class="text-xs text-navy-text/50 mt-1">يرجى تعديل معايير البحث أو تصفية الفئة.</p>
+</div>
+{% endif %}
+{% endif %}
+</div>
+</section>
+
+<!-- 5. شريط الحفظ الجماعي (قائمة الانتظار فقط) -->
+{% if show == 'unreviewed' %}
+<aside aria-label="شريط الحفظ الجماعي للتعديلات" aria-live="polite" class="hidden bg-surface-container rounded-xl p-3.5 sm:p-4 border border-primary/20 shadow-md transition-all duration-200 z-20 sticky bottom-4" id="bulk-actions-bar">
+<div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="flex items-center gap-2.5 text-navy-text">
+<div class="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">edit_note</span>
+</div>
+<p class="text-sm font-bold">لديك <span class="text-primary font-black text-base" id="unsaved-count-number">0</span> تعديل غير محفوظ</p>
+</div>
+<div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+<button class="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-navy-text border border-surface-container hover:bg-surface-subtle transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" id="discard-all-btn" type="button" onclick="handleDiscardAll()">تراجع عن الكل</button>
+<button class="flex-1 sm:flex-none px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-primary hover:bg-primary-accent text-white transition-all shadow-sm flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary/40 active:scale-[0.99]" id="save-all-btn" type="button" onclick="handleSaveAll()">
+<span class="material-symbols-outlined text-base" id="save-btn-icon">save</span>
+<span id="save-btn-text">حفظ التغييرات</span>
+</button>
+</div>
+</div>
+</aside>
+{% endif %}
+
+<!-- 6. الترقيم -->
+<div aria-label="شريط الترقيم" class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 select-none">
+<div class="text-xs sm:text-sm font-bold text-navy-text/60">
+<span id="pagination-total-text">{{ total_count }} عميلًا</span>
+</div>
+<div class="flex items-center gap-2">
+{% if has_prev %}
+<a aria-label="الصفحة السابقة" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text/70 hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}&amp;page={{ prev_page }}">
+<span class="material-symbols-outlined text-base">chevron_right</span>
+<span>السابق</span>
+</a>
+{% endif %}
+<span class="text-xs font-bold text-navy-text/50 px-2">صفحة {{ page }} من {{ total_pages }}</span>
+{% if has_next %}
+<a aria-label="الصفحة التالية" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}&amp;page={{ next_page }}">
+<span>التالي</span>
+<span class="material-symbols-outlined text-base">chevron_left</span>
+</a>
+{% endif %}
+</div>
+</div>
+
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+<!-- 7. لوحة تفاصيل العميل (Slide-over Drawer) -->
+<div aria-modal="true" class="fixed inset-0 z-50 overflow-hidden hidden" id="customer-details-drawer" role="dialog" aria-labelledby="drawer-customer-name">
+<div class="fixed inset-0 bg-navy-text/40 transition-opacity opacity-0 duration-300" id="drawer-backdrop"></div>
+<div class="fixed inset-y-0 left-0 max-w-full flex pl-0 sm:pl-10">
+<div class="w-screen max-w-md md:max-w-lg bg-white shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out border-r border-surface-container" id="drawer-panel">
+<div class="p-5 border-b border-surface-container flex items-start justify-between bg-surface-subtle">
+<div>
+<div class="flex items-center gap-2">
+<h3 class="text-lg font-extrabold text-navy-text leading-tight" id="drawer-customer-name"></h3>
+<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary" id="drawer-customer-badge"></span>
+</div>
+<p class="text-xs font-mono text-navy-text/50 mt-1" id="drawer-customer-code"></p>
+<p class="text-xs text-navy-text/50 mt-1" id="drawer-customer-sub"></p>
+</div>
+<button aria-label="إغلاق اللوحة" class="p-2 rounded-xl text-navy-text/50 hover:text-navy-text hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" id="close-drawer-btn" type="button">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-6">
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface rounded-xl p-3 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي الفواتير</p>
+<p class="text-lg font-black text-navy-text mt-0.5" id="drawer-invoices-count"></p>
+</div>
+<div class="bg-surface rounded-xl p-3 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي المشتريات</p>
+<p class="text-lg font-black text-navy-text mt-0.5" id="drawer-total-sales"></p>
+</div>
+<div class="bg-surface rounded-xl p-3 border border-surface-container">
+<p class="text-[11px] font-bold text-navy-text/50">إجمالي المدفوع</p>
+<p class="text-lg font-black text-navy-text mt-0.5" id="drawer-total-paid"></p>
+</div>
+<div class="bg-surface rounded-xl p-3 border border-alert-bg/60">
+<p class="text-[11px] font-bold text-alert-red">المديونية الحالية</p>
+<p class="text-lg font-black text-alert-red mt-0.5" id="drawer-total-debt"></p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between">
+<h4 class="text-sm font-extrabold text-navy-text">أحدث الفواتير</h4>
+<span class="text-xs text-navy-text/40">سجل المعاملات</span>
+</div>
+<div class="space-y-2" id="drawer-invoices-list">
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-surface-container bg-surface">
+<a class="block w-full py-2.5 bg-primary hover:bg-primary-accent text-white font-bold text-xs sm:text-sm rounded-xl transition-colors text-center focus:outline-none focus:ring-2 focus:ring-primary/40" id="drawer-all-invoices-btn" href="#">عرض جميع الفواتير</a>
+</div>
+</div>
+</div>
+</div>
+<script>
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
+  const SHOW_MODE = {{ show|tojson }};
+  const PUBLIC_GROUP = {{ public_group|tojson }};
+  const CUSTOMERS = {{ customers_json }};
+  const CUSTOMER_MAP = {};
+  CUSTOMERS.forEach((c) => { CUSTOMER_MAP[c.name] = c; });
+  const dirty = new Map();
+  let isSaving = false;
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function rowEl(name) {
+    return document.querySelector('tr[data-row="' + name + '"]');
+  }
+
+  function selectEl(name) {
+    return document.querySelector('select[data-customer="' + name + '"]');
+  }
+
+  function setSelectState(select, state) {
+    select.classList.remove('border-surface-container', 'bg-white', 'text-navy-text', 'border-primary-accent', 'bg-primary/5', 'text-primary', 'border-alert-red', 'bg-alert-bg/20', 'text-alert-red');
+    if (state === 'modified') {
+      select.classList.add('border-primary-accent', 'bg-primary/5', 'text-primary');
+    } else if (state === 'error') {
+      select.classList.add('border-alert-red', 'bg-alert-bg/20', 'text-alert-red');
+    } else {
+      select.classList.add('border-surface-container', 'bg-white', 'text-navy-text');
+    }
+  }
+
+  function handleCategoryChange(select) {
+    const name = select.dataset.customer;
+    const current = select.dataset.current;
+    const errBox = document.querySelector('[data-row-error="' + name + '"]');
+    const modBox = document.querySelector('[data-row-modified="' + name + '"]');
+    if (select.value !== current) {
+      dirty.set(name, select.value);
+      setSelectState(select, 'modified');
+      if (modBox) { modBox.classList.remove('hidden'); modBox.classList.add('flex'); }
+    } else {
+      dirty.delete(name);
+      setSelectState(select, 'default');
+      if (modBox) { modBox.classList.add('hidden'); modBox.classList.remove('flex'); }
+    }
+    if (errBox) { errBox.classList.add('hidden'); errBox.classList.remove('flex'); }
+    const row = rowEl(name);
+    if (row) row.classList.toggle('bg-primary/5', select.value !== current);
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const num = document.getElementById('unsaved-count-number');
+    if (!bar || !num) return;
+    num.textContent = dirty.size;
+    if (dirty.size > 0) {
+      bar.classList.remove('hidden');
+    } else {
+      bar.classList.add('hidden');
+    }
+  }
+
+  function showRowError(name, msg) {
+    const errBox = document.querySelector('[data-row-error="' + name + '"]');
+    if (!errBox) return;
+    const txt = document.querySelector('[data-row-error-text="' + name + '"]');
+    if (txt) txt.textContent = msg;
+    errBox.classList.remove('hidden');
+    errBox.classList.add('flex');
+    const select = selectEl(name);
+    if (select) setSelectState(select, 'error');
+  }
+
+  function showNotification(type, message) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toastId = 'toast-' + Date.now();
+    let bgClass, textClass, borderClass, iconName;
+    if (type === 'success') {
+      bgClass = 'bg-primary/10'; textClass = 'text-primary'; borderClass = 'border-primary/20'; iconName = 'check_circle';
+    } else {
+      bgClass = 'bg-alert-bg'; textClass = 'text-alert-red'; borderClass = 'border-alert-red/20'; iconName = 'error';
+    }
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.setAttribute('role', 'alert');
+    toast.className = 'flex items-center justify-between p-4 rounded-xl border ' + borderClass + ' ' + bgClass + ' ' + textClass + ' shadow-sm transition-all duration-300';
+    const inner = document.createElement('div');
+    inner.className = 'flex items-center gap-3';
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined text-2xl';
+    icon.textContent = iconName;
+    const p = document.createElement('p');
+    p.className = 'font-extrabold text-sm sm:text-base';
+    p.textContent = message;
+    inner.appendChild(icon);
+    inner.appendChild(p);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'p-1 rounded-lg hover:bg-black/5 transition-colors';
+    closeBtn.setAttribute('aria-label', 'إغلاق الإشعار');
+    closeBtn.onclick = function () { dismissNotification(toastId); };
+    const closeIcon = document.createElement('span');
+    closeIcon.className = 'material-symbols-outlined text-lg';
+    closeIcon.textContent = 'close';
+    closeBtn.appendChild(closeIcon);
+    toast.appendChild(inner);
+    toast.appendChild(closeBtn);
+    container.appendChild(toast);
+    setTimeout(function () { dismissNotification(toastId); }, 5000);
+  }
+
+  function dismissNotification(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add('opacity-0', '-translate-y-2');
+      setTimeout(function () { el.remove(); }, 250);
+    }
+  }
+
+  function handleDiscardAll() {
+    dirty.forEach(function (_value, name) {
+      const select = selectEl(name);
+      if (!select) return;
+      select.value = select.dataset.current;
+      setSelectState(select, 'default');
+      const modBox = document.querySelector('[data-row-modified="' + name + '"]');
+      if (modBox) { modBox.classList.add('hidden'); modBox.classList.remove('flex'); }
+      const errBox = document.querySelector('[data-row-error="' + name + '"]');
+      if (errBox) { errBox.classList.add('hidden'); errBox.classList.remove('flex'); }
+      const row = rowEl(name);
+      if (row) row.classList.remove('bg-primary/5');
+    });
+    dirty.clear();
+    updateBulkBar();
+    showNotification('success', 'تم التراجع عن جميع التعديلات غير المحفوظة');
+  }
+
+  async function handleSaveAll() {
+    if (dirty.size === 0 || isSaving) return;
+    const updates = [];
+    dirty.forEach(function (group, name) {
+      updates.push({ customer: name, customer_group: group });
+    });
+    isSaving = true;
+    const saveBtn = document.getElementById('save-all-btn');
+    const saveBtnText = document.getElementById('save-btn-text');
+    const saveBtnIcon = document.getElementById('save-btn-icon');
+    saveBtn.disabled = true;
+    saveBtn.classList.add('opacity-75');
+    saveBtnText.textContent = 'جاري الحفظ...';
+    saveBtnIcon.textContent = 'progress_activity';
+    saveBtnIcon.classList.add('animate-spin');
+    try {
+      const res = await fetch('/api/method/biozone_web.api.staff_set_customer_account_type', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+        body: JSON.stringify({ updates: updates }),
+      }).then(function (r) { return r.json(); });
+      const msg = res.message;
+      if (!msg || msg.ok !== true || !Array.isArray(msg.results)) {
+        throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
+      }
+      let succeeded = 0;
+      let failed = 0;
+      msg.results.forEach(function (r) {
+        if (r.ok) {
+          succeeded += 1;
+          applySavedRow(r.customer, r.customer_group);
+        } else {
+          failed += 1;
+          showRowError(r.customer, r.error || 'تعذر الحفظ، حاول مجددًا');
+        }
+      });
+      updateBulkBar();
+      if (failed === 0) {
+        showNotification('success', 'تم حفظ جميع التعديلات بنجاح');
+      } else if (succeeded > 0) {
+        showNotification('error', 'تم حفظ ' + succeeded + ' من ' + msg.results.length + ' — تعذر حفظ ' + (failed === 1 ? 'صف واحد' : failed + ' صفوف'));
+      } else {
+        showNotification('error', 'تعذر حفظ التعديلات، يرجى المحاولة مرة أخرى');
+      }
+    } catch (err) {
+      showNotification('error', (err && err.message) || 'حدث خطأ غير متوقع أثناء معالجة الطلب');
+    } finally {
+      isSaving = false;
+      saveBtn.disabled = false;
+      saveBtn.classList.remove('opacity-75');
+      saveBtnText.textContent = 'حفظ التغييرات';
+      saveBtnIcon.textContent = 'save';
+      saveBtnIcon.classList.remove('animate-spin');
+    }
+  }
+
+  async function approveAsPublic(name) {
+    if (!name || isSaving) return;
+    const btn = document.querySelector('[data-approve-btn="' + name + '"]');
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/method/biozone_web.api.staff_set_customer_account_type', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+        body: JSON.stringify({ customer: name, customer_group: PUBLIC_GROUP }),
+      }).then(function (r) { return r.json(); });
+      const msg = res.message;
+      if (!msg || !msg.customer) {
+        throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
+      }
+      applySavedRow(msg.customer, msg.customer_group);
+      updateBulkBar();
+      showNotification('success', 'تم اعتماد العميل ضمن فئة الجمهور');
+    } catch (err) {
+      showRowError(name, (err && err.message) || 'تعذر الحفظ، حاول مجددًا');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function applySavedRow(name, group) {
+    dirty.delete(name);
+    const select = selectEl(name);
+    if (select) {
+      select.dataset.current = group;
+      setSelectState(select, 'default');
+    }
+    const modBox = document.querySelector('[data-row-modified="' + name + '"]');
+    if (modBox) { modBox.classList.add('hidden'); modBox.classList.remove('flex'); }
+    const errBox = document.querySelector('[data-row-error="' + name + '"]');
+    if (errBox) { errBox.classList.add('hidden'); errBox.classList.remove('flex'); }
+    const data = CUSTOMER_MAP[name];
+    if (data) {
+      data.customer_group = group;
+      data.reviewed = true;
+    }
+    const badgeWrap = document.querySelector('[data-current-badge="' + name + '"]');
+    if (badgeWrap) {
+      const badge = badgeWrap.querySelector('span');
+      if (badge) {
+        badge.textContent = group;
+        const isPublic = group === 'الجمهور';
+        badge.className = isPublic
+          ? 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10'
+          : 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20';
+      }
+      let check = badgeWrap.querySelector('[data-just-saved]');
+      if (!check) {
+        check = document.createElement('span');
+        check.setAttribute('data-just-saved', '1');
+        check.className = 'material-symbols-outlined text-primary text-sm';
+        check.setAttribute('title', 'تم الحفظ بنجاح');
+        check.textContent = 'check_circle';
+        badgeWrap.appendChild(check);
+      }
+      const reviewBadge = badgeWrap.querySelector('[data-review-badge]');
+      if (reviewBadge) {
+        reviewBadge.textContent = 'تمت المراجعة';
+        reviewBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary';
+      }
+    }
+    if (SHOW_MODE === 'unreviewed') {
+      const row = rowEl(name);
+      if (row) {
+        row.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+        setTimeout(function () {
+          row.remove();
+          decrementCounters();
+          maybeShowPendingEmpty();
+        }, 300);
+      }
+    }
+  }
+
+  function decrementCounters() {
+    const badge = document.getElementById('pending-count-badge');
+    if (badge) {
+      const n = Math.max(parseInt(badge.textContent, 10) - 1, 0);
+      badge.textContent = n;
+      if (n === 0) badge.classList.add('opacity-40');
+    }
+    const total = document.getElementById('pagination-total-text');
+    if (total) {
+      const m = total.textContent.match(/(\d+)/);
+      if (m) total.textContent = total.textContent.replace(/(\d+)/, Math.max(parseInt(m[1], 10) - 1, 0));
+    }
+  }
+
+  function maybeShowPendingEmpty() {
+    const tbody = document.getElementById('customers-table-body');
+    if (tbody && tbody.querySelectorAll('tr[data-row]').length === 0) {
+      const box = document.getElementById('no-results-container');
+      if (box) {
+        box.classList.remove('hidden');
+        box.innerHTML = '<div class="flex flex-col items-center justify-center text-navy-text/40 py-6">'
+          + '<span class="material-symbols-outlined text-5xl mb-2 text-primary/40">check_circle</span>'
+          + '<p class="text-base font-bold text-navy-text/80">لا يوجد عملاء بانتظار المراجعة</p>'
+          + '<p class="text-xs text-navy-text/50 mt-1">تمت مراجعة واعتماد جميع فئات العملاء بنجاح.</p>'
+          + '</div>';
+      }
+    }
+  }
+
+  function statusPill(status) {
+    const s = String(status || '');
+    let cls;
+    if (/paid/i.test(s) || s.indexOf('مسددة') !== -1 && s.indexOf('جزئي') === -1 && s.indexOf('غير') === -1) {
+      cls = 'bg-emerald-50 text-emerald-700';
+    } else if (/overdue/i.test(s) || s.indexOf('متأخر') !== -1 || s.indexOf('غير مسددة') !== -1) {
+      cls = 'bg-alert-bg text-alert-red';
+    } else if (/part/i.test(s) || s.indexOf('جزئي') !== -1) {
+      cls = 'bg-amber-100 text-amber-text';
+    } else {
+      cls = 'bg-surface-subtle text-navy-text/60';
+    }
+    return '<span class="inline-block mt-0.5 text-[10px] px-2 py-0.5 rounded-full font-bold ' + cls + '">' + esc(s) + '</span>';
+  }
+
+  function openCustomerDrawer(name) {
+    const c = CUSTOMER_MAP[name];
+    if (!c) return;
+    document.getElementById('drawer-customer-name').textContent = c.customer_name || c.name;
+    const badge = document.getElementById('drawer-customer-badge');
+    badge.textContent = c.customer_group || '';
+    document.getElementById('drawer-customer-code').textContent = c.name || '';
+    document.getElementById('drawer-customer-sub').textContent = (c.email ? c.email + ' — ' : '') + 'منذ ' + (c.created_display || '');
+    document.getElementById('drawer-invoices-count').textContent = c.invoice_count + ' فواتير';
+    document.getElementById('drawer-total-sales').textContent = c.billed_display || '';
+    document.getElementById('drawer-total-paid').textContent = c.paid_display || '';
+    document.getElementById('drawer-total-debt').textContent = c.outstanding_display || '';
+    const list = document.getElementById('drawer-invoices-list');
+    if (c.invoices && c.invoices.length > 0) {
+      let html = '';
+      c.invoices.forEach(function (inv) {
+        html += '<div class="bg-white p-3 rounded-xl border border-surface-container flex items-center justify-between text-xs">'
+          + '<div><p class="font-bold font-mono text-navy-text">' + esc(inv.name) + '</p>'
+          + '<p class="text-navy-text/50 mt-0.5">' + esc(inv.date_display) + '</p></div>'
+          + '<div class="text-left"><p class="font-black text-navy-text">' + esc(inv.total_display) + '</p>'
+          + statusPill(inv.status) + '</div></div>';
+      });
+      list.innerHTML = html;
+    } else {
+      list.innerHTML = '<div class="py-6 text-center text-navy-text/40 text-xs">'
+        + '<span class="material-symbols-outlined text-2xl mb-1 text-navy-text/30">receipt</span>'
+        + '<p>لا توجد فواتير مسجلة لهذا العميل حتى الآن</p></div>';
+    }
+    document.getElementById('drawer-all-invoices-btn').href = '/staff/orders?customer=' + encodeURIComponent(c.name);
+    const drawer = document.getElementById('customer-details-drawer');
+    const backdrop = document.getElementById('drawer-backdrop');
+    const panel = document.getElementById('drawer-panel');
+    drawer.classList.remove('hidden');
+    setTimeout(function () {
+      backdrop.classList.remove('opacity-0');
+      backdrop.classList.add('opacity-100');
+      panel.classList.remove('translate-x-full');
+      panel.classList.add('translate-x-0');
+    }, 10);
+  }
+
+  function closeCustomerDrawer() {
+    const drawer = document.getElementById('customer-details-drawer');
+    const backdrop = document.getElementById('drawer-backdrop');
+    const panel = document.getElementById('drawer-panel');
+    backdrop.classList.remove('opacity-100');
+    backdrop.classList.add('opacity-0');
+    panel.classList.remove('translate-x-0');
+    panel.classList.add('translate-x-full');
+    setTimeout(function () { drawer.classList.add('hidden'); }, 300);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('close-drawer-btn').addEventListener('click', closeCustomerDrawer);
+    document.getElementById('drawer-backdrop').addEventListener('click', closeCustomerDrawer);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeCustomerDrawer();
+    });
+    updateBulkBar();
+  });
+</script>
+</body></html>

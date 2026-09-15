@@ -52,6 +52,27 @@
       font-family: 'Tajawal', sans-serif;
     }
   </style>
+<style data-purpose="items-table-deterministic">
+/* Deterministic geometry for #items-management-table — plain CSS on purpose.
+   The critical layout (fixed layout, widths floor, truncation, scroll
+   container) is declared here AND duplicated as Tailwind utilities on
+   the elements: whichever layer the browser applies, the values are identical,
+   so a CDN miss, a blocked inline <style>, or a missing prefix can never take
+   the geometry down alone.
+   NOTE: an earlier fix-v2 iteration also pinned the name column with
+   position:sticky (CSS + Tailwind utilities). That pinning was removed after
+   the stray-</div> structural fix was verified: with the table back inside
+   <main>/.sidebar-main, horizontal overflow stays contained in
+   .items-table-scroll with no sidebar overlap, so the pin is unnecessary.
+   Trade-off: at narrow widths the name column now scrolls out of view at the
+   far end of the scroll range (scroll back to see it again).
+   Decorative Tailwind classes elsewhere are untouched. */
+#items-management-table { table-layout: fixed; width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 0; }
+#items-management-table thead th.col-name { background: #f8fafc; }
+#items-management-table tbody td.col-name { background: #ffffff; }
+#items-management-table .cell-truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.items-table-scroll { overflow-x: auto; }
+</style>
 </head>
 {% include "biozone_web/templates/includes/staff_shell_top.html" %}
 <!-- BEGIN: MainContent (موحّد على الـshell المشترك — البنود 5+7) -->
@@ -72,7 +93,7 @@
 <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
 </span>
-<input name="q" value="{{ search_term or '' }}" class="w-full bg-white border border-borderSubtle text-sm rounded-xl pr-10 pl-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ابحث بالاسم أو الكود..." type="text"/>
+<input name="q" value="{{ search_term or '' }}" class="w-full bg-white border border-borderSubtle text-sm rounded-xl pr-10 pl-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ابحث بالاسم أو الكود أو الباركود..." type="text"/>
 </div>
 <!-- Category Filter Dropdown -->
 <div class="relative">
@@ -111,32 +132,38 @@
 </svg>
 <span>إضافة صنف</span>
 </button>
-</div>
+<!-- NOTE (layout guard): .sidebar-main is opened once in staff_shell_top.html
+  and intentionally stays open until the end of <body> (it is never closed in
+  a page template). A stray </div> here would fail silently — no server or
+  console error — and eject all following content out of <main>/.sidebar-main
+  so it renders underneath the fixed sidebar. Keep this toolbar's div balance
+  exact: the <form> above and the title <div> are already closed, so this
+  </section> must come next with no extra </div> in between. -->
 </section>
 <!-- BEGIN: ItemsTableSection -->
 <section class="bg-white rounded-2xl border border-borderSubtle shadow-card overflow-hidden" data-purpose="items-table-wrapper">
-<div class="overflow-x-auto">
-<table class="w-full text-right border-collapse" id="items-management-table">
+<div class="overflow-x-auto items-table-scroll">
+<table class="w-full text-right table-fixed min-w-[1000px]" id="items-management-table">
 <thead>
 <tr class="border-b border-borderSubtle bg-slate-50/70 text-slate-500 text-xs font-bold uppercase tracking-wider">
-<th class="py-4 px-6 text-right" scope="col">اسم الصنف</th>
-<th class="py-4 px-6 text-right" scope="col">الكود</th>
-<th class="py-4 px-6 text-right" scope="col">الكمية بالمخزون</th>
-<th class="py-4 px-6 text-right" scope="col">السعر</th>
-<th class="py-4 px-6 text-center" scope="col">الخصومات</th>
-<th class="py-4 px-6 text-center" scope="col">الحالة</th>
-<th class="py-4 px-6 text-center" scope="col">إجراءات</th>
+<th class="py-4 px-6 text-right col-name bg-slate-50" scope="col">اسم الصنف</th>
+<th class="py-4 px-6 text-right" scope="col" style="width:120px;">الكود</th>
+<th class="py-4 px-6 text-right" scope="col" style="width:120px;">الكمية بالمخزون</th>
+<th class="py-4 px-6 text-right" scope="col" style="width:120px;">السعر</th>
+<th class="py-4 px-6 text-center" scope="col" style="width:180px;">الخصومات</th>
+<th class="py-4 px-6 text-center" scope="col" style="width:120px;">الحالة</th>
+<th class="py-4 px-6 text-center" scope="col" style="width:80px;">إجراءات</th>
 </tr>
 </thead>
 <tbody class="divide-y divide-borderSubtle text-sm">
 {% for it in items %}
 <tr class="hover:bg-slate-50/60 transition-colors">
-<td class="py-4 px-6 font-bold text-darkNavy">
-                    {{ it.item_name }}
-                  </td>
+<td class="py-4 px-6 font-bold text-darkNavy col-name bg-white">
+<div class="cell-truncate truncate" title="{{ it.item_name|e }}">{{ it.item_name }}</div>
+</td>
 <td class="py-4 px-6 font-mono text-xs font-semibold text-slate-600">
-                    {{ it.item_code }}
-                  </td>
+<div class="cell-truncate truncate">{{ it.item_code }}</div>
+</td>
 <td class="py-4 px-6">
 <span class="font-bold text-darkNavy text-base block">{{ "{:,.0f}".format(it.stock_qty) }}</span>
 <span class="text-[11px] text-slate-400 font-medium">من المخزون الفعلي</span>
@@ -168,7 +195,7 @@
 {% endif %}
 </td>
 <td class="py-4 px-6 text-center">
-<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
+<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
@@ -397,8 +424,11 @@ function openItemPanel(data) {
     document.getElementById('item-name').value = data.item_name || '';
     document.getElementById('item-sku').value = data.item_code || '';
     document.getElementById('item-sku').disabled = true; // الكود مايتغيرش وقت التعديل
-    if (data.item_group) document.getElementById('item-group').value = data.item_group;
-    if (data.brand) document.getElementById('item-brand').value = data.brand;
+    // تُضبط المجموعة والعلامة والوحدة دائمًا (بلا شرط) حتى لا تعلق قيمة
+    // الصنف السابق عند فتح صنف بلا علامة/وحدة مختلفة مباشرة بعده.
+    document.getElementById('item-group').value = data.item_group || '';
+    document.getElementById('item-brand').value = data.brand || '';
+    document.getElementById('item-unit').value = data.stock_uom || '';
     document.getElementById('item-price').value = data.price != null ? data.price : '';
     document.getElementById('item-active-toggle').checked = !data.disabled;
     disableWrapper.classList.remove('hidden');
@@ -493,7 +523,9 @@ function disableCurrentItem() {
     body: JSON.stringify({ item_code: currentItemCode }),
   })
     .then((res) => res.json())
-    .then(() => window.location.reload())
+    .then(() => {
+      window.location.reload();
+    })
     .catch(() => alert('تعذر الاتصال بالسيرفر'));
 }
 </script>

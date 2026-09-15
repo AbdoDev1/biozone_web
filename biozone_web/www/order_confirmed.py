@@ -16,6 +16,10 @@ def get_context(context):
 
     context.update(get_header_context())
 
+    if frappe.session.user == "Guest":
+        frappe.local.flags.redirect_location = "/login"
+        raise frappe.Redirect
+
     order_name = frappe.form_dict.get("name") or frappe.form_dict.get("order_name")
 
     if not order_name:

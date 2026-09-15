@@ -84,6 +84,17 @@ get_website_user_home_page = "biozone_web.utils.get_website_user_home_page"
 # automatically create page for each record of this doctype
 # website_generators = ["Web Page"]
 
+# مسار تفاصيل العميل في الستاف: /staff/customers/<customer_name> تُحسم إلى
+# الصفحة الثابتة staff/customer-detail، والاسم المطابَق يصل تلقائيًا في
+# frappe.form_dict (آلية website_route_rules القياسية في Frappe — لا
+# DocType مولّد ولا Web Form مستخدمان هنا).
+website_route_rules = [
+	{"from_route": "/staff/customers/<customer_name>", "to_route": "staff/customer-detail"},
+	# تفاصيل طلب العميل: /account/orders/<name> تُحسم إلى الصفحة الثابتة
+	# account/order-detail، والاسم المطابَق يصل في frappe.form_dict.
+	{"from_route": "/account/orders/<order_name>", "to_route": "account/order-detail"},
+]
+
 # automatically load and sync documents of this doctype from downstream apps
 # importable_doctypes = [doctype_1]
 

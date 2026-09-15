@@ -31,14 +31,32 @@ def get_context(context):
 		filters["item_group"] = item_group
 	if brand:
 		filters["brand"] = brand
+	# البحث الحر: الاسم أو الكود أو الباركود (OR) — مع بقاء فلاتر المجموعة/
+	# العلامة/الكود الدقيق AND كما كانت. الباركود يُحل لأكواد أصناف عبر
+	# جدول Item Barcode ثم يُضمَّن كـ item_code IN (...).
+	or_filters = None
 	if search_term:
-		filters["item_name"] = ["like", f"%{search_term}%"]
+		or_filters = [
+			["item_name", "like", f"%{search_term}%"],
+			["item_code", "like", f"%{search_term}%"],
+		]
+		barcode_codes = _find_item_codes_by_barcode(search_term)
+		if barcode_codes:
+			or_filters.append(["item_code", "in", barcode_codes])
 
-	total_count = frappe.db.count("Item", filters)
+	from frappe.query_builder.functions import Count
+
+	total_count = frappe.qb.get_query(
+		table="Item",
+		filters=filters or None,
+		or_filters=or_filters,
+		fields=[Count("*")],
+	).run()[0][0]
 	items = frappe.get_all(
 		"Item",
-		fields=["item_code", "item_name", "item_group", "brand", "disabled"],
+		fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "disabled"],
 		filters=filters,
+		or_filters=or_filters,
 		order_by="item_name asc",
 		start=(page - 1) * PAGE_SIZE,
 		page_length=PAGE_SIZE,
@@ -110,6 +128,28 @@ def get_context(context):
 	context.next_page = page + 1
 
 	return context
+
+
+def _find_item_codes_by_barcode(search_term):
+	"""أكواد الأصناف المطابقة لباركود مدخل في البحث الحر.
+
+	تطابق تام أولًا (الباركود معرّف دقيق — يتجنب ضجيج المطابقة الجزئية)،
+	ثم جزئي عند انعدام التام. تُرجع قائمة أكواد فريدة (قد تكون فارغة).
+	"""
+	for barcode_filter in (search_term, ["like", f"%{search_term}%"]):
+		rows = frappe.get_all(
+			"Item Barcode",
+			filters={"parenttype": "Item", "barcode": barcode_filter},
+			fields=["parent"],
+			limit_page_length=50,
+		)
+		codes = []
+		for r in rows:
+			if r.parent and r.parent not in codes:
+				codes.append(r.parent)
+		if codes:
+			return codes
+	return []
 
 
 def _get_active_discounts(item_codes):

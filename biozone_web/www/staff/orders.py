@@ -46,18 +46,46 @@ def _read_filters() -> dict:
 
 
 def _customer_options() -> list:
-	rows = frappe.get_all(
-		"Sales Order",
-		fields=["customer", "customer_name"],
-		filters={"docstatus": ["in", [0, 1]]},
-		limit_page_length=500,
-		order_by="customer_name asc",
+	# خيارات فلتر العميل: عميل واحد لكل صف، بلا سقف 500.
+	# استعلام تجميع واحد بدل جلب 500 طلب كامل وإسقاط المكرر في بايثون.
+	# MIN(customer_name) يطابق اختيار الاسم القديم تمامًا (كان يرتّب بالاسم
+	# تصاعديًا ويأخذ أول ظهور لكل عميل). الترتيب النهائي في بايثون عمدًا —
+	# ترتيب MySQL (collation) يختلف عن ترتيب بايثون (codepoints) فيطابق
+	# القديم حرفيًا.
+	rows = frappe.db.sql(
+		"""
+		select customer as name, min(customer_name) as label
+		from `tabSales Order`
+		where docstatus in (0, 1) and customer is not null and customer != ''
+		group by customer
+		""",
+		as_dict=True,
 	)
-	seen = {}
-	for r in rows:
-		if r.customer and r.customer not in seen:
-			seen[r.customer] = r.customer_name or r.customer
-	return [{"name": k, "label": v} for k, v in sorted(seen.items(), key=lambda kv: kv[1])]
+	options = [{"name": r.name, "label": r.label or r.name} for r in rows if r.name]
+	return sorted(options, key=lambda o: o["label"])
+
+
+def _get_prep_counts(order_names: list) -> dict:
+	"""عدد البنود والمؤكَّدة لكل طلب: {order_name: (total, confirmed)}.
+
+	استعلام تجميع واحد على بنود الطلب — يغني عن تحميل كل مستند كاملًا
+	لمجرد حساب عدّاد التقدم. custom_confirmed مخزّن 0/1 فيغني SUM عنه.
+	"""
+	if not order_names:
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		select parent as name, count(*) as total,
+			coalesce(sum(custom_confirmed), 0) as confirmed
+		from `tabSales Order Item`
+		where parent in %(names)s
+		group by parent
+		""",
+		{"names": order_names},
+		as_dict=True,
+	)
+	return {r.name: (int(r.total), int(r.confirmed)) for r in rows}
 
 
 def _load_orders(filters: dict) -> list:
@@ -116,6 +144,7 @@ def _load_orders(filters: dict) -> list:
 			"grand_total",
 			"net_total",
 			"docstatus",
+			"status",
 			"creation",
 			"modified",
 			"custom_needs_attention",
@@ -125,28 +154,44 @@ def _load_orders(filters: dict) -> list:
 		limit_page_length=200,
 	)
 
+	# إسقاط الملغاة من الصف الخفيف مباشرة (status عمود مخزّن) — بلا get_doc.
+	rows = [r for r in rows if r.get("status") != "Cancelled"]
+
+	# حالة التجهيز لكل طلب دفعة واحدة: عدد البنود وعدد المؤكَّدة عبر
+	# GROUP BY واحد، بدل get_doc كامل (بكل جداوله الفرعية) لكل صف.
+	counts = _get_prep_counts([r.name for r in rows])
+
 	orders = []
 	for r in rows:
-		doc = frappe.get_doc("Sales Order", r.name)
-		state = get_order_prep_state(doc)
-		# الطلبات الملغاة خارج القائمة تمامًا.
-		if doc.status == "Cancelled":
-			continue
+		total, confirmed = counts.get(r.name, (0, 0))
+		# كائن خفيف بنفس الحقول التي تقرأها get_order_prep_state تمامًا
+		# (docstatus + البنود + حقلي الانتباه) — نفس منطق العرض، بلا تحميل.
+		state = get_order_prep_state(
+			frappe._dict(
+				{
+					"docstatus": r.docstatus,
+					"custom_needs_attention": r.custom_needs_attention,
+					"custom_attention_note": r.custom_attention_note,
+					"items": [frappe._dict(custom_confirmed=1)] * confirmed
+					+ [frappe._dict(custom_confirmed=0)] * (total - confirmed),
+				}
+			)
+		)
 		entry = {
 			"name": r.name,
 			"customer": r.customer,
-			"customer_name": doc.customer_name,
+			"customer_name": r.customer_name,
 			"transaction_date": str(r.transaction_date or ""),
 			"created_display": frappe.utils.format_datetime(r.creation, "dd MMM yyyy - HH:mm"),
-			"grand_total": float(doc.grand_total or 0),
-			"grand_total_display": f"{float(doc.grand_total or 0):,.2f} ج.م",
+			"grand_total": float(r.grand_total or 0),
+			"grand_total_display": f"{float(r.grand_total or 0):,.2f} ج.م",
 			"state": state["state"],
 			"total": state["total"],
 			"confirmed": state["confirmed"],
 			"percent": state["percent"],
 			"progress_text": state["progress_text"],
 			"needs_attention": state["needs_attention"],
-			"docstatus": doc.docstatus,
+			"docstatus": r.docstatus,
 		}
 		orders.append(entry)
 

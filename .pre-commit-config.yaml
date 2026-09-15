@@ -63,6 +63,19 @@ repos:
                 biozone_web/public/js/lib/.*
             )$
 
+  - repo: local
+    hooks:
+      - id: check-staff-layout
+        name: "Check staff shell div nesting"
+        # Guards the staff shell's intentionally-open .sidebar-main wrapper:
+        # a stray close tag in any staff page fails silently in the browser
+        # (content ejected under the fixed sidebar), so catch it here.
+        # See scripts/check_staff_layout.py for the full explanation.
+        entry: python3 scripts/check_staff_layout.py
+        language: system
+        pass_filenames: false
+        files: "biozone_web/(www/staff/.*\\.html|templates/includes/staff_shell_.*\\.html)$"
+
 ci:
     autoupdate_schedule: weekly
     skip: []

@@ -10,8 +10,8 @@
    own copy had it removed when this was centralized (items.html never
    had one, which is why its sidebar showed raw ligature text).
 
-   Each page's get_context() must set:
-   - active_page: "dashboard" | "items" | "stock" | "orders" | "pricing"
+    Each page's get_context() must set:
+    - active_page: "dashboard" | "items" | "stock" | "orders" | "pricing" | "customers"
    - user_full_name, today_display (dashboard.py already sets these
      via get_header_context() + its own today_display line — other
      staff pages should do the same) #}
@@ -78,6 +78,10 @@
 <a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'pricing' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/pricing" title="التسعير">
 <span class="material-symbols-outlined text-[22px]">sell</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">التسعير</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'customers' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/customers" title="العملاء">
+<span class="material-symbols-outlined text-[22px]">group</span>
+<span class="text-sm lg:max-xl:hidden sidebar-label">العملاء</span>
 </a>
 </nav>
 </div>
