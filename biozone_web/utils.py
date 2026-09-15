@@ -387,3 +387,201 @@ def get_default_company():
 	return frappe.defaults.get_global_default("company") or frappe.db.get_single_value(
 		"Global Defaults", "default_company"
 	)
+
+
+# ---------- البند 5 (B5+B6d): عرض السعر حسب الفئة — سيرفر-سايد بالكامل ----------
+#
+# مصدر الحقيقة الوحيد للسعر هو محرك تسعير ERPNext نفسه
+# (apply_pricing_rule على Standard Selling)، بنفس المدخلات التي تُستخدم
+# عند إنشاء Sales Order. أي سطح عرض (كتالوج/رئيسية/سلة) يمر من هنا،
+# فيتطابق السعر بالضرورة مع الطلب النهائي.
+
+# قائمة البيع الوحيدة المعتمدة — لا توجد قوائم بيع أخرى للفئات (اتأكد حيًا:
+# جدول Price List فيه Standard Selling وStandard Buying فقط)، فالتمييز بين
+# الفئات يتم حصريًا عبر Pricing Rule (خصم %) فوق نفس السعر الأساسي.
+PUBLIC_PRICE_LIST = "Standard Selling"
+
+# الفئة العامة الاحتياطية لو Selling Settings بلا قيمة (دفاع فقط — القيمة
+# الحية الحالية هي "الجمهور"، وهي نفسها فئة العميل الجديد الافتراضية).
+PUBLIC_CUSTOMER_GROUP_FALLBACK = "الجمهور"
+
+
+def get_public_customer_group():
+	"""اسم فئة الجمهور (العامة) من الإعداد الحي، لا تخمين ثابت."""
+	return (
+		frappe.db.get_single_value("Selling Settings", "customer_group")
+		or PUBLIC_CUSTOMER_GROUP_FALLBACK
+	)
+
+
+def get_customer_price_group(customer=None):
+	"""الفئة السعرية الفعّالة لعميل — بلا أي fallback لفئة بديلة.
+
+	- زائر/بلا ربط Customer → فئة الجمهور.
+	- عميل على فئة الجمهور نفسها (أي حساب جديد قبل التفعيل) → الجمهور.
+	- عميل على فئة غير موجودة/مجمّعة (is_group)/معطّلة → الجمهور مباشرة،
+	  وليس لأي فئة بديلة (قاعدة "ممنوع fallback" في التصميم).
+	- غير ذلك → اسم فئته المفعّلة كما هي.
+
+	ملحوظة: المحرك نفسه لا يفحص disabled على Customer Group، لذلك الفحص
+	هنا صريح وإلزامي قبل تمرير الفئة للمحرك أو للطلب.
+	"""
+	public_group = get_public_customer_group()
+
+	if customer is None:
+		customer = find_customer_for_current_user()
+
+	if not customer:
+		return public_group
+
+	group = frappe.db.get_value("Customer", customer, "customer_group")
+
+	if not group or group == public_group:
+		return public_group
+
+	group_row = frappe.db.get_value(
+		"Customer Group", group, ["is_group", "disabled"], as_dict=True
+	)
+
+	if not group_row or group_row.is_group or group_row.disabled:
+		return public_group
+
+	return group
+
+
+def is_active_price_customer(customer=None):
+	"""هل العميل مؤهّل سعريًا (فئة مفعّلة غير عامة)؟"""
+	return get_customer_price_group(customer) != get_public_customer_group()
+
+
+def get_storefront_price_context(customer=None):
+	"""سياق التسعير الكامل للطلب الحالي — تُشتق الفئة سيرفر-سايد دائمًا،
+	ولا يُقبل أي customer_group من العميل (قرار اختبار 7)."""
+	if customer is None:
+		customer = find_customer_for_current_user()
+
+	public_group = get_public_customer_group()
+	group = get_customer_price_group(customer)
+
+	return {
+		"customer": customer,
+		"customer_group": group,
+		"is_active": bool(group and group != public_group),
+		"is_guest": frappe.session.user == "Guest",
+	}
+
+
+def require_active_price_customer():
+	"""بوابة تأكيد الطلب (البند 5): ترفض أي حساب بلا فئة مفعّلة.
+
+	تستخدم find فقط (بلا إنشاء Customer) حتى لا تُنشأ صفوف يتيمة من
+	محاولات مرفوضة. تُرجع (customer, customer_group) المؤكدين للاستخدام
+	المباشر في Sales Order — بلا إعادة قراءة منفصلة.
+	"""
+	customer = find_customer_for_current_user()
+	group = get_customer_price_group(customer)
+
+	if group == get_public_customer_group():
+		frappe.throw(
+			_("يتعذّر تأكيد الطلب قبل تفعيل فئة حسابك. يُرجى التواصل مع إدارة المتجر لتفعيل الحساب."),
+			frappe.PermissionError,
+		)
+
+	return customer, group
+
+
+def get_effective_item_prices(item_codes, customer=None, customer_group=None):
+	"""السعر النهائي (بعد خصم الفئة) لمجموعة أصناف، دفعة واحدة عبر محرك
+	ERPNext الحقيقي — نفس المحرك الذي يسعّر صفوف Sales Order.
+
+	تُرجع dict لكل كود مطلوب: {"price", "base_price", "discount_percentage"}.
+	الأصناف بلا سعر أساسي تُرجع price=None (تُعامل كغير متاحة، كما قبل).
+
+	ملحوظتان موثّقتان:
+	- تُحسب بسعر الوحدة (qty=1). قواعد بحد أدنى للكمية (min_qty) لا يمكن
+	  إنشاؤها من شاشة /staff/pricing أصلًا (دائمًا 0)، فإن وُجدت من Desk
+	  يدويًا فقد يختلف سطر الطلب عن العرض — المحرك واحد والمدخلات واحدة
+	  عدا الكمية.
+	- أي عطل في المحرك يُترك ليُرمى (fail loud) — لا عرض لسعر بديل صامت.
+	"""
+	codes = []
+	for code in item_codes or []:
+		code = (code or "").strip() if isinstance(code, str) else ""
+		if code and code not in codes:
+			codes.append(code)
+
+	result = {
+		code: {"price": None, "base_price": None, "discount_percentage": 0.0}
+		for code in codes
+	}
+
+	if not codes:
+		return result
+
+	base_rows = frappe.get_all(
+		"Item Price",
+		fields=["item_code", "price_list_rate"],
+		filters={"price_list": PUBLIC_PRICE_LIST, "item_code": ["in", codes]},
+	)
+	base_map = {r["item_code"]: r["price_list_rate"] for r in base_rows}
+
+	pricable = [c for c in codes if base_map.get(c)]
+	if not pricable:
+		return result
+
+	if customer_group is None:
+		customer_group = get_customer_price_group(customer)
+
+	if customer is None:
+		customer = find_customer_for_current_user()
+
+	meta_rows = frappe.get_all(
+		"Item",
+		fields=["item_code", "item_group", "stock_uom"],
+		filters={"item_code": ["in", pricable]},
+	)
+	meta_map = {r["item_code"]: r for r in meta_rows}
+
+	company = get_default_company()
+	currency = frappe.db.get_value("Company", company, "default_currency")
+
+	from erpnext.accounts.doctype.pricing_rule.pricing_rule import apply_pricing_rule
+
+	engine_out = apply_pricing_rule(
+		{
+			"doctype": "Sales Order",
+			"transaction_type": "selling",
+			"selling_price_list": PUBLIC_PRICE_LIST,
+			"price_list": PUBLIC_PRICE_LIST,
+			"company": company,
+			"currency": currency,
+			"transaction_date": frappe.utils.today(),
+			"ignore_pricing_rule": 0,
+			"customer": customer,
+			"customer_group": customer_group,
+			"items": [
+				{
+					"doctype": "Sales Order Item",
+					"item_code": code,
+					"item_group": (meta_map.get(code) or {}).get("item_group"),
+					"qty": 1,
+					"stock_qty": 1,
+					"uom": (meta_map.get(code) or {}).get("stock_uom"),
+					"price_list_rate": base_map[code],
+				}
+				for code in pricable
+			],
+		}
+	)
+
+	for code, row in zip(pricable, engine_out):
+		base = base_map[code]
+		price_list_rate = frappe.utils.flt(row.get("price_list_rate")) or base
+		discount_amount = frappe.utils.flt(row.get("discount_amount"))
+		result[code] = {
+			"price": price_list_rate - discount_amount,
+			"base_price": base,
+			"discount_percentage": frappe.utils.flt(row.get("discount_percentage")),
+		}
+
+	return result
