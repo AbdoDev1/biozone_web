@@ -16,6 +16,26 @@ def get_context(context):
 	# الـfetch calls بتاعة الحفظ/التعطيل تعدي فحص CSRF بتاع Frappe.
 	context.csrf_token = frappe.sessions.get_csrf_token()
 
+	tab = frappe.form_dict.get("tab") or "list"
+	if tab not in ("list", "import"):
+		tab = "list"
+	context.tab = tab
+
+	if tab == "import":
+		_load_import_tab(context)
+		context.items = []
+		context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")
+		context.brands = []
+		context.search_term = ""
+		context.selected_group = None
+		context.selected_brand = None
+		context.page = 1
+		context.has_prev = False
+		context.has_next = False
+		context.prev_page = 1
+		context.next_page = 1
+		return context
+
 	page = frappe.utils.cint(frappe.form_dict.get("page")) or 1
 	search_term = (frappe.form_dict.get("q") or "").strip()
 	item_group = frappe.form_dict.get("group")
@@ -128,6 +148,29 @@ def get_context(context):
 	context.next_page = page + 1
 
 	return context
+
+
+def _load_import_tab(context):
+	"""سياق تبويب الاستيراد/التصدير: الفئات النشطة + المخزن الافتراضي
+	المحلول حيًا + العملة + الحدود. قراءة فقط — أي فشل في حل المخزن
+	يُعرض كخطأ إعداد واضح بدل التخمين (المهمة A)."""
+	from biozone_web.utils import get_default_warehouse
+
+	context.import_groups = frappe.get_all(
+		"Customer Group",
+		filters={"is_group": 0, "disabled": 0},
+		fields=["name"],
+		order_by="name asc",
+	)
+	try:
+		context.import_warehouse = get_default_warehouse()
+		context.import_warehouse_error = ""
+	except Exception as e:
+		context.import_warehouse = ""
+		context.import_warehouse_error = str(e)
+	context.import_price_list = "Standard Selling"
+	context.import_max_mb = 5
+	context.import_max_rows = 2000
 
 
 def _find_item_codes_by_barcode(search_term):

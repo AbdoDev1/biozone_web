@@ -1,0 +1,204 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-09-16 00:00:00.000000",
+ "custom": 1,
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "run_type",
+  "status",
+  "file_section",
+  "file_name",
+  "file_hash",
+  "column_break_1",
+  "warehouse",
+  "total_rows",
+  "counts_section",
+  "rows_to_create",
+  "rows_to_update",
+  "rows_failed",
+  "column_break_2",
+  "done_created",
+  "done_updated",
+  "done_failed",
+  "report_section",
+  "missing_columns",
+  "warnings",
+  "column_break_3",
+  "result_json",
+  "error",
+  "audit_section",
+  "requested_by",
+  "confirmed_rerun",
+  "groups_snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "run_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Run Type",
+   "options": "Import\nExport",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Uploaded\nValidating\nPreview\nQueued\nRunning\nCompleted\nPartial\nFailed\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "file_section",
+   "fieldtype": "Section Break",
+   "label": "File"
+  },
+  {
+   "fieldname": "file_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "File Name"
+  },
+  {
+   "fieldname": "file_hash",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "File SHA256",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Data",
+   "label": "Default Warehouse (resolved at staging)"
+  },
+  {
+   "fieldname": "total_rows",
+   "fieldtype": "Int",
+   "label": "Total Rows"
+  },
+  {
+   "fieldname": "counts_section",
+   "fieldtype": "Section Break",
+   "label": "Counts"
+  },
+  {
+   "fieldname": "rows_to_create",
+   "fieldtype": "Int",
+   "label": "Rows To Create (preview)"
+  },
+  {
+   "fieldname": "rows_to_update",
+   "fieldtype": "Int",
+   "label": "Rows To Update (preview)"
+  },
+  {
+   "fieldname": "rows_failed",
+   "fieldtype": "Int",
+   "label": "Rows Failed (preview)"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "done_created",
+   "fieldtype": "Int",
+   "label": "Committed Created"
+  },
+  {
+   "fieldname": "done_updated",
+   "fieldtype": "Int",
+   "label": "Committed Updated"
+  },
+  {
+   "fieldname": "done_failed",
+   "fieldtype": "Int",
+   "label": "Committed Failed"
+  },
+  {
+   "fieldname": "report_section",
+   "fieldtype": "Section Break",
+   "label": "Report"
+  },
+  {
+   "fieldname": "missing_columns",
+   "fieldtype": "Small Text",
+   "label": "Missing Columns (expected headers not found)"
+  },
+  {
+   "fieldname": "warnings",
+   "fieldtype": "Long Text",
+   "label": "Warnings"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "result_json",
+   "fieldtype": "Long Text",
+   "label": "Result JSON (staged rows at preview, outcomes at commit)"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Setup/Run Error"
+  },
+  {
+   "fieldname": "audit_section",
+   "fieldtype": "Section Break",
+   "label": "Audit"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Requested By",
+   "options": "User"
+  },
+  {
+   "fieldname": "confirmed_rerun",
+   "fieldtype": "Check",
+   "default": 0,
+   "label": "Rerun Explicitly Confirmed"
+  },
+  {
+   "fieldname": "groups_snapshot",
+   "fieldtype": "Long Text",
+   "label": "Active Customer Groups At Staging (JSON)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biozone Web",
+ "name": "Biozone Item Import",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
