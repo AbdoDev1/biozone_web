@@ -30,6 +30,7 @@ tailwind.config = {
         "error": "#ba1a1a",
         "on-error": "#ffffff"
       },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
       fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
     }
   }
@@ -48,10 +49,73 @@ tailwind.config = {
 
     <h1 class="text-xl sm:text-2xl font-extrabold text-on-surface">حسابي</h1>
 
+    <!-- تبويبا الحساب: أساسية ومديونية — روابط سيرفر-سايد بلا أي جلب ديناميكي -->
+    <nav aria-label="أقسام الحساب" class="flex border-b border-outline-variant/40">
+      <a href="/account?tab=profile" class="flex-1 sm:flex-none pb-3 px-6 font-bold text-sm text-center transition-colors {% if active_tab == 'profile' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-on-surface border-b-2 border-transparent{% endif %}">البيانات الأساسية</a>
+      <a href="/account?tab=debt" class="flex-1 sm:flex-none pb-3 px-6 font-bold text-sm text-center transition-colors {% if active_tab == 'debt' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-on-surface border-b-2 border-transparent{% endif %}">المديونية</a>
+    </nav>
+
+    {% if active_tab == 'debt' %}
+    <!-- تبويب المديونية: قائمة كل الفواتير المرحّلة للعميل الحالي فقط -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
+      <div class="font-bold text-on-surface mb-3">الفواتير ({{ invoices_count }})</div>
+      <!-- تخطيط صريح بثلاث حالات (راجع تقرير إصلاح تخطيط الفلاتر):
+           الهاتف (أساسًا) عمود واحد، العرض المتوسط (sm) عمودان متساويان،
+           سطح المكتب (lg) صف واحد: بحث مرن + مسار صريح 10rem لكل حقل تاريخ
+           + أزرار بحسب محتواها. مسارات grid صريحة (وبـminmax(0,1fr)) تمنع
+           اعتماد العرض على min-content لحقول التاريخ الأصلية، فلا تجاوز
+           للحاوية ولا تداخل ولا فائض أفقي — وترتيب العناصر المنطقي يحفظ RTL. -->
+      <form method="get" action="/account" class="grid grid-cols-1 gap-2.5 mb-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]">
+        <input type="hidden" name="tab" value="debt">
+        <input type="search" name="q" value="{{ invoice_q }}" placeholder="بحث برقم الفاتورة" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <input type="date" name="date_from" value="{{ invoice_date_from }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <input type="date" name="date_to" value="{{ invoice_date_to }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <div class="flex gap-2.5">
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-sm transition-colors">بحث</button>
+          <a href="/account?tab=debt" class="px-5 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant font-bold text-sm hover:border-primary/40 transition-all">مسح</a>
+        </div>
+      </form>
+      {% if not invoices %}
+      {% if invoice_q or invoice_date_from or invoice_date_to %}
+      <p class="text-sm text-on-surface-variant">لا توجد فواتير مطابقة للبحث — جرّب تعديل البحث.</p>
+      {% else %}
+      <p class="text-sm text-on-surface-variant">لا توجد فواتير بعد — ستظهر فواتيرك هنا فور اعتمادها.</p>
+      {% endif %}
+      {% else %}
+      <div class="flex flex-col gap-2.5">
+        {% for inv in invoices %}
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/40 px-3.5 py-3">
+          <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ inv.name }}</div>
+          <div class="text-sm font-bold whitespace-nowrap {% if inv.is_return %}text-error{% else %}text-on-surface{% endif %}" style="direction: ltr;">{{ inv.value_display }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if invoices_pages > 1 %}
+      <div class="flex items-center justify-between gap-3 mt-4">
+        {% if invoice_page > 1 %}
+        <a href="/account?tab=debt&page={{ invoice_page - 1 }}&q={{ invoice_q }}&date_from={{ invoice_date_from }}&date_to={{ invoice_date_to }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">السابق</a>
+        {% else %}
+        <span class="px-4 py-2 rounded-xl border border-outline-variant/20 text-on-surface-variant/40 font-bold text-sm">السابق</span>
+        {% endif %}
+        <span class="text-xs text-on-surface-variant">صفحة {{ invoice_page }} من {{ invoices_pages }}</span>
+        {% if invoice_page < invoices_pages %}
+        <a href="/account?tab=debt&page={{ invoice_page + 1 }}&q={{ invoice_q }}&date_from={{ invoice_date_from }}&date_to={{ invoice_date_to }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">التالي</a>
+        {% else %}
+        <span class="px-4 py-2 rounded-xl border border-outline-variant/20 text-on-surface-variant/40 font-bold text-sm">التالي</span>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+
+    {% else %}
+    <!-- تبويب البيانات الأساسية -->
     <!-- بيانات العميل الأساسية -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="font-bold text-on-surface">{{ customer_name }}</div>
       <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ email }}</div>
+      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ phone_display }}</div>
+      <div class="text-xs text-on-surface-variant mt-1">{{ address_note }}</div>
     </div>
 
     <!-- حالة الفئة -->
@@ -92,6 +156,7 @@ tailwind.config = {
       </div>
       {% endif %}
     </div>
+    {% endif %}
 
   </div>
 </main>

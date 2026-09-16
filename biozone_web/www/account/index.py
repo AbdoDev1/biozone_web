@@ -7,10 +7,14 @@ from biozone_web.utils import (
 	get_portal_users_for_customer,
 	redirect_staff_away_from_store,
 )
-from biozone_web.www.my_orders import build_customer_orders_list
+from biozone_web.www.my_orders import build_customer_invoices_list, build_customer_orders_list
 
 RECENT_ORDERS_LIMIT = 3
 UNASSIGNED_CATEGORY_LABEL = "لم تُحدَّد لك فئة تسعير بعد"
+# الهاتف اختياري فعليًا (السيرفر لا يشترطه) — الفراغ يُعرض شرطة (قرار B10).
+PHONE_EMPTY_DISPLAY = "-"
+# لا ميزة عناوين قائمة في المشروع — حالة محايدة ثابتة فقط (قرار B10).
+ADDRESS_NEUTRAL_LABEL = "لم تتم إضافة عنوان بعد"
 
 
 def get_context(context):
@@ -49,6 +53,10 @@ def get_context(context):
 
 	context.customer_name = customer_name
 	context.email = email
+	context.phone_display = (
+		frappe.db.get_value("User", frappe.session.user, "phone") or PHONE_EMPTY_DISPLAY
+	)
+	context.address_note = ADDRESS_NEUTRAL_LABEL
 	if assigned:
 		context.category_assigned = True
 		context.customer_group = group
@@ -61,5 +69,37 @@ def get_context(context):
 	orders, orders_count = build_customer_orders_list()
 	context.orders_count = orders_count
 	context.recent_orders = orders[:RECENT_ORDERS_LIMIT]
+
+	# تبويبا /account (قرار B10): أساسية (افتراضي) ومديونية — رسم
+	# سيرفر-سايد بلا API. قيم الفلاتر تُمرَّر دائمًا لإعادة ملئها،
+	# أما الاستعلام نفسه فيُدار فقط عند فتح تبويب المديونية.
+	tab = (frappe.form_dict.get("tab") or "profile").strip()
+	if tab not in ("profile", "debt"):
+		tab = "profile"
+	context.active_tab = tab
+
+	context.invoice_q = (frappe.form_dict.get("q") or "").strip()
+	context.invoice_date_from = (frappe.form_dict.get("date_from") or "").strip()
+	context.invoice_date_to = (frappe.form_dict.get("date_to") or "").strip()
+	try:
+		context.invoice_page = int(frappe.form_dict.get("page") or 1)
+	except (TypeError, ValueError):
+		context.invoice_page = 1
+
+	if tab == "debt":
+		invoices, invoices_count, invoices_pages, invoices_page = build_customer_invoices_list(
+			page=context.invoice_page,
+			name_filter=context.invoice_q,
+			date_from=context.invoice_date_from,
+			date_to=context.invoice_date_to,
+		)
+		context.invoices = invoices
+		context.invoices_count = invoices_count
+		context.invoices_pages = invoices_pages
+		context.invoice_page = invoices_page
+	else:
+		context.invoices = []
+		context.invoices_count = 0
+		context.invoices_pages = 1
 
 	return context

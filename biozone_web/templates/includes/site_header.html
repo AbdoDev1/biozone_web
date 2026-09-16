@@ -5,7 +5,28 @@
    Pass `active_page` = "home" | "catalog" | "cart" from each page's
    get_context so the current section is highlighted.
    The category <select> only renders when a page passes `categories`
-   (currently only catalog.py does) — safe to omit elsewhere. #}
+   (currently only catalog.py does) — safe to omit elsewhere.
+
+   ثبات عرض الصفحة عند ظهور/اختفاء شريط التمرير — السبب الجذري لانزياح
+   عناصر الهيدر عند الانتقال بين تبويبَي /account (مقيس حيًّا: 15px = عرض
+   الـgutter بالضبط). حاوية الهيدر `w-full … mx-auto` تتبع حافة الـviewport،
+   فعندما يظهر شريط تمرير في صفحة ولا يظهر في أخرى يتغير عرض التخطيط بمقدار
+   عرض الشريط. القاعدة موضوعة هنا في الـpartial المشترك نفسه حتى تنطبق
+   تلقائيًا على كل صفحة تضمّه، بلا أي إزاحة خاصة بصفحة أو تبويب.
+   - `scrollbar-gutter: stable` هو المسار الأساسي (مدعوم ومُتحقَّق حيًّا).
+   - `overflow-y: scroll` قبل `@supports` احتياطي لمحركات لا تدعم الخاصية
+     (يعطي نفس الثبات بمقابل شريط تمرير ظاهر دائمًا).
+   الأبعاد المثبَّتة داخل الهيدر: ارتفاع الشريط h-[72px] | الشعار text-2xl
+   (24px) | كل زر أيقونة 40×40px = p-2 (8px×2) + أيقونة w-6 h-6 (24px)
+   | فجوة الأيقونات gap-sm (8px) | الحاوية الداخلية px-md (16px) و
+   max-w-container-max (1280px) — كلها توكنات يجب أن تُعرَّف في الصفحة
+   المضيفة (راجع فحص تعريف التوكنات في قواعد البناء). #}
+<style>
+  html { overflow-y: scroll; }
+  @supports (scrollbar-gutter: stable) {
+    html { overflow-y: auto; scrollbar-gutter: stable; }
+  }
+</style>
 <header class="sticky top-0 z-50 w-full shadow-sm bg-surface">
   <div class="flex justify-between items-center w-full px-md py-sm max-w-container-max mx-auto h-[72px]">
     <div class="flex-shrink-0">
@@ -33,7 +54,10 @@
     </form>
     <div class="flex items-center gap-sm">
       {% if is_logged_in %}
-        <span class="hidden md:inline text-sm font-bold text-on-surface-variant">{{ user_full_name }}</span>
+        <a href="/account" title="حسابي" class="hidden md:inline text-sm font-bold text-on-surface-variant hover:text-primary transition-colors">{{ user_full_name }}</a>
+        <a href="/account" title="حسابي" class="md:hidden p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
+          <span class="material-symbols-outlined">person</span>
+        </a>
         <a href="/account/orders" title="طلباتي" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-3"/><circle cx="7" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg>
         </a>
