@@ -140,6 +140,9 @@ tailwind.config = {
 (function () {
   const CSRF_TOKEN = {{ csrf_token|tojson }};
   const CART_KEY = 'biozone_cart_items';
+  // Helper hint only: whether the last reprice saw a guest session.
+  // Never the sole basis for messaging; HTTP status decides.
+  let cartIsGuest = false;
   // Cart shape: [{ item_code, item_name, item_group, price, image, quantity }]
 
   function loadCart() {
@@ -291,6 +294,9 @@ tailwind.config = {
     errorEl.classList.add('hidden');
     if (items.length === 0) return;
 
+    // Default user-facing message; replaced only with curated text below.
+    // Raw network / framework text must never reach the page.
+    let failMessage = 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
     try {
       const res = await fetch('/api/method/biozone_web.api.biozone_confirm_order', {
         method: 'POST',
@@ -300,11 +306,27 @@ tailwind.config = {
         },
         body: JSON.stringify({ items })
       });
-      const data = await res.json();
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
       if (!res.ok) {
-        const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
-          || data.exception || 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
-        throw new Error(msg);
+        // Never render server internals (exception / traceback / framework
+        // messages). Curated API string only; otherwise local messages
+        // chosen by status, never by parsing error text.
+        const apiError = (data && data.message && typeof data.message.error === 'string')
+          ? data.message.error : '';
+        if (apiError) {
+          failMessage = apiError;
+        } else if (res.status === 403) {
+          // 403 alone does not prove Guest; is_guest is a helper hint only.
+          failMessage = cartIsGuest
+            ? 'سجّل الدخول أولًا لإتمام طلبك'
+            : 'انتهت الجلسة أو لا تملك صلاحية تنفيذ الطلب';
+        } else if (res.status === 400) {
+          // Narrow reading per live evidence (missing/invalid CSRF token);
+          // revisit if the API ever returns other 400 validation errors.
+          failMessage = 'انتهت الجلسة، حدّث الصفحة وحاول مجددًا';
+        }
+        throw new Error('confirm-order failed with status ' + res.status);
       }
       localStorage.removeItem(CART_KEY);
       // البند 1: تحديث الشارة في نفس التبويب فورًا قبل التحويل —
@@ -316,7 +338,7 @@ tailwind.config = {
       } catch (e) {}
       window.location.href = (data.message && data.message.redirect) || '/biozone-home';
     } catch (err) {
-      errorEl.textContent = err.message;
+      errorEl.textContent = failMessage;
       errorEl.classList.remove('hidden');
     }
   });
@@ -327,8 +349,9 @@ tailwind.config = {
   window.addEventListener('storage', function (e) {
     if (e && e.key === CART_KEY) render();
   });
-  repriceFromServer(loadCart()).then((outcome) => {
-    if (outcome.failed) return;
+repriceFromServer(loadCart()).then((outcome) => {
+if (outcome.failed) return;
+cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
     saveCart(outcome.items);
     render();
     const noticeEl = document.getElementById('cart-reprice-notice');
