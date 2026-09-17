@@ -211,14 +211,18 @@ def _conflict_warning_text(conflicts):
 
 
 def _zero_valuation_warnings(staged, warehouse):
-	"""Read-only preview warning: positive-qty rows with no usable valuation.
+	"""Read-only preview disclosure: positive-qty rows with no usable valuation.
 
 	Mirrors the write path exactly (_import_apply_qty): a receipt is valued from
 	Bin.valuation_rate for the run's single resolved warehouse — the same single
 	source staff_log_stock_movement pre-checks before its own submit — never
 	from Item.valuation_rate, Item Price, or a get_valuation_rate fallback
-	chain. A broader check would warn about rows that would not actually fail at
-	submit time, which is worse than no warning.
+	chain.
+
+	These rows are ACCEPTED at temporary zero valuation (cost zero) under the
+	approved interim policy — this message discloses that, it no longer predicts
+	a rejection. A broader check would disclose rows that need no disclosure,
+	which is worse than no message.
 
 	Applies to rows that satisfy BOTH conditions:
 	(a) a positive quantity cell — a blank cell means "leave unchanged" and
@@ -268,8 +272,7 @@ def _zero_valuation_warnings(staged, warehouse):
 		# back on "\n" for display.
 		out.append(
 			"الصف {0} — الصنف {1}: لا يوجد له تقييم أو رصيد مخزون سابق في المخزن "
-			"الحالي — استيراد كمية له سيُرفض ما لم يُسجَّل له إدخال مخزون "
-			"افتتاحي أولًا من شاشة المخزون.".format(row["n"], row["item_code"])
+			"الحالي — سيُقبل بتقييم صفري مؤقتًا (تكلفة صفر) لحين تسويته لاحقًا.".format(row["n"], row["item_code"])
 		)
 	return out
 
@@ -679,6 +682,10 @@ def _import_apply_qty(item_code, qty_cell, uom_cell, warehouse, run_name, row_n)
 					"conversion_factor": conversion_factor,
 					"t_warehouse": warehouse,
 					"basic_rate": valuation or 0,
+					# Temporary policy: a row with no usable valuation posts at
+					# zero instead of being rejected — scoped to this receipt
+					# line only, never to the Item card or other movements.
+					"allow_zero_valuation_rate": 1 if not valuation else 0,
 				}
 			],
 		}
@@ -993,11 +1000,11 @@ def run_validate_job(run_name):
 		conflict_text = _conflict_warning_text(conflicts)
 		if conflict_text:
 			warnings.append(conflict_text)
-		# Warning-only preview heads-up (final rejection at submit is
-		# unchanged): rows whose positive quantity will be rejected because the
-		# run's resolved warehouse has no usable Bin.valuation_rate for them
-		# yet — a brand-new item included, since it goes through the same
-		# Bin-based valuation lookup in the same write path.
+		# Disclosure (temporary zero-valuation policy): rows whose positive
+		# quantity has no usable Bin.valuation_rate in the run's resolved
+		# warehouse will be ACCEPTED at zero cost — a brand-new item included,
+		# since it goes through the same Bin-based valuation lookup in the
+		# same write path. The message discloses this; it predicts no rejection.
 		warnings.extend(_zero_valuation_warnings(staged, run.warehouse))
 		run.db_set("missing_columns", "\n".join(missing))
 		run.db_set("warnings", "\n".join(warnings))
