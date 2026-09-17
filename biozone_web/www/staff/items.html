@@ -292,8 +292,15 @@
 </div>
 <!-- تنبيه الأعمدة الناقصة (أعلى التقرير دائمًا) -->
 <div id="import-missing" class="hidden bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 text-xs font-bold text-amber-800"></div>
-<!-- تحذيرات -->
-<div id="import-warnings" class="hidden flex-col gap-2"></div>
+<!-- تحذيرات: قائمة مقيدة الارتفاع وقابلة للتمرير + ترقيم عميل (20 تحذيرًا في الصفحة) -->
+<div id="import-warnings" class="hidden flex-col gap-2 max-h-64 overflow-y-auto"></div>
+<!-- BEGIN: ImportWarningsPagination -->
+<div id="import-warnings-pager" class="hidden items-center gap-2" data-purpose="import-warnings-pagination">
+<button id="import-warnings-prev" type="button" onclick="importWarningsGoToPage(importWarningsPage - 1)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle text-slate-700 disabled:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed">السابق</button>
+<span id="import-warnings-page-indicator" class="text-xs font-bold text-navy-text/50 px-2"></span>
+<button id="import-warnings-next" type="button" onclick="importWarningsGoToPage(importWarningsPage + 1)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle text-slate-700 disabled:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed">التالي</button>
+</div>
+<!-- END: ImportWarningsPagination -->
 <!-- تحذير إعادة التشغيل + تأكيد -->
 <div id="import-rerun-wrap" class="hidden bg-alert-bg/50 border border-alert-red/30 rounded-xl px-4 py-3 text-xs font-bold text-alert-red"></div>
 <label id="import-rerun-label" class="hidden items-center gap-2 text-xs font-bold text-darkNavy cursor-pointer">
@@ -316,7 +323,18 @@
 <div class="border border-borderSubtle rounded-xl p-3"><p class="text-xs font-black text-darkNavy mb-2">نتائج الأصناف (إنشاء/تحديث/كمية/سعر)</p><div id="import-items-result" class="flex flex-col gap-1 text-xs max-h-64 overflow-y-auto"></div></div>
 <div class="border border-borderSubtle rounded-xl p-3"><p class="text-xs font-black text-darkNavy mb-2">نتائج التسعير (قواعد الخصم)</p><div id="import-pricing-result" class="flex flex-col gap-1 text-xs max-h-64 overflow-y-auto"></div></div>
 </div>
-<div id="import-errors-result" class="flex flex-col gap-1 text-xs"></div>
+<!-- الأخطاء: قائمة مقيدة الارتفاع وقابلة للتمرير + ترقيم عميل (20 خطأ في الصفحة) -->
+<div id="import-errors-wrap" class="hidden flex-col gap-2">
+<p id="import-errors-title" class="text-xs font-black text-alert-red">أخطاء الصفوف (بالرقم):</p>
+<div id="import-errors-result" class="flex flex-col gap-1 text-xs max-h-64 overflow-y-auto"></div>
+<!-- BEGIN: ImportErrorsPagination -->
+<div id="import-errors-pager" class="hidden items-center gap-2" data-purpose="import-errors-pagination">
+<button id="import-errors-prev" type="button" onclick="importErrorsGoToPage(importErrorsPage - 1)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle text-slate-700 disabled:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed">السابق</button>
+<span id="import-errors-page-indicator" class="text-xs font-bold text-navy-text/50 px-2"></span>
+<button id="import-errors-next" type="button" onclick="importErrorsGoToPage(importErrorsPage + 1)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle text-slate-700 disabled:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed">التالي</button>
+</div>
+<!-- END: ImportErrorsPagination -->
+</div>
 </div>
 </div>
 </section>
@@ -687,16 +705,13 @@ function renderImportCallouts(d) {
   } else { miss.classList.add('hidden'); miss.textContent = ''; }
   const w = document.getElementById('import-warnings');
   const warnings = d.warnings || [];
+  importWarningsAll = warnings;
+  importWarningsPage = 1;
   if (warnings.length) {
     w.classList.remove('hidden'); w.classList.add('flex');
-    w.innerHTML = '';
-    warnings.forEach((t) => {
-      const p = document.createElement('p');
-      p.className = 'bg-slate-50 border border-borderSubtle rounded-xl px-3 py-2 text-[11px] text-slate-600 font-medium';
-      p.textContent = t;
-      w.appendChild(p);
-    });
-  } else { w.classList.add('hidden'); w.classList.remove('flex'); w.innerHTML = ''; }
+  } else { w.classList.add('hidden'); w.classList.remove('flex'); }
+  w.innerHTML = '';
+  renderImportWarningPage();
 }
 function uploadImportFile() {
   importClearFail();
@@ -808,6 +823,92 @@ function confirmImportFile() {
     })
     .catch(() => importFail('تعذر الاتصال بالسيرفر'));
 }
+/* ===== ترقيم قوائم الاستيراد: عميل فقط، IMPORT_LIST_PAGE_SIZE عنصر في الصفحة =====
+   الرد من staff_import_status يبقى كما هو (result_json كامل بلا تقطيع) —
+   التقسيم هنا في العرض فقط، بنفس نمط «صفحة X من Y» وأزرار السابق/التالي
+   المستخدم في قوائم الأصناف/العملاء وفي /staff/pricing.
+   ازدواج منطق الترقيم بين الأخطاء والتحذيرات مقصود — لا تستخرج دالة عامة.
+   تغيير الحجم مستقبلًا = سطر واحد هنا فقط. */
+const IMPORT_LIST_PAGE_SIZE = 20;
+let importErrorsAll = [];
+let importErrorsPage = 1;
+
+function importErrorsTotalPages() {
+  return Math.max(1, Math.ceil(importErrorsAll.length / IMPORT_LIST_PAGE_SIZE));
+}
+function renderImportErrorPage() {
+  const totalPages = importErrorsTotalPages();
+  if (importErrorsPage > totalPages) importErrorsPage = totalPages;
+  if (importErrorsPage < 1) importErrorsPage = 1;
+  const eo = document.getElementById('import-errors-result');
+  eo.textContent = '';
+  const start = (importErrorsPage - 1) * IMPORT_LIST_PAGE_SIZE;
+  importErrorsAll.slice(start, start + IMPORT_LIST_PAGE_SIZE).forEach((r) => {
+    const p = document.createElement('p');
+    p.className = 'text-alert-red font-medium';
+    p.textContent = 'صف ' + r.row + (r.item_code ? ' • ' + r.item_code : '') + ' • ' + r.error;
+    eo.appendChild(p);
+  });
+  const pager = document.getElementById('import-errors-pager');
+  if (!importErrorsAll.length) {
+    // No errors: hide the pager and clear any text left by a previous render.
+    pager.classList.add('hidden'); pager.classList.remove('flex');
+    document.getElementById('import-errors-page-indicator').textContent = '';
+    document.getElementById('import-errors-prev').disabled = true;
+    document.getElementById('import-errors-next').disabled = true;
+    return;
+  }
+  document.getElementById('import-errors-page-indicator').textContent =
+    'صفحة ' + importErrorsPage + ' من ' + totalPages;
+  document.getElementById('import-errors-prev').disabled = importErrorsPage <= 1;
+  document.getElementById('import-errors-next').disabled = importErrorsPage >= totalPages;
+  pager.classList.remove('hidden'); pager.classList.add('flex');
+}
+function importErrorsGoToPage(page) {
+  importErrorsPage = page;
+  renderImportErrorPage();
+}
+/* ===== ترقيم قائمة التحذيرات: عميل فقط، نفس حجم صفحة الأخطاء =====
+   مرآة مقصودة لمنطق ترقيم الأخطاء أعلاه (نفس البنية والتسمية) —
+   لا تستخرج دالة عامة مشتركة. */
+let importWarningsAll = [];
+let importWarningsPage = 1;
+
+function importWarningsTotalPages() {
+  return Math.max(1, Math.ceil(importWarningsAll.length / IMPORT_LIST_PAGE_SIZE));
+}
+function renderImportWarningPage() {
+  const totalPages = importWarningsTotalPages();
+  if (importWarningsPage > totalPages) importWarningsPage = totalPages;
+  if (importWarningsPage < 1) importWarningsPage = 1;
+  const w = document.getElementById('import-warnings');
+  w.textContent = '';
+  const start = (importWarningsPage - 1) * IMPORT_LIST_PAGE_SIZE;
+  importWarningsAll.slice(start, start + IMPORT_LIST_PAGE_SIZE).forEach((t) => {
+    const p = document.createElement('p');
+    p.className = 'bg-slate-50 border border-borderSubtle rounded-xl px-3 py-2 text-[11px] text-slate-600 font-medium';
+    p.textContent = t;
+    w.appendChild(p);
+  });
+  const pager = document.getElementById('import-warnings-pager');
+  if (!importWarningsAll.length) {
+    // No warnings: hide the pager and clear any text left by a previous render.
+    pager.classList.add('hidden'); pager.classList.remove('flex');
+    document.getElementById('import-warnings-page-indicator').textContent = '';
+    document.getElementById('import-warnings-prev').disabled = true;
+    document.getElementById('import-warnings-next').disabled = true;
+    return;
+  }
+  document.getElementById('import-warnings-page-indicator').textContent =
+    'صفحة ' + importWarningsPage + ' من ' + totalPages;
+  document.getElementById('import-warnings-prev').disabled = importWarningsPage <= 1;
+  document.getElementById('import-warnings-next').disabled = importWarningsPage >= totalPages;
+  pager.classList.remove('hidden'); pager.classList.add('flex');
+}
+function importWarningsGoToPage(page) {
+  importWarningsPage = page;
+  renderImportWarningPage();
+}
 function renderImportResult(s) {
   importShow('import-result-wrap', true, true);
   const items = s.items || [], pricing = s.pricing || [], errors = s.errors || [];
@@ -828,20 +929,10 @@ function renderImportResult(s) {
     p.textContent = 'صف ' + r.row + ' • ' + r.item_code + ' • ' + r.group + ' • قاعدة ' + (r.rule || '—');
     po.appendChild(p);
   });
-  const eo = document.getElementById('import-errors-result');
-  eo.innerHTML = '';
-  if (errors.length) {
-    const h = document.createElement('p');
-    h.className = 'text-xs font-black text-alert-red';
-    h.textContent = 'أخطاء الصفوف (بالرقم):';
-    eo.appendChild(h);
-    errors.forEach((r) => {
-      const p = document.createElement('p');
-      p.className = 'text-alert-red font-medium';
-      p.textContent = 'صف ' + r.row + (r.item_code ? ' • ' + r.item_code : '') + ' • ' + r.error;
-      eo.appendChild(p);
-    });
-  }
+  importErrorsAll = errors;
+  importErrorsPage = 1;
+  importShow('import-errors-wrap', errors.length > 0, true);
+  renderImportErrorPage();
 }
 </script>
 </body></html>

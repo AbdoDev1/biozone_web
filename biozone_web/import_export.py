@@ -82,6 +82,69 @@ def _parse_discount_header(header):
 	return None
 
 
+# Header cells are matched against the canonical Arabic constants above, but
+# real spreadsheets arrive with cosmetic differences that are NOT different
+# headers: a BOM leaking into the first cell, zero-width spaces from a
+# copy-paste, NBSP / other nonstandard Unicode whitespace, repeated interior
+# spaces, a space before the discount colon, and the common colon look-alikes.
+# Normalization here is for MATCHING ONLY — the raw cell text is still what
+# gets echoed back to the user in diagnostics (unknown/duplicate reports) and
+# in the _meta snapshot.
+_HEADER_BOM = "\ufeff"
+_HEADER_ZERO_WIDTH_SPACE = "\u200b"
+_HEADER_COLON_VARIANTS = ("\uff1a", "\u2236")  # U+FF1A fullwidth, U+2236 ratio
+
+
+def _normalize_header_for_match(header):
+	"""Return the comparison form of one raw header cell (never displayed).
+
+	Pure string work: no DB access, no translation, no aliases. The canonical
+	Arabic constants (BASE_COLUMNS / DISCOUNT_PREFIX) stay the only source of
+	truth, and a header that already matches them exactly is returned unchanged
+	(no regression).
+	"""
+	text = (header or "").replace(_HEADER_BOM, "").replace(_HEADER_ZERO_WIDTH_SPACE, "")
+	for colon in _HEADER_COLON_VARIANTS:
+		text = text.replace(colon, ":")
+	# str.split() splits on every Unicode whitespace character — NBSP
+	# (U+00A0) and the other nonstandard spaces included — so this one pass
+	# turns nonstandard whitespace into regular spaces AND collapses repeated
+	# / outer whitespace into single spacing.
+	text = " ".join(text.split())
+	if ":" in text:
+		# Only the whitespace *before* the colon is dropped ("خصم : فئة" ->
+		# "خصم: فئة"); the canonical "خصم: فئة" form (single space after the
+		# colon) is therefore returned unchanged.
+		text = ":".join(part.rstrip() for part in text.split(":"))
+	return text
+
+
+def _echo_raw_header_text(messages, raw_headers, match_headers):
+	"""Re-echo the raw header cells inside map_headers diagnostics.
+
+	Normalization is a matching-only concern: a diagnostic must show the cell
+	text the user actually typed, not the comparison form. map_headers returns
+	unknown headers as bare text and duplicate-header messages with the header
+	embedded, so both shapes are restored. When two different raw spellings
+	collapse to the same comparison form, the first spelling is used.
+	"""
+	raw_by_match = {}
+	for raw, match in zip(raw_headers, match_headers, strict=True):
+		if match and match not in raw_by_match:
+			raw_by_match[match] = raw
+	out = []
+	for message in messages:
+		if message in raw_by_match:
+			out.append(raw_by_match[message])
+			continue
+		restored = message
+		for match, raw in raw_by_match.items():
+			if match != raw and match in restored:
+				restored = restored.replace(match, raw)
+		out.append(restored)
+	return out
+
+
 def _active_customer_groups():
 	"""Live active leaf Customer Groups, ordered by name."""
 	return frappe.get_all(
@@ -145,6 +208,70 @@ def _conflict_warning_text(conflicts):
 		f"خصومات الأصناف المستوردة: {names}{more}. تصميم الاستيراد ينشئ "
 		"قواعد بسيطة لكل (صنف، فئة) فقط، دون تغيير هذه القواعد."
 	)
+
+
+def _zero_valuation_warnings(staged, warehouse):
+	"""Read-only preview warning: positive-qty rows with no usable valuation.
+
+	Mirrors the write path exactly (_import_apply_qty): a receipt is valued from
+	Bin.valuation_rate for the run's single resolved warehouse — the same single
+	source staff_log_stock_movement pre-checks before its own submit — never
+	from Item.valuation_rate, Item Price, or a get_valuation_rate fallback
+	chain. A broader check would warn about rows that would not actually fail at
+	submit time, which is worse than no warning.
+
+	Applies to rows that satisfy BOTH conditions:
+	(a) a positive quantity cell — a blank cell means "leave unchanged" and
+	    posts no stock movement, so it is never checked;
+	(b) no existing validation errors — the error is already the signal, and a
+	    warning layered on top of it is noise.
+
+	Returns one single-line Arabic string per triggering row (never one
+	aggregated message). Read-only: one batched query for all rows, no writes.
+	"""
+	if not warehouse:
+		return []
+	targets = []
+	for row in staged:
+		if row.get("errors") or not row.get("item_code"):
+			continue
+		qty_raw = (row.get("values", {}).get("qty") or "").strip()
+		if not qty_raw:
+			continue
+		ok, qty = _strict_num(qty_raw)
+		if not ok or qty <= 0:
+			continue
+		targets.append(row)
+	if not targets:
+		return []
+	# One batched query for every row (same pattern as staff_export_items uses
+	# for Bin) — never one query per row.
+	valued = {
+		r.item_code
+		for r in frappe.get_all(
+			"Bin",
+			filters={
+				"item_code": ["in", sorted({row["item_code"] for row in targets})],
+				"warehouse": warehouse,
+				"valuation_rate": [">", 0],
+			},
+			fields=["item_code"],
+			limit_page_length=0,
+		)
+	}
+	out = []
+	for row in targets:
+		if row["item_code"] in valued:
+			continue
+		# Single line by construction (concatenated literals, no "\n"): the
+		# warnings list is joined with "\n" into a Long Text field and split
+		# back on "\n" for display.
+		out.append(
+			"الصف {0} — الصنف {1}: لا يوجد له تقييم أو رصيد مخزون سابق في المخزن "
+			"الحالي — استيراد كمية له سيُرفض ما لم يُسجَّل له إدخال مخزون "
+			"افتتاحي أولًا من شاشة المخزون.".format(row["n"], row["item_code"])
+		)
+	return out
 
 
 # ---------------------------------------------------------------------------
@@ -642,7 +769,7 @@ def _process_staged_row(row, warehouse, run_name):
 		doc.insert(ignore_permissions=True)
 		action = "create"
 	item_outcome = {"row": row["n"], "item_code": doc.name, "action": action}
-	price_changed, _ = _import_apply_price(doc.name, values.get("price", ""))
+	price_changed, _price_rule = _import_apply_price(doc.name, values.get("price", ""))
 	if price_changed:
 		item_outcome["price_updated"] = True
 	pricing_outcomes = []
@@ -827,7 +954,13 @@ def run_validate_job(run_name):
 			raise frappe.ValidationError(_("ملف التشغيل غير موجود"))
 		content = frappe.get_doc("File", attached[0].name).get_content()
 		parsed = parse_upload_bytes(content, run.file_name)
-		key_by_index, missing, unknown, duplicates, _ = map_headers(parsed["headers"])
+		# Matching uses a normalized comparison form of each header cell (BOM,
+		# zero-width space, nonstandard whitespace, colon variants, spacing
+		# around the colon); diagnostics keep the raw cell text the user typed.
+		match_headers = [_normalize_header_for_match(h) for h in parsed["headers"]]
+		key_by_index, missing, unknown, duplicates, _groups = map_headers(match_headers)
+		unknown = _echo_raw_header_text(unknown, parsed["headers"], match_headers)
+		duplicates = _echo_raw_header_text(duplicates, parsed["headers"], match_headers)
 		if duplicates:
 			raise frappe.ValidationError(_("رؤوس مكررة: {0}").format("، ".join(duplicates)))
 		active_groups = _active_customer_groups()
@@ -835,7 +968,7 @@ def run_validate_job(run_name):
 		unknown_group_headers = sorted(
 			{g for g in _discount_group_headers(key_by_index) if g not in active_set}
 		)
-		staged, counts, _ = validate_rows(parsed["rows"], key_by_index, active_groups)
+		staged, counts, _file_errors = validate_rows(parsed["rows"], key_by_index, active_groups)
 		warnings = []
 		if unknown:
 			warnings.append(
@@ -857,6 +990,12 @@ def run_validate_job(run_name):
 		conflict_text = _conflict_warning_text(conflicts)
 		if conflict_text:
 			warnings.append(conflict_text)
+		# Warning-only preview heads-up (final rejection at submit is
+		# unchanged): rows whose positive quantity will be rejected because the
+		# run's resolved warehouse has no usable Bin.valuation_rate for them
+		# yet — a brand-new item included, since it goes through the same
+		# Bin-based valuation lookup in the same write path.
+		warnings.extend(_zero_valuation_warnings(staged, run.warehouse))
 		run.db_set("missing_columns", "\n".join(missing))
 		run.db_set("warnings", "\n".join(warnings))
 		run.db_set(
