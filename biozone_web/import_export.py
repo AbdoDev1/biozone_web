@@ -492,7 +492,7 @@ def validate_rows(raw_rows, key_by_index, active_groups):
 			ok, amount = _strict_num(qty)
 			if not ok:
 				row["errors"].append(_("الكمية ليست رقمًا صالحًا"))
-			elif amount <= 0:
+			elif amount < 0:
 				row["errors"].append(_("الكمية المضافة يجب أن تكون أكبر من صفر"))
 		for gname, raw in (values.get("discounts") or {}).items():
 			v = (raw or "").strip()
@@ -641,8 +641,11 @@ def _import_apply_qty(item_code, qty_cell, uom_cell, warehouse, run_name, row_n)
 	if not qty_raw:
 		return None
 	ok, qty = _strict_num(qty_raw)
-	if not ok or qty <= 0:
+	if not ok or qty < 0:
 		raise frappe.ValidationError(_("الكمية المضافة يجب أن تكون رقمًا أكبر من صفر"))
+	if qty == 0:
+		# Zero means "add nothing": success with no stock movement, no receipt.
+		return None
 	item = frappe.db.get_value(
 		"Item", item_code, ["stock_uom"], as_dict=True
 	)
