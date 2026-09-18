@@ -22,6 +22,61 @@ def biozone_login(usr: str, pwd: str, remember_me: int = 0):
 	}
 
 
+STAFF_LOGIN_FAILED_MESSAGE = "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+
+
+def _fail_staff_login():
+	"""فشل موحد لدخول الستاف — يمنع user enumeration حتى على مستوى الـAPI.
+
+	إرجاع طبيعي (بلا throw) مع http_status_code=401: معالج Frappe يبني مفاتيح
+	 exc/exception/exc_type/_server_messages فقط عند انتشار استثناء، فتبقى
+	 الاستجابة الخام {"message": النص العام} حصرًا. القيم القديمة
+	 (home_page/full_name من post_login سابق) تُحذف قبل الإرجاع، والعميل
+	 (staff/login.html) يعرض ثابتًا محليًا دائمًا ولا يقرأ الجسم إطلاقًا.
+	"""
+	frappe.clear_messages()
+	frappe.local.response.pop("home_page", None)
+	frappe.local.response.pop("full_name", None)
+	frappe.local.response["http_status_code"] = 401
+	return STAFF_LOGIN_FAILED_MESSAGE
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def staff_login(usr=None, pwd=None):
+	"""دخول الستاف عبر نطاق staff فقط — System Users دون غيرهم.
+
+	- نفس آلية المصادقة القائمة في biozone_login (login_manager.authenticate
+	  ثم post_login) — بلا آلية مخصصة، فيرث حد المعدل الداخلي تلقائيًا
+	  (allow_consecutive_login_attempts / allow_login_after_fail).
+	- ملحوظة 2FA مؤقتة وموثقة: مثل biozone_login تمامًا، يستدعي
+	  authenticate+post_login مباشرة دون مسار LoginManager.login()، أي لا
+	  يمر بفحص should_run_2fa/OTP. لا يُدَّعى أن دخول الستاف محمي بـ2FA —
+	  بند مستقل لاحقًا لنقله للمسار القياسي.
+	- رسالة فشل واحدة موحدة لكل الحالات (فارغ/مفقود/غير موجود/كلمة خاطئة/
+	  معطل/Website User/قفل مؤقت) — بلا تحليل لنص الخطأ، وبلا مغلّف
+	  استثناء في الجسم الخام (إرجاع + 401 بدل throw).
+	- بلا remember_me عمدًا: جلسات الستاف قصيرة فقط.
+	"""
+	if not isinstance(usr, str) or not usr.strip() or not isinstance(pwd, str) or not pwd:
+		return _fail_staff_login()
+	login_manager = frappe.local.login_manager
+	try:
+		login_manager.authenticate(user=usr, pwd=pwd)
+	except (frappe.AuthenticationError, frappe.SecurityException):
+		return _fail_staff_login()
+	login_manager.post_login()
+
+	user_type = frappe.db.get_value("User", login_manager.user, "user_type")
+	if user_type != "System User":
+		login_manager.logout()
+		return _fail_staff_login()
+
+	return {
+		"message": "Logged In",
+		"home_page": "/staff/dashboard",
+	}
+
+
 @frappe.whitelist(allow_guest=True)
 def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 	email = email.strip().lower()

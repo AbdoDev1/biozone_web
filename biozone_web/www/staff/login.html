@@ -92,6 +92,9 @@
   const form = document.getElementById('staff-login-form');
   const errorEl = document.getElementById('staff-login-error');
   const submitBtn = document.getElementById('staff-login-submit');
+  // رسالة فشل موحدة حرفيًا لكل حالات الدخول — بلا تمييز للسبب، وبلا عرض
+  // لأي نص خادم خام (نفس نص login.html).
+  const LOGIN_FAILED_MESSAGE = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -110,14 +113,12 @@
       const data = await res.json();
 
       if (!res.ok) {
-        const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
-          || data.exception || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-        throw new Error(msg);
+        throw new Error(LOGIN_FAILED_MESSAGE);
       }
 
       window.location.href = (data.message && data.message.home_page) || '/staff/dashboard';
     } catch (err) {
-      errorEl.textContent = err.message || 'تعذر تسجيل الدخول، حاول مرة أخرى';
+      errorEl.textContent = LOGIN_FAILED_MESSAGE;
       errorEl.classList.remove('hidden');
       submitBtn.disabled = false;
     }
