@@ -426,15 +426,18 @@ async function saveMovement() {
         note: note,
       }),
     });
-    const data = await res.json();
+    // حارس تحليل ضيق: رد غير-JSON يعني العامة مباشرة، بلا تسريب
+    // SyntaxError خام للمستخدم. لا يمس منطق res.ok.
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
     if (!res.ok) {
-      const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
-        || data.exception || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
-      throw new Error(msg);
+      // لا يُقرأ أي نص خام من الخادم (exception / _server_messages قد
+      // تكشف أسماء دوال ومسارات داخلية) — العامة دائمًا.
+      throw new Error('stock-movement-failed');
     }
     window.location.reload();
   } catch (err) {
-    errorEl.textContent = err.message;
+    errorEl.textContent = 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
     errorEl.classList.remove('hidden');
   } finally {
     saveBtn.disabled = false;

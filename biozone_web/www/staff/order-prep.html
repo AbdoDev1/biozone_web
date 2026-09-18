@@ -200,8 +200,12 @@ function apiCall(method, args) {
   }).then(async (res) => {
     const data = await res.json();
     if (!res.ok || (data.message && data.message.ok === false)) {
-      const msg = (data.message && data.message.error) || data.exception || 'تعذر تنفيذ العملية';
-      throw new Error(msg);
+      // لا يُعرض أي نص خام من الخادم (exception / traceback) — الرسالة
+      // المنظمة فقط (نص عربي مقصود من الـwrapper) وإلا العامة. هذا يمنع
+      // أيضًا وصول HTML خام إلى Toast (تُبنى بـinnerHTML).
+      const apiError = (data && data.message && typeof data.message.error === 'string')
+        ? data.message.error : '';
+      throw new Error(apiError || 'تعذر تنفيذ العملية');
     }
     return data.message;
   });

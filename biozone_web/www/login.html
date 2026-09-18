@@ -280,7 +280,7 @@
                 const result = await callApi('biozone_forgot_password', { email });
                 showMessage('forgot-message', result.message);
             } catch (err) {
-                showError('login-error', err.message || 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
+                showError('login-error', 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
             }
         }
 
@@ -292,9 +292,10 @@
             });
             const data = await res.json();
             if (!res.ok) {
-                const msg = (data._server_messages && JSON.parse(JSON.parse(data._server_messages)[0]).message)
-                    || data.exception || 'حدث خطأ، حاول مرة أخرى';
-                throw new Error(msg);
+                // لا تعرض أي نص خام من الخادم (exception / _server_messages
+                // قد تكشف أسماء دوال ومسارات داخلية) — خطأ داخلي ثابت فقط،
+                // وكل مسار يعرض رسالته العامة الخاصة بسياقه.
+                throw new Error('login-api-failed');
             }
             return data.message;
         }
@@ -310,7 +311,7 @@
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
-                showError('login-error', err.message || 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
+                showError('login-error', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
             }
         });
 
@@ -326,7 +327,7 @@
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
-                showError('signup-error', err.message || 'تعذر إنشاء الحساب، حاول مرة أخرى');
+                showError('signup-error', 'تعذر إنشاء الحساب، حاول مرة أخرى');
             }
         });
     </script>
