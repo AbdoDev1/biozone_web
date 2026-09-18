@@ -2,10 +2,32 @@ import frappe
 from frappe import _
 
 
+STORE_LOGIN_FAILED_MESSAGE = "هذا الحساب غير مصرح له بالدخول إلى المتجر"
+
+
+def _fail_store_login():
+	"""رفض دخول المتجر — إرجاع نظيف بلا مغلّف استثناء (نفس نمط
+	 _fail_staff_login): الجسم {"message": النص الواضح} حصرًا مع 401.
+	 يُستخدم لمساري الرفض الجديدين فقط (فارغ/نوع مرفوض) — مسارات الفشل
+	 القائمة (كلمة خاطئة/غير موجود) تبقى على سلوك المحرك كما هي.
+	"""
+	frappe.clear_messages()
+	frappe.local.response["http_status_code"] = 401
+	return STORE_LOGIN_FAILED_MESSAGE
+
+
 @frappe.whitelist(allow_guest=True)
-def biozone_login(usr: str, pwd: str, remember_me: int = 0):
+def biozone_login(usr=None, pwd=None, remember_me: int = 0):
+	# بوابة نوع المتجر (قرار فصل النطاقات): حسابات العملاء (Website User)
+	# فقط. أي System User (موظف/أدمن) يُرفض هنا — بعد نجاح المصادقة لكن
+	# قبل post_login — فلا تُنشأ أي جلسة ولا يُصدَر أي session cookie.
+	# الرفض برسالة المتجر الواضحة نفسها، بلا redirect لأي نطاق آخر.
+	if not isinstance(usr, str) or not usr.strip() or not isinstance(pwd, str) or not pwd:
+		return _fail_store_login()
 	login_manager = frappe.local.login_manager
 	login_manager.authenticate(user=usr, pwd=pwd)
+	if frappe.db.get_value("User", login_manager.user, "user_type") != "Website User":
+		return _fail_store_login()
 	login_manager.post_login()
 
 	if frappe.utils.cint(remember_me):

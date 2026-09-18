@@ -117,9 +117,11 @@
 </div>
 <div class="flex items-center gap-4 sm:gap-6">
 <span class="hidden sm:inline text-xs text-navy-text/50 font-medium">{{ today_display }}</span>
-<a class="flex items-center gap-1.5 text-xs sm:text-sm text-navy-text/60 hover:text-alert-red font-medium transition-colors" href="/staff/login" onclick="event.preventDefault(); fetch('/api/method/logout', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'}).finally(function() { window.location.href = '/staff/login'; });">
+<a class="flex items-center gap-1.5 text-xs sm:text-sm text-navy-text/60 hover:text-alert-red font-medium transition-colors" href="/staff/login" onclick="event.preventDefault(); fetch('/api/method/logout', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''}, body: '{}'}).finally(function() { window.location.href = '/staff/login'; });">
 <span class="material-symbols-outlined text-base">logout</span>
 <span class="">تسجيل خروج</span>
 </a>
+<script>window.frappe = window.frappe || {};</script>
+<!-- csrf_token -->
 </div>
 </header>

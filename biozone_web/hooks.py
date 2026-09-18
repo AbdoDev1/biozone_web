@@ -236,7 +236,10 @@ website_route_rules = [
 
 # Request Events
 # ----------------
-# before_request = ["biozone_web.utils.before_request"]
+# حارس مسارات Desk على مضيفي المتجر والستاف (قرار فصل النطاقات — قاعدة
+# نهائية: app.biozone.pro وحده يعرض Desk). المسارات محددة بدقة (^/desk ،^/app) حتى
+# لا يمس أي /api أو أصول أو صفحات متجر — وتفاصيل الحارس في utils.
+before_request = ["biozone_web.utils.guard_domain_routes"]
 # after_request = ["biozone_web.utils.after_request"]
 
 # Job Events

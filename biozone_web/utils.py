@@ -24,6 +24,29 @@ def get_current_domain_role():
 	return "store"
 
 
+def guard_domain_routes():
+	"""حارس before_request لمسارات Desk (قاعدة نهائية).
+
+	- يمنع /desk و/app (بأي عمق فرعي) على دوري store وstaff — لكل الحالات
+	  (ضيف/عميل/موظف/أدمن) وبلا استثناء صلاحيات: المنع حسب المضيف+المسار.
+	  app.biozone.pro وحده يعرض Desk (يُمرَّر دون مساس).
+	- إعادة كتابة داخلية لصفحة الرفض المحلية /not-available (403 نظيفة
+	  بلا traceback، same-host) — لا redirect ولا عبور نطاقات.
+	- لا يمس /api ولا الأصول ولا أي مسار آخر.
+	"""
+	request = getattr(frappe.local, "request", None)
+	path = (getattr(request, "path", "") or "").lower()
+	if get_current_domain_role() not in ("store", "staff"):
+		return
+	if path == "/desk" or path.startswith("/desk/") or path == "/app" or path.startswith("/app/"):
+		# إعادة كتابة المسار داخليًا لصفحة الرفض المحلية /not-available
+		# (403 نظيفة بلا traceback) — رمي استثناء من before_request يعرض
+		# صفحة خطأ الإطار بمحتوى تتبع داخلي، وRedirect هنا مكسور (301 بلا
+		# Location). لا redirect ولا عبور نطاقات: نفس الطلب نفس المضيف.
+		frappe.local.request.path = "/not-available"
+		return
+
+
 def require_staff_access():
 	"""يتأكد إن اللي بيفتح أي صفحة تحت /staff/* هو حساب موظف (System User)
 	مفعّل (enabled)، مش حساب عميل (Website User اللي بيتعمل وقت التسجيل
@@ -214,6 +237,11 @@ def get_website_user_home_page(user=None):
 		return "/biozone-home"
 
 	if is_system_user(user):
+		# مضيف app يعرض Desk حصرًا: أي System User (موظف أو إداري) يهبط
+		# على /desk، ولا يرث /staff/dashboard من مسار الستاف — هذا الـhook
+		# يغذي أيضًا home_page لدخول الإطار (/api/method/login) على app.
+		if get_current_domain_role() == "app":
+			return "/desk"
 		return get_home_route_for_system_user(user)
 
 	return "/biozone-home"
