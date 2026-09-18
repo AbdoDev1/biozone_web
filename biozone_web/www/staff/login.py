@@ -1,14 +1,23 @@
 import frappe
+from frappe import _
+
+from biozone_web.utils import get_current_domain_role
 
 
 def get_context(context):
-	# لو داخل بالفعل، حوّله لمكانه الصحيح بدل ما يشوف الفورم تاني —
-	# موظف حقيقي على لوحة التحكم، وأي حساب تاني (لو حد فتح الرابط ده
-	# غلط) على الصفحة الرئيسية للمتجر.
+	# صفحة دخول الموظفين لا تُعرض إلا تحت مضيف staff — أي مضيف آخر
+	# (store/app) يُرفض محليًا بـ403، بلا تحويل.
+	if get_current_domain_role() != "staff":
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
+
+	# لو داخل بالفعل، الموظف الحقيقي على لوحة التحكم، وأي حساب تاني
+	# (عميل فتح الرابط غلط) مرفوض محليًا بـ403 — بلا نقل لأي مسار متجر.
 	if frappe.session.user != "Guest":
 		user_type = frappe.db.get_value("User", frappe.session.user, "user_type")
-		frappe.local.flags.redirect_location = "/staff/dashboard" if user_type == "System User" else "/biozone-home"
-		raise frappe.Redirect
+		if user_type == "System User":
+			frappe.local.flags.redirect_location = "/staff/dashboard"
+			raise frappe.Redirect
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
 
 	context.no_cache = 1
 	return context

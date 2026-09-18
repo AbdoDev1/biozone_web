@@ -3,6 +3,27 @@ from frappe import _
 from frappe.utils import has_common
 
 
+def get_current_domain_role():
+	"""دور النطاق الحالي من Host header — أساس الفصل بين النطاقات الثلاثة.
+
+	- `staff.*` → "staff" (بوابة الموظفين فقط).
+	- `app.*` → "app" (Desk فقط).
+	- أي شيء آخر (biozone.pro/www/store/test/مضيفات التطوير/IPs) → "store".
+
+	المضيفات المجهولة تمامًا يرفضها Frappe قبل الوصول لأي كود (404 على
+	تحليل الموقع)، فالافتراضي "store" آمن للتطوير المحلي فقط وموثق هنا.
+	كل القرارات downstream نسبية same-host — لا يُبنى أي redirect مطلق
+	عابر للنطاقات من هذه الدالة.
+	"""
+	request = getattr(frappe.local, "request", None)
+	host = (getattr(request, "host", "") or "").lower().split(":")[0]
+	if host.startswith("staff."):
+		return "staff"
+	if host.startswith("app."):
+		return "app"
+	return "store"
+
+
 def require_staff_access():
 	"""يتأكد إن اللي بيفتح أي صفحة تحت /staff/* هو حساب موظف (System User)
 	مفعّل (enabled)، مش حساب عميل (Website User اللي بيتعمل وقت التسجيل
@@ -14,7 +35,15 @@ def require_staff_access():
 	(الحسابات والخصومات) تتبنى فعليًا، لازم نضيف هنا (أو في كل صفحة/
 	API لوحدها) فحص Role حقيقي (مثلًا frappe.has_role("Store Staff"))
 	بدل الاكتفاء بـ"موظف عادي = يشوف كل حاجة" زي دلوقتي.
+
+	فصل النطاقات: صفحات /staff/* لا تُعرض إلا تحت مضيف staff — أي مضيف
+	آخر يرفض محليًا بـ403 (بلا تحويل). الضيف على مضيف staff يُحوَّل نسبيًا
+	لـ/staff/login (نفس المضيف). العميل/المعطّل على مضيف staff يُرفض
+	محليًا بـ403 بدل تحويله لمسار المتجر.
 	"""
+	if get_current_domain_role() != "staff":
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
+
 	user = frappe.session.user
 
 	if user == "Guest":
@@ -24,31 +53,32 @@ def require_staff_access():
 	user_type, enabled = frappe.db.get_value("User", user, ["user_type", "enabled"])
 	if user_type != "System User" or not enabled:
 		# حساب عميل، أو حساب موظف اتقفل (enabled=0) بعد ما ساب الشركة
-		# مثلًا لكن جلسته القديمة لسه شغالة — في الحالتين نرجّعه للمتجر
-		# بدل ما يشوف صفحة خطأ صلاحيات خام.
-		frappe.local.flags.redirect_location = "/biozone-home"
-		raise frappe.Redirect
+		# مثلًا لكن جلسته القديمة لسه شغالة — رفض محلي بلا نقل لأي مسار.
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
 
 
 def redirect_staff_away_from_store():
-	"""عكس require_staff_access تمامًا: لو حساب موظف (System User) حاول
-	يفتح أي صفحة من صفحات المتجر/العميل (الرئيسية، المتجر، السلة،
-	تأكيد الطلب، طلباتي، تسجيل الدخول)، بنرجّعه على لوحة تحكم الموظف
-	بدل كده.
+	"""حارس نطاق صفحات المتجر/العميل (الاسم تاريخي — لم يعد يحوّل إطلاقًا).
 
-	فصل كامل بين المدخلين ده اتطلب عشان الاستضافة النهائية هتكون على
-	دومينين منفصلين (staff.biozone.pro لواجهة الموظف، biozone.pro
-	للمتجر) — فكل فئة توصل لمدخلها بس حتى لو حد جرّب يفتح رابط
-	المدخل التاني يدويًا.
+	قرار فصل النطاقات: لا يوجد أي تحويل هنا، نسبيًا كان أو مطلقًا.
+	- تحت مضيف staff/app: صفحات المتجر مرفوضة محليًا بـ403.
+	- تحت مضيف store: الموظف (System User) مرفوض محليًا بـ403 — بوابته
+	  مضيف staff حصرًا، ولا يُحوَّل إليه تلقائيًا حتى لا ينشئ حلقة أو
+	  يعرض صفحة غير مناسبة على مضيف المتجر.
+	- الضيف والحسابات غير الموظفة على مضيف store: يمرون كالمعتاد.
 	"""
+	role = get_current_domain_role()
+	if role in ("staff", "app"):
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
+		return
+
 	user = frappe.session.user
 	if user == "Guest":
 		return
 
 	user_type = frappe.db.get_value("User", user, "user_type")
 	if user_type == "System User":
-		frappe.local.flags.redirect_location = "/staff/dashboard"
-		raise frappe.Redirect
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
 
 
 SYSTEM_USER_ROLES = ("System Manager", "Administrator")
@@ -113,20 +143,27 @@ def get_home_route_for_system_user(user):
 
 
 def get_store_url(path="/biozone-home"):
-	"""رابط المتجر العام (دومين biozone.pro أو ما يعادله في التطوير)
-	عشان زر "الرجوع للمتجر" في /system-home يفتحه في **تبويب جديد**
-	بجلسة منفصلة — التبويب الجديد على دومين مختلف مش بيحمل كوكيز/
-	توكن جلسة الموظف أصلًا، فقاعدة عزل الدومينين
-	(redirect_staff_away_from_store) تفضل شغالة من غير ما تتعدل.
+	"""رابط متجر الاختبار المستقل (store.biozone.pro حاليًا — يحل محل
+	 biozone.pro مؤقتًا لحين تشغيل نفق الإنتاج) عشان زر "الرجوع للمتجر"
+	 في /system-home يفتحه في **تبويب جديد** بجلسة منفصلة — التبويب الجديد
+	 على دومين مختلف مش بيحمل كوكيز/توكن جلسة الموظف أصلًا (كوكيز host-only
+	 بلا Domain)، فلا مشاركة جلسة مع staff/app ولا تحويل تلقائي من أي نطاق:
+	 مجرد رابط يفتحه المستخدم بيده. لا يُستخدم داخل منطق الفصل المركزي
+	 كاستثناء يربط النطاقات — مجرد عنوان عرض.
 
 	بيرجع رابط كامل بالـ scheme والـ port من الطلب الحالي عشان يشتغل
 	على dev server (نفس البورت لو جوه التطوير) وعلى الإنتاج (https).
 	"""
 	store_domain = ""
+	fallback_domain = ""
 	for domain in frappe.get_site_config().get("domains") or []:
-		if domain and "staff" not in domain and "app" not in domain:
+		if not domain or "staff" in domain or "app" in domain:
+			continue
+		if "store." in domain and not store_domain:
 			store_domain = domain
-			break
+		if not fallback_domain:
+			fallback_domain = domain
+	store_domain = store_domain or fallback_domain
 
 	if not store_domain:
 		# مفيش دومين عام معرّف — نرجّع مسار نسبي (مش رابط كامل).
@@ -148,12 +185,12 @@ def get_store_url(path="/biozone-home"):
 
 
 def get_website_user_home_page(user=None):
-	"""يحدد الصفحة اللي بيوصل ليها اللي بيفتح "/" حسب نوع الحساب:
+	"""يحدد الصفحة اللي بيوصل ليها اللي بيفتح "/" حسب نوع الحساب **ودور النطاق**:
 
-	- Guest: بيفتح المتجر مباشرة /biozone-home — تعديل 3 (الزائر
-	  بيتصفح الكاتالوج فعليًا، بدل ما يقع على صفحة تسجيل الدخول).
-	- Website User: يروح مباشرة لصفحة المتجر (/biozone-home) بدل صفحة
-	  Settings الافتراضية (Edit Profile / Reset Password / 3rd party apps).
+	- Guest: مضيف staff → /staff/login (نسبي، نفس المضيف)؛ مضيف app → /desk
+	  (وضيفه يهبط على دخول Desk القياسي)؛ غير ذلك → /biozone-home.
+	- Website User: /biozone-home (صفحة المتجر نفسها ترفضه محليًا بـ403 تحت
+	  staff/app عبر redirect_staff_away_from_store — بلا مغادرة للمضيف).
 	- System User:
 	    * موظف عادي → /staff/dashboard
 	    * Administrator/صاحب دور إداري → /desk
@@ -167,6 +204,13 @@ def get_website_user_home_page(user=None):
 	"""
 	user = user or frappe.session.user
 	if not user or user == "Guest":
+		role = get_current_domain_role()
+		if role == "staff":
+			return "/staff/login"
+		if role == "app":
+			# "/app" لا يُحسم كصفحة موقع (404)، فالمضيف يُوجَّه لـ/desk
+			# وضيفه يهبط على دخول Desk القياسي — كله نفس المضيف.
+			return "/desk"
 		return "/biozone-home"
 
 	if is_system_user(user):
