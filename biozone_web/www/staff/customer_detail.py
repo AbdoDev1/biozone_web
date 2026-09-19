@@ -4,6 +4,7 @@ from frappe import _
 from biozone_web.utils import (
 	customer_has_category_assigned_field,
 	get_header_context,
+	render_state_page,
 	require_staff_access,
 )
 
@@ -14,12 +15,20 @@ def get_context(context):
 	context.active_page = "customers"
 	context.update(get_header_context())
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
+	context.error_state = False
 
 	# الاسم يأتي من قاعدة الـroute (website_route_rules) عبر form_dict —
 	# بلا أي افتراض لشكله، والتحقق الوحيد هو وجود السجل فعليًا.
 	customer_name = (frappe.form_dict.get("customer_name") or "").strip()
 	if not customer_name or not frappe.db.exists("Customer", customer_name):
-		frappe.throw(_("العميل غير موجود"), frappe.DoesNotExistError)
+		return render_state_page(
+			context,
+			_("العميل غير موجود"),
+			_("بيانات العميل المطلوب غير موجودة. تحقق من الاسم أو ارجع إلى قائمة العملاء."),
+			http_status_code=404,
+			back_url="/staff/customers",
+			back_label=_("العودة إلى قائمة العملاء"),
+		)
 
 	doc = frappe.get_doc("Customer", customer_name)
 

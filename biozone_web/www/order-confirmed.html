@@ -59,6 +59,14 @@
   {% include "biozone_web/templates/includes/site_header.html" %}
 
   <main class="flex-1 flex items-center justify-center px-4 py-10 sm:py-16">
+  {% if error_state %}
+  <!-- حالة ناعمة: طلب غير موجود — بلا traceback -->
+  <div class="w-full max-w-[620px] mx-auto flex flex-col items-center text-center gap-4 bg-surface-container-low rounded-2xl p-8">
+    <p class="text-xl font-bold">{{ error_title }}</p>
+    <p class="text-on-surface-variant">{{ error_message }}</p>
+    <a href="{{ error_back_url or '/account/orders' }}" class="text-sm font-bold text-primary hover:underline">{{ error_back_label or 'العودة إلى الطلبات' }}</a>
+  </div>
+  {% else %}
     <div class="w-full max-w-[620px] mx-auto flex flex-col items-center">
 
       <!-- أيقونة النجاح -->
@@ -259,6 +267,7 @@
       </div>
 
     </div>
+  {% endif %}
   </main>
 
   {% include "biozone_web/templates/includes/site_footer.html" %}

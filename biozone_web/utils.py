@@ -709,3 +709,58 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 		}
 
 	return result
+
+
+def render_state_page(
+	context,
+	title,
+	message,
+	hint="",
+	http_status_code=None,
+	order_name="",
+	back_url="/staff/orders",
+	back_label=None,
+):
+	"""صفحة حالة/رفض ناعمة بدل exception عام — القالب يعرضها عبر `error_state`.
+
+	`http_status_code=404` للحالات المرفوضة (سجل غير موجود / فاتورة غير صالحة)،
+	وبلا كود (200) لصفحات الحالة (بلا فاتورة / ملغى). لا traceback في أي حالة
+	لأن لا استثناء يُرمى أصلًا. `back_url/back_label` يخصصان زر العودة
+	(صفحات المتجر تستخدم مساراتها).
+	"""
+	context.error_state = True
+	context.error_title = title
+	context.error_message = message
+	context.error_hint = hint or ""
+	context.error_order = order_name or ""
+	context.error_back_url = back_url or "/staff/orders"
+	context.error_back_label = back_label or _("العودة إلى قائمة الطلبات")
+	if http_status_code:
+		context.http_status_code = http_status_code
+	return context
+
+
+def invoice_linked_to_order(si_name, order_name):
+	"""ارتباط مثبت بين الفاتورة والطلب: مباشر عبر Sales Invoice Item،
+	أو عبر Delivery Note معتمد (docstatus=1).
+
+	أي فاتورة تمرَّر صراحةً لطلب لا تخصه يجب رفضها — لا fallback ولا عرض
+	متبادل (خلل سلامة بيانات مثبت في order-delivery).
+	"""
+	if frappe.db.exists(
+		"Sales Invoice Item", {"parent": si_name, "sales_order": order_name, "docstatus": ["!=", 2]}
+	):
+		return True
+	dn_names = frappe.db.get_all(
+		"Delivery Note Item",
+		filters={"against_sales_order": order_name, "docstatus": ["!=", 2]},
+		pluck="parent",
+	)
+	for dn in {d for d in dn_names if d}:
+		if frappe.db.get_value("Delivery Note", dn, "docstatus") != 1:
+			continue
+		if frappe.db.exists(
+			"Sales Invoice Item", {"parent": si_name, "delivery_note": dn, "docstatus": ["!=", 2]}
+		):
+			return True
+	return False

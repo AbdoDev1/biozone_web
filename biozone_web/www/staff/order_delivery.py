@@ -2,7 +2,12 @@ import frappe
 from frappe import _
 
 from biozone_web.b9_utils import amount_in_arabic_words
-from biozone_web.utils import get_header_context, require_staff_access
+from biozone_web.utils import (
+	get_header_context,
+	invoice_linked_to_order,
+	render_state_page,
+	require_staff_access,
+)
 
 
 def get_context(context):
@@ -11,30 +16,80 @@ def get_context(context):
 	context.active_page = "orders"
 	context.update(get_header_context())
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
+	context.error_state = False
 
 	order_name = (frappe.form_dict.get("order") or "").strip()
 	si_param = (frappe.form_dict.get("invoice") or "").strip()
+
+	# الطلب غير موجود → 404 مهذبة (بلا traceback).
 	if not order_name or not frappe.db.exists("Sales Order", order_name):
-		frappe.throw(_("الطلب غير موجود"), frappe.DoesNotExistError)
+		return render_state_page(
+			context,
+			_("الطلب غير موجود"),
+			_("رقم الطلب المطلوب غير موجود. تحقق من الرقم أو ارجع إلى قائمة الطلبات."),
+			http_status_code=404,
+		)
 
 	so = frappe.get_doc("Sales Order", order_name)
 
-	si_name = si_param or frappe.db.get_value(
-		"Sales Invoice Item", {"sales_order": order_name, "docstatus": ["!=", 2]}, "parent"
-	)
-	if not si_name:
-		# احتياط عبر التسليم المرتبط بالطلب.
-		dn_name = frappe.db.get_value(
-			"Delivery Note Item", {"against_sales_order": order_name, "docstatus": ["!=", 2]}, "parent"
+	# الطلب الملغى → رسالة منفصلة قبل أي بحث عن فاتورة.
+	if so.docstatus == 2:
+		return render_state_page(
+			context,
+			_("هذا الطلب ملغى"),
+			_("هذا الطلب ملغى ولا يمكن إنشاء مستند تسليم له."),
+			order_name=so.name,
 		)
-		if dn_name:
-			si_name = frappe.db.get_value(
-				"Sales Invoice Item", {"delivery_note": dn_name, "docstatus": ["!=", 2]}, "parent"
-			)
-	if not si_name or not frappe.db.exists("Sales Invoice", si_name):
-		frappe.throw(_("لا توجد فاتورة معتمَدة لهذا الطلب بعد"), frappe.DoesNotExistError)
 
-	si = frappe.get_doc("Sales Invoice", si_name)
+	if si_param:
+		# فاتورة مرسلة صراحة: وجود + اعتماد + ارتباط — أي فشل → رفض صريح بلا fallback،
+		# ولا يجوز أبدًا عرض فاتورة تخص طلبًا آخر.
+		if not frappe.db.exists("Sales Invoice", si_param):
+			return render_state_page(
+				context,
+				_("الفاتورة المطلوبة غير صالحة"),
+				_("الفاتورة المطلوبة غير موجودة، ولا يمكن عرضها لهذا الطلب."),
+				http_status_code=404,
+				order_name=so.name,
+			)
+		si = frappe.get_doc("Sales Invoice", si_param)
+		if si.docstatus != 1 or not invoice_linked_to_order(si.name, order_name):
+			return render_state_page(
+				context,
+				_("الفاتورة المطلوبة غير صالحة"),
+				_("الفاتورة المطلوبة ليست فاتورة معتمدة لهذا الطلب، ولا يمكن عرضها هنا."),
+				http_status_code=404,
+				order_name=so.name,
+			)
+	else:
+		# استنتاج تلقائي فقط عند غياب المعامل — ويجب أن تكون معتمدة ومرتبطة.
+		si_name = si_param or frappe.db.get_value(
+			"Sales Invoice Item", {"sales_order": order_name, "docstatus": ["!=", 2]}, "parent"
+		)
+		if not si_name:
+			# احتياط عبر التسليم المرتبط بالطلب.
+			dn_name = frappe.db.get_value(
+				"Delivery Note Item", {"against_sales_order": order_name, "docstatus": ["!=", 2]}, "parent"
+			)
+			if dn_name:
+				si_name = frappe.db.get_value(
+					"Sales Invoice Item", {"delivery_note": dn_name, "docstatus": ["!=", 2]}, "parent"
+				)
+		if not si_name or not frappe.db.exists("Sales Invoice", si_name):
+			return render_state_page(
+				context,
+				_("لا توجد فاتورة معتمدة لهذا الطلب بعد"),
+				_("لا توجد فاتورة معتمدة لهذا الطلب بعد. لا يمكن إنشاء مستند تسليم حاليًا."),
+				order_name=so.name,
+			)
+		si = frappe.get_doc("Sales Invoice", si_name)
+		if si.docstatus != 1 or not invoice_linked_to_order(si.name, order_name):
+			return render_state_page(
+				context,
+				_("لا توجد فاتورة معتمدة لهذا الطلب بعد"),
+				_("لا توجد فاتورة معتمدة لهذا الطلب بعد. لا يمكن إنشاء مستند تسليم حاليًا."),
+				order_name=so.name,
+			)
 	dn_name = frappe.db.get_value(
 		"Delivery Note Item", {"against_sales_order": order_name, "docstatus": ["!=", 2]}, "parent"
 	)

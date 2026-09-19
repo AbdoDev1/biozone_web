@@ -45,6 +45,14 @@ tailwind.config = {
 {% include "biozone_web/templates/includes/site_header.html" %}
 
 <main class="flex-1 px-4 py-8 sm:py-12">
+  {% if error_state %}
+  <!-- حالة ناعمة: طلب غير موجود — بلا traceback -->
+  <div class="w-full max-w-[820px] mx-auto flex flex-col items-center text-center gap-4 bg-surface-container-low rounded-2xl p-8">
+    <p class="text-xl font-bold">{{ error_title }}</p>
+    <p class="text-on-surface-variant">{{ error_message }}</p>
+    <a href="{{ error_back_url or '/account/orders' }}" class="text-sm font-bold text-primary hover:underline">{{ error_back_label or 'العودة إلى الطلبات' }}</a>
+  </div>
+  {% else %}
   <div class="w-full max-w-[820px] mx-auto flex flex-col gap-4">
 
     <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -82,6 +90,7 @@ tailwind.config = {
     <a href="/account/orders" class="text-xs font-bold text-primary hover:underline self-start">العودة إلى كل الطلبات</a>
 
   </div>
+  {% endif %}
 </main>
 
 {% include "biozone_web/templates/includes/site_footer.html" %}

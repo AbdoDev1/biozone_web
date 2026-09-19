@@ -25,6 +25,18 @@ body.is-resizing * { cursor: col-resize !important; }
 {% include "biozone_web/templates/includes/staff_shell_top.html" %}
 <main class="flex-1 p-4 sm:p-6 space-y-5 max-w-[1400px] w-full mx-auto">
 
+{% if error_state %}
+<!-- حالة ناعمة: طلب غير موجود / ملغى — بلا traceback -->
+<div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
+<p class="text-[20px] font-bold">{{ error_title }}</p>
+<p class="text-navy-text/70">{{ error_message }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<div class="flex items-center gap-2 flex-wrap justify-center mt-2">
+<a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
+</div>
+</div>
+{% else %}
+
 <!-- بيانات الطلب وإجراءات العودة -->
 <section class="bg-white border border-surface-container rounded-xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-sm">
 <div class="flex items-center flex-wrap gap-2.5">
@@ -153,6 +165,7 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 class="px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all {% if confirmed == total and total > 0 %}bg-primary hover:bg-primary-accent text-white shadow-md cursor-pointer{% else %}bg-surface-container text-navy-text/50 opacity-60 cursor-not-allowed{% endif %}">
 <span class="material-symbols-outlined text-[20px]">task_alt</span>تأكيد التسليم وإنشاء الفاتورة</button>
 </section>
+{% endif %}
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 

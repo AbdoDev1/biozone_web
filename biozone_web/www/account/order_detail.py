@@ -5,6 +5,7 @@ from biozone_web.utils import (
 	assert_can_view_sales_order,
 	get_header_context,
 	redirect_staff_away_from_store,
+	render_state_page,
 )
 from biozone_web.www.my_orders import STATUS_LABELS, STATUS_STYLES
 
@@ -16,6 +17,7 @@ def get_context(context):
 	context.active_page = None
 
 	context.update(get_header_context())
+	context.error_state = False
 
 	# نفس بوابة /my-orders: الزائر يُوجَّه لصفحة الدخول قبل أي فحص ملكية.
 	if frappe.session.user == "Guest":
@@ -26,15 +28,23 @@ def get_context(context):
 	order_name = (frappe.form_dict.get("order_name") or "").strip()
 
 	if not order_name:
-		frappe.throw(
+		return render_state_page(
+			context,
 			_("رقم الطلب غير موجود"),
-			frappe.DoesNotExistError,
+			_("تعذر تحديد الطلب المطلوب. ارجع إلى قائمة طلباتك وحاول مجددًا."),
+			http_status_code=404,
+			back_url="/account/orders",
+			back_label=_("العودة إلى الطلبات"),
 		)
 
 	if not frappe.db.exists("Sales Order", order_name):
-		frappe.throw(
+		return render_state_page(
+			context,
 			_("الطلب غير موجود"),
-			frappe.DoesNotExistError,
+			_("الطلب المطلوب غير موجود. ارجع إلى قائمة طلباتك وحاول مجددًا."),
+			http_status_code=404,
+			back_url="/account/orders",
+			back_label=_("العودة إلى الطلبات"),
 		)
 
 	so = frappe.get_doc("Sales Order", order_name)

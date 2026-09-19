@@ -1791,7 +1791,7 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 	submitted دائمًا.
 	"""
 	from biozone_web.b9_utils import amount_in_arabic_words
-	from biozone_web.utils import require_staff_access
+	from biozone_web.utils import invoice_linked_to_order, require_staff_access
 
 	require_staff_access()
 	order_name = (order_name or "").strip()
@@ -1799,6 +1799,12 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 		return {"ok": False, "error": _("الطلب غير موجود")}
 
 	so = frappe.get_doc("Sales Order", order_name)
+	if so.docstatus == 2:
+		return {
+			"ok": False,
+			"error": _("هذا الطلب ملغى ولا يمكن إنشاء مستند تسليم له."),
+			"cancelled": True,
+		}
 	existing = _b9_existing_delivery_docs(order_name)
 	si_name = (sales_invoice or "").strip() or existing["sales_invoice"]
 	if not si_name or not frappe.db.exists("Sales Invoice", si_name):
@@ -1807,6 +1813,10 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 	si = frappe.get_doc("Sales Invoice", si_name)
 	if si.docstatus != 1:
 		return {"ok": False, "error": _("الفاتورة ليست معتمَدة")}
+	if not invoice_linked_to_order(si.name, order_name):
+		if (sales_invoice or "").strip():
+			return {"ok": False, "error": _("الفاتورة ليست فاتورة معتمدة لهذا الطلب")}
+		return {"ok": False, "error": _("لا توجد فاتورة معتمَدة لهذا الطلب بعد")}
 
 	# السابق من الحقل المثبَّت لحظة الإنشاء (C2) — بلا أي حساب جديد هنا.
 	# الحالي = السابق + مستحق هذه الفاتورة (حساب ثابت لا ينجرف).
