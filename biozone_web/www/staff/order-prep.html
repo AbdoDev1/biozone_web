@@ -205,7 +205,13 @@ function apiCall(method, args) {
       // أيضًا وصول HTML خام إلى Toast (تُبنى بـinnerHTML).
       const apiError = (data && data.message && typeof data.message.error === 'string')
         ? data.message.error : '';
-      throw new Error(apiError || 'تعذر تنفيذ العملية');
+      const apiErr = new Error(apiError || 'تعذر تنفيذ العملية');
+      // تمرير error_code (Pilot-2) على الخطأ دون تغيير رسالته — باقي
+      // مستدعي apiCall يتجاهلونه، ومسار الباركود وحده يقرأه للعناوين.
+      const apiCode = (data && data.message && typeof data.message.error_code === 'string')
+        ? data.message.error_code : '';
+      if (apiCode) apiErr.code = apiCode;
+      throw apiErr;
     }
     return data.message;
   });
@@ -261,13 +267,23 @@ async function processEnteredBarcode() {
   const val = (input.value || '').trim();
   if (!val) return;
   input.value = '';
+  // عناوين Toast المميزة لأكواد Pilot-2 — الوصف يبقى رسالة الخادم
+  // المنظمة (أو العامة)، والعنوان وحده يتمايز بالكود.
+  const BARCODE_ERROR_TITLES = {
+    BARCODE_ORDER_NOT_FOUND: 'الطلب غير موجود',
+    BARCODE_ORDER_NOT_DRAFT: 'الطلب لم يعد قيد التجهيز',
+    BARCODE_EMPTY: 'أدخل الباركود',
+    BARCODE_UNKNOWN: 'باركود غير مسجل',
+    BARCODE_NOT_IN_ORDER: 'صنف خارج الطلب',
+  };
   try {
     const p = await apiCall('staff_confirm_item_barcode', { order_name: ORDER_NAME, barcode: val });
     if (p.already) showToast('صنف مؤكد مسبقًا', 'هذا الصنف مسجل ومكتمل مسبقًا في هذا الطلب.', 'info');
     else showToast('تم بنجاح', 'تم التعرف على الصنف وتأكيده بنجاح.', 'success');
     refreshFromPayload(p);
   } catch (err) {
-    showToast('تعذر التأكيد', err.message, 'error');
+    const title = (err && err.code && BARCODE_ERROR_TITLES[err.code]) || 'تعذر التأكيد';
+    showToast(title, (err && err.message) || 'تعذر تنفيذ العملية', 'error');
     input.focus();
   }
 }

@@ -1,3 +1,5 @@
+import uuid
+
 import frappe
 from frappe import _
 
@@ -791,6 +793,24 @@ def staff_disable_item(item_code: str):
 	}
 
 
+def _pilot_stock_fail(error_code: str, message: str):
+	"""فشل منظم لمسار المخزون (Pilot عقد الأخطاء — الحالات الخمس فقط).
+
+	يضبط 422 (تحقق أعمال: لا 417 الخاصة بشرط Expect في HTTP، ولا 200
+	التي تخفي التمييز بين التحقق والصلاحيات وفشل الخادم) ويُرجع جسمًا
+	نظيفًا {ok, error, error_code, request_id}. على مسار الإرجاع الطبيعي
+	لا يحقن الإطار أي exception/_server_messages/exc_type (مثبت حيًا
+	بنفس الآلية في _fail_staff_login). request_id فريد لكل استدعاء.
+	"""
+	frappe.local.response["http_status_code"] = 422
+	return {
+		"ok": False,
+		"error": message,
+		"error_code": error_code,
+		"request_id": uuid.uuid4().hex,
+	}
+
+
 @frappe.whitelist(methods=["POST"])
 def staff_log_stock_movement(
 	item_code: str,
@@ -808,12 +828,12 @@ def staff_log_stock_movement(
 	require_staff_access()
 
 	if movement_type not in ("in", "out"):
-		frappe.throw(_("نوع الحركة غير صحيح"))
+		return _pilot_stock_fail("STOCK_BAD_TYPE", _("نوع الحركة غير صحيح"))
 
 	qty = frappe.utils.flt(qty)
 
 	if qty <= 0:
-		frappe.throw(_("الكمية يجب أن تكون أكبر من صفر"))
+		return _pilot_stock_fail("STOCK_BAD_QTY", _("الكمية يجب أن تكون أكبر من صفر"))
 
 	item = frappe.db.get_value(
 		"Item",
@@ -823,7 +843,7 @@ def staff_log_stock_movement(
 	)
 
 	if not item or item.disabled:
-		frappe.throw(_("الصنف غير موجود أو غير مفعّل"))
+		return _pilot_stock_fail("STOCK_BAD_ITEM", _("الصنف غير موجود أو غير مفعّل"))
 
 	conversion_factor = 1.0
 
@@ -839,7 +859,7 @@ def staff_log_stock_movement(
 		)
 
 		if not conversion_factor:
-			frappe.throw(_("الوحدة المختارة غير معرّفة لهذا الصنف"))
+			return _pilot_stock_fail("STOCK_BAD_UOM", _("الوحدة المختارة غير معرّفة لهذا الصنف"))
 
 	warehouse = get_default_warehouse()
 	purpose = (
@@ -849,11 +869,12 @@ def staff_log_stock_movement(
 	)
 
 	if not frappe.db.exists("Stock Entry Type", purpose):
-		frappe.throw(
+		return _pilot_stock_fail(
+			"STOCK_BAD_ENTRY_TYPE",
 			_(
 				'نوع حركة المخزون "{0}" غير معرّف في النظام — '
 				"يرجى إعداده أولًا"
-			).format(purpose)
+			).format(purpose),
 		)
 
 	current_valuation_rate = frappe.utils.flt(
@@ -1328,6 +1349,25 @@ def staff_get_order_prep(order_name: str):
 	return _b9_prep_payload(so)
 
 
+def _pilot_barcode_fail(error_code: str, message: str, extra: dict | None = None):
+	"""فشل منظم لمسار تأكيد الباركود (Pilot-2 عقد الأخطاء).
+
+	نفس عقد Pilot-1: ‏422 + {ok, error, error_code, request_id} بلا حقول
+	خام. request_id فريد لكل استدعاء. extra مفاتيح توافقية إضافية
+	(مثل out_of_order/item_code) تُحفَظ كما هي.
+	"""
+	frappe.local.response["http_status_code"] = 422
+	out = {
+		"ok": False,
+		"error": message,
+		"error_code": error_code,
+		"request_id": uuid.uuid4().hex,
+	}
+	if extra:
+		out.update(extra)
+	return out
+
+
 @frappe.whitelist(methods=["POST"])
 def staff_confirm_item_barcode(order_name: str, barcode: str):
 	"""تأكيد صنف بمسحة باركود واحدة = الصنف بأكمله مؤكَّد (بلا كمية).
@@ -1342,24 +1382,28 @@ def staff_confirm_item_barcode(order_name: str, barcode: str):
 	require_staff_access()
 	so, err = _b9_get_draft_order(order_name)
 	if err:
-		return {"ok": False, "error": err}
+		# فصل الحالتين على الشرط الفعلي نفسه داخل _b9_get_draft_order
+		# (غياب السجل مقابل خروجه من المسودة) — بلا تغيير ترتيب الفحوص
+		# أو نصوصها؛ كل فرع بكوده الخاص.
+		if not frappe.db.exists("Sales Order", (order_name or "").strip()):
+			return _pilot_barcode_fail("BARCODE_ORDER_NOT_FOUND", err)
+		return _pilot_barcode_fail("BARCODE_ORDER_NOT_DRAFT", err)
 
 	barcode = (barcode or "").strip()
 	if not barcode:
-		return {"ok": False, "error": _("من فضلك أدخل رقم الباركود")}
+		return _pilot_barcode_fail("BARCODE_EMPTY", _("من فضلك أدخل رقم الباركود"))
 
 	item_code = find_item_code_by_barcode(barcode)
 	if not item_code:
-		return {"ok": False, "error": _("الباركود غير مسجل في الدليل")}
+		return _pilot_barcode_fail("BARCODE_UNKNOWN", _("الباركود غير مسجل في الدليل"))
 
 	matched = [it for it in (so.items or []) if it.item_code == item_code]
 	if not matched:
-		return {
-			"ok": False,
-			"error": _("هذا الصنف غير مدرج في هذا الطلب"),
-			"out_of_order": True,
-			"item_code": item_code,
-		}
+		return _pilot_barcode_fail(
+			"BARCODE_NOT_IN_ORDER",
+			_("هذا الصنف غير مدرج في هذا الطلب"),
+			{"out_of_order": True, "item_code": item_code},
+		)
 
 	unconfirmed = [it for it in matched if not frappe.utils.cint(it.get("custom_confirmed"))]
 	if not unconfirmed:

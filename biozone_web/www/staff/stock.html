@@ -425,19 +425,32 @@ async function saveMovement() {
         rate: mpSelectedType === 'in' ? rate : '',
         note: note,
       }),
-    });
+    }).then(function (r) { return r; },
+      function () { throw new Error('تعذر حفظ الحركة، يرجى المحاولة مرة أخرى'); });
     // حارس تحليل ضيق: رد غير-JSON يعني العامة مباشرة، بلا تسريب
     // SyntaxError خام للمستخدم. لا يمس منطق res.ok.
     let data = {};
     try { data = await res.json(); } catch (e) { data = {}; }
     if (!res.ok) {
-      // لا يُقرأ أي نص خام من الخادم (exception / _server_messages قد
-      // تكشف أسماء دوال ومسارات داخلية) — العامة دائمًا.
-      throw new Error('stock-movement-failed');
+      // Pilot عقد الأخطاء: error_code أولًا (خريطة محلية ثابتة للخمسة
+      // المعتمدة)، ثم error النصي القديم كـfallback، ثم العامة. لا يُقرأ
+      // أي حقل خام (exception/_server_messages/traceback) إطلاقًا.
+      const STOCK_ERROR_MESSAGES = {
+        STOCK_BAD_TYPE: 'نوع الحركة غير صحيح',
+        STOCK_BAD_QTY: 'الكمية يجب أن تكون أكبر من صفر',
+        STOCK_BAD_ITEM: 'الصنف غير موجود أو غير مفعّل',
+        STOCK_BAD_UOM: 'الوحدة المختارة غير معرّفة لهذا الصنف',
+        STOCK_BAD_ENTRY_TYPE: 'نوع حركة المخزون غير معرّف في النظام — يرجى إعداده أولًا',
+      };
+      const code = (data && typeof data.error_code === 'string') ? data.error_code : '';
+      const legacy = (data && typeof data.error === 'string') ? data.error : '';
+      throw new Error(STOCK_ERROR_MESSAGES[code] || legacy || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى');
     }
     window.location.reload();
   } catch (err) {
-    errorEl.textContent = 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
+    // err.message آمن للعرض بالبناء: إما رسالة الخريطة، أو error نصي
+    // قديم، أو العامة — لا يمر خام هنا أبدًا.
+    errorEl.textContent = (err && err.message) || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
     errorEl.classList.remove('hidden');
   } finally {
     saveBtn.disabled = false;
