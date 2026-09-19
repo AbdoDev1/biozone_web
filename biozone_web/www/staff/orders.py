@@ -1,6 +1,5 @@
-import json
-
 import frappe
+from urllib.parse import urlencode
 
 from biozone_web.b9_utils import STATE_DELIVERED, STATE_PREPARING, STATE_READY, get_order_prep_state
 from biozone_web.utils import get_csrf_token_safe, get_header_context, require_staff_access
@@ -18,16 +17,25 @@ def get_context(context):
 
 	filters = _read_filters()
 	context.filters = filters
+	page = _read_page()
 
-	orders = _load_orders(filters)
-	context.orders = orders
-	context.orders_count = len(orders)
-	context.preparing_count = sum(1 for o in orders if o["state"] == STATE_PREPARING)
-	context.ready_count = sum(1 for o in orders if o["state"] == STATE_READY)
-	context.delivered_count = sum(1 for o in orders if o["state"] == STATE_DELIVERED)
-	context.attention_count = sum(1 for o in orders if o["needs_attention"])
+	data = _load_orders(filters, page)
+	if data is None:
+		# صفحة خارج النطاق → توجيه نظيف لـpage=1 مع بقاء الفلاتر.
+		qs = _build_querystring(filters)
+		frappe.local.flags.redirect_location = f"/staff/orders?{qs}" if qs else "/staff/orders"
+		raise frappe.Redirect
+
+	context.orders = data["orders"]
+	context.orders_count = data["total"]
+	context.preparing_count = data["preparing_count"]
+	context.ready_count = data["ready_count"]
+	context.delivered_count = data["delivered_count"]
+	context.attention_count = data["attention_count"]
 	context.customers = _customer_options()
-	context.orders_json = json.dumps(orders, ensure_ascii=False, default=str)
+	context.page = data["page"]
+	context.total_pages = data["total_pages"]
+	context.total = data["total"]
 	return context
 
 
@@ -43,6 +51,25 @@ def _read_filters() -> dict:
 		"date_from": (frappe.form_dict.get("date_from") or "").strip(),
 		"date_to": (frappe.form_dict.get("date_to") or "").strip(),
 	}
+
+
+def _read_page() -> int:
+	"""رقم الصفحة من querystring — أي قيمة فاسدة أو <1 تعني 1."""
+	raw = frappe.form_dict.get("page", 1)
+	try:
+		page = int(raw)
+	except (ValueError, TypeError):
+		return 1
+	return page if page >= 1 else 1
+
+
+def _build_querystring(filters: dict) -> str:
+	"""querystring نظيفة للفلاتر الخمسة + page=1 (بلا تكرار page)."""
+	params = {"page": 1}
+	for key in ("q", "state", "customer", "date_from", "date_to"):
+		if filters.get(key):
+			params[key] = filters[key]
+	return urlencode(params)
 
 
 def _customer_options() -> list:
@@ -88,7 +115,14 @@ def _get_prep_counts(order_names: list) -> dict:
 	return {r.name: (int(r.total), int(r.confirmed)) for r in rows}
 
 
-def _load_orders(filters: dict) -> list:
+def _load_orders(filters: dict, page: int) -> dict | None:
+	"""القائمة المفلترة كاملة للعدّادات + شريحة الصفحة للعرض.
+
+	- الجلب الأول أسماء فقط (name/status/creation/needs_attention) بلا حد،
+	  مرتبة `creation desc, name desc` (tiebreaker ثابت).
+	- إسقاط Cancelled وفلترة state/attention بايثون-سايد (كما كانت).
+	- `total` = طول المفلترة كاملة؛ `None` عند تجاوز آخر صفحة.
+	"""
 	db_filters: dict = {}
 	q = filters["q"]
 	if q:
@@ -135,23 +169,8 @@ def _load_orders(filters: dict) -> list:
 	rows = frappe.get_all(
 		"Sales Order",
 		filters=db_filters,
-		fields=[
-			"name",
-			"customer",
-			"customer_name",
-			"transaction_date",
-			"delivery_date",
-			"grand_total",
-			"net_total",
-			"docstatus",
-			"status",
-			"creation",
-			"modified",
-			"custom_needs_attention",
-			"custom_attention_note",
-		],
-		order_by="creation desc",
-		limit_page_length=200,
+		fields=["name", "status", "creation", "docstatus", "custom_needs_attention", "custom_attention_note"],
+		order_by="creation desc, name desc",
 	)
 
 	# إسقاط الملغاة من الصف الخفيف مباشرة (status عمود مخزّن) — بلا get_doc.
@@ -161,7 +180,7 @@ def _load_orders(filters: dict) -> list:
 	# GROUP BY واحد، بدل get_doc كامل (بكل جداوله الفرعية) لكل صف.
 	counts = _get_prep_counts([r.name for r in rows])
 
-	orders = []
+	filtered = []
 	for r in rows:
 		total, confirmed = counts.get(r.name, (0, 0))
 		# كائن خفيف بنفس الحقول التي تقرأها get_order_prep_state تمامًا
@@ -177,32 +196,80 @@ def _load_orders(filters: dict) -> list:
 				}
 			)
 		)
+		filtered.append((r, state))
+
+	state_filter = filters["state"]
+	if state_filter == "preparing":
+		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_PREPARING]
+	elif state_filter == "ready":
+		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_READY]
+	elif state_filter == "delivered":
+		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_DELIVERED]
+	elif state_filter == "attention":
+		filtered = [(r, s) for r, s in filtered if s["needs_attention"]]
+
+	total = len(filtered)
+	total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+	if page > total_pages:
+		return None
+	start = (page - 1) * PAGE_SIZE
+	page_rows = [r for r, _ in filtered[start : start + PAGE_SIZE]]
+
+	detail_map = {}
+	if page_rows:
+		for d in frappe.get_all(
+			"Sales Order",
+			filters={"name": ["in", [r.name for r in page_rows]]},
+			fields=[
+				"name",
+				"customer",
+				"customer_name",
+				"transaction_date",
+				"delivery_date",
+				"grand_total",
+				"net_total",
+				"docstatus",
+				"status",
+				"creation",
+				"modified",
+				"custom_needs_attention",
+				"custom_attention_note",
+			],
+		):
+			detail_map[d.name] = d
+
+	state_by_name = {r.name: s for r, s in filtered}
+	orders = []
+	for r in page_rows:
+		d = detail_map.get(r.name)
+		if not d:
+			continue
+		state = state_by_name[d.name]
 		entry = {
-			"name": r.name,
-			"customer": r.customer,
-			"customer_name": r.customer_name,
-			"transaction_date": str(r.transaction_date or ""),
-			"created_display": frappe.utils.format_datetime(r.creation, "dd MMM yyyy - HH:mm"),
-			"grand_total": float(r.grand_total or 0),
-			"grand_total_display": f"{float(r.grand_total or 0):,.2f} ج.م",
+			"name": d.name,
+			"customer": d.customer,
+			"customer_name": d.customer_name,
+			"transaction_date": str(d.transaction_date or ""),
+			"created_display": frappe.utils.format_datetime(d.creation, "dd MMM yyyy - HH:mm"),
+			"grand_total": float(d.grand_total or 0),
+			"grand_total_display": f"{float(d.grand_total or 0):,.2f} ج.م",
 			"state": state["state"],
 			"total": state["total"],
 			"confirmed": state["confirmed"],
 			"percent": state["percent"],
 			"progress_text": state["progress_text"],
 			"needs_attention": state["needs_attention"],
-			"docstatus": r.docstatus,
+			"docstatus": d.docstatus,
 		}
 		orders.append(entry)
 
-	state_filter = filters["state"]
-	if state_filter == "preparing":
-		orders = [o for o in orders if o["state"] == STATE_PREPARING]
-	elif state_filter == "ready":
-		orders = [o for o in orders if o["state"] == STATE_READY]
-	elif state_filter == "delivered":
-		orders = [o for o in orders if o["state"] == STATE_DELIVERED]
-	elif state_filter == "attention":
-		orders = [o for o in orders if o["needs_attention"]]
-
-	return orders
+	return {
+		"orders": orders,
+		"total": total,
+		"page": page,
+		"total_pages": total_pages,
+		"preparing_count": sum(1 for _, s in filtered if s["state"] == STATE_PREPARING),
+		"ready_count": sum(1 for _, s in filtered if s["state"] == STATE_READY),
+		"delivered_count": sum(1 for _, s in filtered if s["state"] == STATE_DELIVERED),
+		"attention_count": sum(1 for _, s in filtered if s["needs_attention"]),
+	}

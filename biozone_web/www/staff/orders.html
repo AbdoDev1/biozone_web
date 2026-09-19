@@ -104,16 +104,17 @@
 
 <!-- شرائح الحالة (active tab مضبوط من السيرفر) -->
 <div class="flex flex-wrap items-center gap-2" id="stateChips">
-<a href="/staff/orders" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'all' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">الكل ({{ orders_count }})</a>
-<a href="/staff/orders?state=preparing" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'preparing' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جارٍ التجهيز</a>
-<a href="/staff/orders?state=ready" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'ready' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جاهز للتسليم</a>
-<a href="/staff/orders?state=delivered" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'delivered' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">تم التسليم</a>
-<a href="/staff/orders?state=attention" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'attention' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">تحتاج انتباه</a>
+<a href="/staff/orders?page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'all' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">الكل ({{ orders_count }})</a>
+<a href="/staff/orders?state=preparing&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'preparing' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جارٍ التجهيز</a>
+<a href="/staff/orders?state=ready&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'ready' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جاهز للتسليم</a>
+<a href="/staff/orders?state=delivered&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'delivered' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">تم التسليم</a>
+<a href="/staff/orders?state=attention&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'attention' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">تحتاج انتباه</a>
 </div>
 
 <!-- البحث ولوحة الفلترة المنظمة -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-surface-subtle/60 flex flex-col gap-4">
 <form method="get" action="/staff/orders" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+<input type="hidden" name="page" value="1">
 <input type="hidden" name="state" value="{{ filters.state }}">
 <div class="relative flex-1">
 <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-navy-text/40"><span class="material-symbols-outlined text-[20px]">search</span></div>
@@ -128,6 +129,7 @@
 </form>
 <div id="filterPanel" class="hidden border-t border-surface-subtle pt-4">
 <form method="get" action="/staff/orders" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<input type="hidden" name="page" value="1">
 <input type="hidden" name="q" value="{{ filters.q }}">
 <input type="hidden" name="state" value="{{ filters.state }}">
 <div class="flex flex-col gap-1.5">
@@ -220,6 +222,31 @@
 <div class="flex items-center justify-between p-4 bg-surface-subtle/40 text-xs text-navy-text/60 border-t border-surface-subtle">
 <span>عدد الطلبات المعروضة: {{ orders_count }}</span>
 <span>اسحب الحافة الفاصلة بين الأعمدة لتغيير عرضها</span>
+</div>
+{% set _pg_ns = namespace(parts=[]) %}
+{% if filters.q %}{% set _ = _pg_ns.parts.append("q=" + filters.q|urlencode) %}{% endif %}
+{% if filters.state %}{% set _ = _pg_ns.parts.append("state=" + filters.state|urlencode) %}{% endif %}
+{% if filters.customer %}{% set _ = _pg_ns.parts.append("customer=" + filters.customer|urlencode) %}{% endif %}
+{% if filters.date_from %}{% set _ = _pg_ns.parts.append("date_from=" + filters.date_from|urlencode) %}{% endif %}
+{% if filters.date_to %}{% set _ = _pg_ns.parts.append("date_to=" + filters.date_to|urlencode) %}{% endif %}
+{% set _pg_fqs = _pg_ns.parts|join("&") %}
+{% set _pg_start = (page - 1) * 20 + 1 %}
+{% set _pg_end = [page * 20, total]|min %}
+<div class="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white border-t border-surface-subtle text-sm">
+<span class="text-navy-text/70 font-bold">عرض {{ _pg_start }}–{{ _pg_end }} من {{ total }} طلب</span>
+<div class="flex items-center gap-2">
+{% if page <= 1 %}
+<span class="px-4 py-2 rounded-xl bg-surface-container text-navy-text/40 text-sm font-bold opacity-60 cursor-not-allowed">السابق</span>
+{% else %}
+<a href="/staff/orders?page={{ page - 1 }}{% if _pg_fqs %}&{{ _pg_fqs }}{% endif %}" class="px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text text-sm font-bold transition-colors">السابق</a>
+{% endif %}
+<span class="text-navy-text/60 text-sm font-bold">صفحة {{ page }} من {{ total_pages }}</span>
+{% if page >= total_pages %}
+<span class="px-4 py-2 rounded-xl bg-surface-container text-navy-text/40 text-sm font-bold opacity-60 cursor-not-allowed">التالي</span>
+{% else %}
+<a href="/staff/orders?page={{ page + 1 }}{% if _pg_fqs %}&{{ _pg_fqs }}{% endif %}" class="px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text text-sm font-bold transition-colors">التالي</a>
+{% endif %}
+</div>
 </div>
 {% endif %}
 </div>
