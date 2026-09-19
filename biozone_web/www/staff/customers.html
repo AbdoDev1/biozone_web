@@ -575,7 +575,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
         body: JSON.stringify({ updates: updates }),
-      }).then(function (r) { return r.json(); });
+      }).then(function (r) {
+        if (!r.ok) throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب');
+        return r.json().then(function (j) { return j; },
+          function () { throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب'); });
+      }, function () { throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب'); });
       const msg = res.message;
       if (!msg || msg.ok !== true || !Array.isArray(msg.results)) {
         throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
@@ -620,7 +624,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
         body: JSON.stringify({ customer: name, customer_group: PUBLIC_GROUP }),
-      }).then(function (r) { return r.json(); });
+      }).then(function (r) {
+        if (!r.ok) throw new Error('تعذر الحفظ، حاول مجددًا');
+        return r.json().then(function (j) { return j; },
+          function () { throw new Error('تعذر الحفظ، حاول مجددًا'); });
+      }, function () { throw new Error('تعذر الحفظ، حاول مجددًا'); });
       const msg = res.message;
       if (!msg || !msg.customer) {
         throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');

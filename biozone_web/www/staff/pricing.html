@@ -210,7 +210,7 @@
       },
       body: JSON.stringify({ customer_group: name, disabled: disabled }),
     })
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error('resok-group-toggle'); return res.json(); })
       .then((res) => {
         if (res.message && res.message.ok) {
           window.location.reload();
@@ -245,7 +245,7 @@
       },
       body: JSON.stringify({ customer_group_name: name }),
     })
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error('resok-group-create'); return res.json(); })
       .then((res) => {
         if (res.message && res.message.ok) {
           window.location.reload();
@@ -279,7 +279,7 @@
         discount_percent: value,
       }),
     })
-      .then((res) => res.json())
+      .then((res) => { if (!res.ok) throw new Error('resok-discount-save'); return res.json(); })
       .then((res) => {
         if (res.message && res.message.ok) {
           savedLabel.classList.remove('hidden');

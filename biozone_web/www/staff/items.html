@@ -602,12 +602,13 @@ function saveItemPanel() {
     },
     body: JSON.stringify(payload),
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-item-save'); return res.json(); })
     .then((res) => {
       if (res.message && res.message.ok) {
         window.location.reload();
       } else {
-        const msg = (res.message && res.message.error) || 'حصل خطأ أثناء الحفظ';
+        const rawErr = (res.message && res.message.error) || 'حصل خطأ أثناء الحفظ';
+        const msg = (typeof rawErr === 'string') ? rawErr : 'حصل خطأ أثناء الحفظ';
         if (msg.includes('BARCODE_CONFLICT_WITH_OTHER_ITEM') && err) {
           err.textContent = msg;
           err.classList.remove('hidden');
@@ -631,7 +632,7 @@ function disableCurrentItem() {
     },
     body: JSON.stringify({ item_code: currentItemCode }),
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-item-disable'); return res.json(); })
     .then(() => {
       window.location.reload();
     })
@@ -725,7 +726,7 @@ function uploadImportFile() {
     headers: { 'X-Frappe-CSRF-Token': CSRF_TOKEN },
     body: fd,
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-import-upload'); return res.json(); })
     .then((res) => {
       const d = res.message || {};
       if (!d.ok) { importFail(d.error); return; }
@@ -739,7 +740,7 @@ function pollImportStatus(first) {
   fetch('/api/method/biozone_web.import_export.staff_import_status?run_name=' + encodeURIComponent(importRunName), {
     headers: { 'X-Frappe-CSRF-Token': CSRF_TOKEN },
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-import-status'); return res.json(); })
     .then((res) => {
       const d = res.message || {};
       if (!d.ok) { importFail(d.error || 'تعذر قراءة الحالة'); return; }
@@ -765,7 +766,7 @@ function loadImportPreview() {
   fetch('/api/method/biozone_web.import_export.staff_import_preview?run_name=' + encodeURIComponent(importRunName), {
     headers: { 'X-Frappe-CSRF-Token': CSRF_TOKEN },
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-import-preview'); return res.json(); })
     .then((res) => {
       const d = res.message || {};
       if (!d.ok) { importFail(d.error); return; }
@@ -804,7 +805,7 @@ function confirmImportFile() {
     headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
     body: JSON.stringify({ run_name: importRunName, confirm_rerun: rerun }),
   })
-    .then((res) => res.json())
+    .then((res) => { if (!res.ok) throw new Error('resok-import-confirm'); return res.json(); })
     .then((res) => {
       const d = res.message || {};
       if (!d.ok) {
