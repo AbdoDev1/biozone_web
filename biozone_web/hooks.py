@@ -147,6 +147,16 @@ website_route_rules = [
 
 # notification_config = "biozone_web.notifications.get_notification_config"
 
+# In-app notifications (N2): our types never send email. Registered in
+# Slice 0 (Notification Type records); the broadcast type joins this list
+# in Slice C. Takes effect on restart (no migrate needed).
+notification_skip_email_types = [
+	"BZ New Order",
+	"BZ Prep Started",
+	"BZ Delivered",
+	"BZ Escalation",
+]
+
 # Awesome Bar
 # -----------
 # Extra search results: list of dicts with label, description, route, index.
