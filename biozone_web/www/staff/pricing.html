@@ -215,10 +215,10 @@
         if (res.message && res.message.ok) {
           window.location.reload();
         } else {
-          alert((res.message && res.message.error) || 'حصل خطأ أثناء الحفظ');
+          StaffUI.toast('خطأ', (res.message && res.message.error) || 'حصل خطأ أثناء الحفظ', 'error');
         }
       })
-      .catch(() => alert('تعذر الاتصال بالسيرفر'));
+      .catch(() => StaffUI.toast('خطأ', 'تعذر الاتصال بالسيرفر', 'error'));
   }
 
   function createGroup(event) {
@@ -285,10 +285,10 @@
           savedLabel.classList.remove('hidden');
           setTimeout(() => savedLabel.classList.add('hidden'), 1500);
         } else {
-          alert((res.message && res.message.error) || 'حصل خطأ أثناء الحفظ');
+          StaffUI.toast('خطأ', (res.message && res.message.error) || 'حصل خطأ أثناء الحفظ', 'error');
         }
       })
-      .catch(() => alert('تعذر الاتصال بالسيرفر'));
+      .catch(() => StaffUI.toast('خطأ', 'تعذر الاتصال بالسيرفر', 'error'));
   }
 </script>
 </body></html>

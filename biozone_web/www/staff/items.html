@@ -613,11 +613,11 @@ function saveItemPanel() {
           err.textContent = msg;
           err.classList.remove('hidden');
         } else {
-          alert(msg);
+          StaffUI.toast('خطأ', msg, 'error');
         }
       }
     })
-    .catch(() => alert('تعذر الاتصال بالسيرفر'));
+    .catch(() => StaffUI.toast('خطأ', 'تعذر الاتصال بالسيرفر', 'error'));
 }
 
 function disableCurrentItem() {
@@ -636,7 +636,7 @@ function disableCurrentItem() {
     .then(() => {
       window.location.reload();
     })
-    .catch(() => alert('تعذر الاتصال بالسيرفر'));
+    .catch(() => StaffUI.toast('خطأ', 'تعذر الاتصال بالسيرفر', 'error'));
 }
 
 /* ===== تبويب الاستيراد/التصدير: رفع → تحقق → معاينة → تأكيد → تقدم → نتائج ===== */
