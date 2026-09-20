@@ -410,6 +410,29 @@ async function saveMovement() {
   saveBtn.disabled = true;
   saveBtn.textContent = 'جارٍ الحفظ...';
 
+  // Local stock display contract (sole interpretation point for this page):
+  // {code,title,message,displayMessage}. title: shared map, read-only.
+  // message: raw server legacy. displayMessage: this page's exact current
+  // display string (ENTRY_TYPE suffix kept, purpose dropped as today).
+  // Stock owns its display fallback; displayMessage never goes to toast.
+  // Kept in function scope (moved up from the !ok block) so try+catch
+  // share it; network failures carry no code by design.
+  const STOCK_ERROR_MESSAGES = {
+    STOCK_BAD_TYPE: 'نوع الحركة غير صحيح',
+    STOCK_BAD_QTY: 'الكمية يجب أن تكون أكبر من صفر',
+    STOCK_BAD_ITEM: 'الصنف غير موجود أو غير مفعّل',
+    STOCK_BAD_UOM: 'الوحدة المختارة غير معرّفة لهذا الصنف',
+    STOCK_BAD_ENTRY_TYPE: 'نوع حركة المخزون غير معرّف في النظام — يرجى إعداده أولًا',
+  };
+  const stockErrorDisplay = function (errCode, legacyMessage) {
+    return {
+      code: errCode || '',
+      title: (errCode && window.STAFF_ERROR_TITLES[errCode]) || 'تعذر تنفيذ العملية',
+      message: (typeof legacyMessage === 'string' && legacyMessage) ? legacyMessage : '',
+      displayMessage: STOCK_ERROR_MESSAGES[errCode] || legacyMessage || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى'
+    };
+  };
+
   try {
     const res = await fetch('/api/method/biozone_web.api.staff_log_stock_movement', {
       method: 'POST',
@@ -432,25 +455,25 @@ async function saveMovement() {
     let data = {};
     try { data = await res.json(); } catch (e) { data = {}; }
     if (!res.ok) {
-      // Pilot عقد الأخطاء: error_code أولًا (خريطة محلية ثابتة للخمسة
-      // المعتمدة)، ثم error النصي القديم كـfallback، ثم العامة. لا يُقرأ
-      // أي حقل خام (exception/_server_messages/traceback) إطلاقًا.
-      const STOCK_ERROR_MESSAGES = {
-        STOCK_BAD_TYPE: 'نوع الحركة غير صحيح',
-        STOCK_BAD_QTY: 'الكمية يجب أن تكون أكبر من صفر',
-        STOCK_BAD_ITEM: 'الصنف غير موجود أو غير مفعّل',
-        STOCK_BAD_UOM: 'الوحدة المختارة غير معرّفة لهذا الصنف',
-        STOCK_BAD_ENTRY_TYPE: 'نوع حركة المخزون غير معرّف في النظام — يرجى إعداده أولًا',
-      };
+      // Pilot عقد الأخطاء: error_code أولًا (خريطة stock المحلية أعلاه)،
+      // ثم error النصي القديم كـfallback، ثم العامة — عبر المحوّل المحلي.
+      // لا يُقرأ أي حقل خام (exception/_server_messages/traceback) إطلاقًا.
       const code = (data && typeof data.error_code === 'string') ? data.error_code : '';
       const legacy = (data && typeof data.error === 'string') ? data.error : '';
-      throw new Error(STOCK_ERROR_MESSAGES[code] || legacy || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى');
+      const info = stockErrorDisplay(code, legacy);
+      // Carry the code on the error (cf. order-prep apiCall) so catch can
+      // re-derive the exact display string instead of a merged message.
+      const carried = new Error(info.displayMessage);
+      carried.code = info.code;
+      throw carried;
     }
     window.location.reload();
   } catch (err) {
-    // err.message آمن للعرض بالبناء: إما رسالة الخريطة، أو error نصي
-    // قديم، أو العامة — لا يمر خام هنا أبدًا.
-    errorEl.textContent = (err && err.message) || 'تعذر حفظ الحركة، يرجى المحاولة مرة أخرى';
+    // Display via the local converter: code-carried errors re-derive their
+    // exact current string; codeless errors (network) get the stock generic.
+    // err.message آمن للعرض بالبناء — لا يمر خام هنا أبدًا.
+    var info = stockErrorDisplay((err && err.code) || '', (err && err.message) || '');
+    errorEl.textContent = info.displayMessage;
     errorEl.classList.remove('hidden');
   } finally {
     saveBtn.disabled = false;
