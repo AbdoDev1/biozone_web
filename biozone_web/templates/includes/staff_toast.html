@@ -1,0 +1,270 @@
+{# Shared staff toast — Phase 1 of Toast الموحد (§4-2). Display layer only.
+   Phase 2 injects this partial once via staff_shell_bottom.html; every
+   /staff/* shell page loads it, staff/login.html stays out of scope.
+   Defining the file alone (Phase 1) changed zero runtime behaviour.
+
+   Layering rule (binding): this partial NEVER inspects message text to
+   decide anything. Title resolution lives in staffErrorInfo() and keys
+   off the stable API `code` only. Any temporary `msg.includes` fallback
+   stays in the calling pages during migration (documented for removal)
+   and never enters this file.
+
+   Security rule (binding): no HTML-string sink exists in the toast path. Title and
+   message always go through `textContent` on fresh `createElement` nodes.
+   A future need for links/formatting requires a separate restricted API —
+   never a trusted-HTML parameter on the general function.
+
+   Stacking policy: max 4 visible toasts; the oldest is dismissed first
+   (its timer cleared). An identical title+message+type within 1500ms is
+   suppressed as a duplicate.
+
+   Long messages: never truncated in code — the body wraps (`break-words`)
+   inside a max-width toast. Roles: success/info → status+polite,
+   warning/error → alert+assertive. Timers pause on hover/focus and honour
+   `prefers-reduced-motion`. Toasts are removed from the DOM after hiding. #}
+<div aria-live="off" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none" dir="rtl" id="staff-toast-stack"></div>
+<script>
+(function () {
+  'use strict';
+
+  var MAX_VISIBLE = 4;
+  var DEDUPE_WINDOW_MS = 1500;
+  var GENERIC_TITLE = 'تعذر تنفيذ العملية';
+  var GENERIC_MESSAGE = 'حدث خطأ غير متوقع';
+
+  var TYPE_CONFIG = {
+    success: { icon: 'task_alt', border: 'border-emerald-300', color: 'text-emerald-600', role: 'status', live: 'polite' },
+    info: { icon: 'info', border: 'border-primary/30', color: 'text-primary', role: 'status', live: 'polite' },
+    warning: { icon: 'warning', border: 'border-amber-300', color: 'text-amber-600', role: 'alert', live: 'assertive' },
+    error: { icon: 'error', border: 'border-red-300', color: 'text-red-600', role: 'alert', live: 'assertive' }
+  };
+
+  var TOAST_DURATION = {
+    success: 3500,
+    info: 4000,
+    warning: 5000,
+    error: 7000
+  };
+
+  // Stable API codes only (BARCODE_* / STOCK_* from the error contract
+  // pilots + the item-save barcode conflict). Never message text.
+  var STAFF_ERROR_TITLES = {
+    BARCODE_ORDER_NOT_FOUND: 'الطلب غير موجود',
+    BARCODE_ORDER_NOT_DRAFT: 'الطلب لم يعد قيد التجهيز',
+    BARCODE_EMPTY: 'أدخل الباركود',
+    BARCODE_UNKNOWN: 'باركود غير مسجل',
+    BARCODE_NOT_IN_ORDER: 'صنف خارج الطلب',
+    BARCODE_CONFLICT_WITH_OTHER_ITEM: 'تعارض في الباركود',
+    STOCK_BAD_TYPE: 'نوع الحركة غير صحيح',
+    STOCK_BAD_QTY: 'الكمية يجب أن تكون أكبر من صفر',
+    STOCK_BAD_ITEM: 'الصنف غير موجود أو غير مفعّل',
+    STOCK_BAD_UOM: 'الوحدة المختارة غير معرّفة لهذا الصنف',
+    STOCK_BAD_ENTRY_TYPE: 'نوع حركة المخزون غير معرّف في النظام'
+  };
+
+  Object.freeze(TYPE_CONFIG);
+  Object.freeze(TOAST_DURATION);
+  Object.freeze(STAFF_ERROR_TITLES);
+
+  function toText(value, fallback) {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return fallback;
+    try {
+      return String(value);
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function normalizeType(type) {
+    return Object.prototype.hasOwnProperty.call(TYPE_CONFIG, type) ? type : 'info';
+  }
+
+  function prefersReducedMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getStack() {
+    var stack = document.getElementById('staff-toast-stack');
+    if (!stack) {
+      // Defensive only: the partial ships its own stack div above. If a
+      // host page ever drops it, calls still must not throw.
+      stack = document.createElement('div');
+      stack.id = 'staff-toast-stack';
+      stack.className = 'fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none';
+      stack.setAttribute('dir', 'rtl');
+      stack.setAttribute('aria-live', 'off');
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
+
+  function clearTimer(toast) {
+    if (toast && toast._staffToastTimer) {
+      window.clearTimeout(toast._staffToastTimer);
+      toast._staffToastTimer = 0;
+    }
+  }
+
+  // Synchronous eviction for the cap only: clears the timer and detaches
+  // the oldest toast in the same call, so the cap loop below always makes
+  // progress. Animated fade-out stays exclusive to user/timer dismissal
+  // (dismissToast) and is never part of the cap path.
+  function evictOldest(stack) {
+    var oldest = stack.firstChild;
+    if (!oldest) return;
+    clearTimer(oldest);
+    oldest.remove();
+  }
+
+  function dismissToast(toast) {
+    if (!toast || !toast.parentNode) return;
+    clearTimer(toast);
+    if (prefersReducedMotion()) {
+      toast.remove();
+      return;
+    }
+    toast.classList.add('opacity-0');
+    window.setTimeout(function () {
+      toast.remove();
+    }, 300);
+  }
+
+  function armTimer(toast, duration) {
+    var remaining = duration;
+    var startedAt = Date.now();
+    function done() {
+      toast._staffToastTimer = 0;
+      dismissToast(toast);
+    }
+    toast._staffToastTimer = window.setTimeout(done, remaining);
+    function pause() {
+      if (!toast._staffToastTimer) return;
+      window.clearTimeout(toast._staffToastTimer);
+      toast._staffToastTimer = 0;
+      remaining -= Date.now() - startedAt;
+      if (remaining < 0) remaining = 0;
+    }
+    function resume() {
+      if (toast._staffToastTimer || !toast.isConnected) return;
+      startedAt = Date.now();
+      toast._staffToastTimer = window.setTimeout(done, remaining);
+    }
+    toast.addEventListener('mouseenter', pause);
+    toast.addEventListener('mouseleave', resume);
+    toast.addEventListener('focusin', pause);
+    toast.addEventListener('focusout', resume);
+  }
+
+  var lastShown = { key: '', at: 0 };
+
+  // Display only: builds DOM via createElement + textContent. Never reads
+  // error codes and never touches message text semantics.
+  function staffToast(title, message, type) {
+    type = normalizeType(type);
+    title = toText(title, '');
+    message = toText(message, '');
+    if (!title && !message) {
+      title = GENERIC_TITLE;
+    }
+    var key = type + '\n' + title + '\n' + message;
+    var now = Date.now();
+    if (key === lastShown.key && now - lastShown.at < DEDUPE_WINDOW_MS) {
+      return null;
+    }
+    lastShown = { key: key, at: now };
+
+    var cfg = TYPE_CONFIG[type];
+    var stack = getStack();
+    while (stack.children.length >= MAX_VISIBLE && stack.firstChild) {
+      evictOldest(stack);
+    }
+
+    var toast = document.createElement('div');
+    toast.className = 'pointer-events-auto flex items-center gap-3 bg-white p-3.5 rounded-xl border shadow-xl min-w-[280px] max-w-sm transition-opacity duration-300 ' + cfg.border;
+    toast.setAttribute('role', cfg.role);
+    toast.setAttribute('aria-live', cfg.live);
+
+    var icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined text-[22px] shrink-0 ' + cfg.color;
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = cfg.icon;
+
+    var body = document.createElement('div');
+    body.className = 'flex flex-col gap-0.5 text-xs min-w-0 flex-1 break-words';
+
+    var titleEl = document.createElement('span');
+    titleEl.className = 'font-bold text-navy-text';
+    titleEl.textContent = title;
+
+    var messageEl = document.createElement('span');
+    messageEl.className = 'text-navy-text/60';
+    messageEl.textContent = message;
+
+    body.appendChild(titleEl);
+    body.appendChild(messageEl);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'shrink-0 p-1 rounded-lg text-navy-text/40 hover:text-navy-text hover:bg-black/5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30';
+    closeBtn.setAttribute('aria-label', 'إغلاق الإشعار');
+    var closeIcon = document.createElement('span');
+    closeIcon.className = 'material-symbols-outlined text-lg';
+    closeIcon.setAttribute('aria-hidden', 'true');
+    closeIcon.textContent = 'close';
+    closeBtn.appendChild(closeIcon);
+    closeBtn.addEventListener('click', function () {
+      dismissToast(toast);
+    });
+    toast.addEventListener('keydown', function (ev) {
+      if (ev && ev.key === 'Escape') dismissToast(toast);
+    });
+
+    toast.appendChild(icon);
+    toast.appendChild(body);
+    toast.appendChild(closeBtn);
+    stack.appendChild(toast);
+    armTimer(toast, TOAST_DURATION[type]);
+    return toast;
+  }
+
+  // Interpretation only: normalizes {code, message} into display data.
+  // Title keys off `code` exclusively; `error_code` accepted as the same
+  // server-contract field under its wire name. Message text is passed
+  // through untouched and never searched.
+  function staffErrorInfo(error) {
+    var code = '';
+    if (error && typeof error === 'object') {
+      if (typeof error.code === 'string') {
+        code = error.code;
+      } else if (typeof error.error_code === 'string') {
+        code = error.error_code;
+      }
+    }
+    var message = (error && typeof error.message === 'string') ? error.message : GENERIC_MESSAGE;
+    return {
+      title: STAFF_ERROR_TITLES[code] || GENERIC_TITLE,
+      message: message,
+      type: 'error'
+    };
+  }
+
+  window.StaffUI = window.StaffUI || {};
+  window.StaffUI.toast = staffToast;
+  window.StaffUI.dismissToast = dismissToast;
+  window.StaffUI.errorInfo = staffErrorInfo;
+  window.StaffUI.ERROR_TITLES = STAFF_ERROR_TITLES;
+  window.StaffUI.TOAST_DURATION = TOAST_DURATION;
+
+  // Exact-name globals (verified free in the pre-check audit): thin aliases
+  // of the namespace above, so call sites read naturally.
+  window.staffToast = staffToast;
+  window.staffErrorInfo = staffErrorInfo;
+  window.STAFF_ERROR_TITLES = STAFF_ERROR_TITLES;
+  window.TOAST_DURATION = TOAST_DURATION;
+})();
+</script>

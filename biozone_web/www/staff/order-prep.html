@@ -280,23 +280,19 @@ async function processEnteredBarcode() {
   const val = (input.value || '').trim();
   if (!val) return;
   input.value = '';
-  // عناوين Toast المميزة لأكواد Pilot-2 — الوصف يبقى رسالة الخادم
-  // المنظمة (أو العامة)، والعنوان وحده يتمايز بالكود.
-  const BARCODE_ERROR_TITLES = {
-    BARCODE_ORDER_NOT_FOUND: 'الطلب غير موجود',
-    BARCODE_ORDER_NOT_DRAFT: 'الطلب لم يعد قيد التجهيز',
-    BARCODE_EMPTY: 'أدخل الباركود',
-    BARCODE_UNKNOWN: 'باركود غير مسجل',
-    BARCODE_NOT_IN_ORDER: 'صنف خارج الطلب',
-  };
+  // Toast titles for Pilot-2 codes resolve via the shared converter
+  // (StaffUI.errorInfo) — the only interpretation point (Phase 5).
+  // Description stays the organized server message. Known codes render
+  // byte-identical titles to the removed local map; only the
+  // unknown-code fallback title converges to the shared generic.
   try {
     const p = await apiCall('staff_confirm_item_barcode', { order_name: ORDER_NAME, barcode: val });
     if (p.already) showToast('صنف مؤكد مسبقًا', 'هذا الصنف مسجل ومكتمل مسبقًا في هذا الطلب.', 'info');
     else showToast('تم بنجاح', 'تم التعرف على الصنف وتأكيده بنجاح.', 'success');
     refreshFromPayload(p);
   } catch (err) {
-    const title = (err && err.code && BARCODE_ERROR_TITLES[err.code]) || 'تعذر التأكيد';
-    showToast(title, (err && err.message) || 'تعذر تنفيذ العملية', 'error');
+    const info = window.StaffUI.errorInfo(err);
+    showToast(info.title, info.message, info.type);
     input.focus();
   }
 }
@@ -364,16 +360,12 @@ function openModal(id) { const m = document.getElementById(id); if (m) { m.class
 function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
 function showToast(title, desc, type) {
-  const container = document.getElementById('toastContainer');
-  const toast = document.createElement('div');
-  let border = 'border-primary/30', icon = 'info', color = 'text-primary';
-  if (type === 'error') { border = 'border-red-300'; icon = 'error'; color = 'text-red-600'; }
-  else if (type === 'warning') { border = 'border-amber-300'; icon = 'warning'; color = 'text-amber-600'; }
-  else if (type === 'success') { border = 'border-emerald-300'; icon = 'task_alt'; color = 'text-emerald-600'; }
-  toast.className = 'pointer-events-auto flex items-center gap-3 bg-white p-3.5 rounded-xl border ' + border + ' shadow-xl min-w-[280px] max-w-sm';
-  toast.innerHTML = '<span class="material-symbols-outlined ' + color + ' text-[22px]">' + icon + '</span><div class="flex flex-col text-xs"><span class="font-bold">' + title + '</span><span class="text-navy-text/60">' + desc + '</span></div>';
-  container.appendChild(toast);
-  setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+  // Phase 4: direct delegation to the unified safe builder (StaffUI.toast).
+  // Signature and all 14 calls unchanged; barcode titles now resolve via
+  // the shared converter (Phase 5), so no local map remains here.
+  // No local fallback by design: the shell partial loads on every staff
+  // page, so a missing StaffUI must fail loudly, never render silently.
+  return window.StaffUI.toast(title, desc, type);
 }
 
 (function initResizableColumns() {

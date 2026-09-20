@@ -85,3 +85,7 @@
       window.matchMedia('(min-width: 1024px)').addEventListener('change', syncSidebarAria);
     }
 </script>
+{# Unified staff toast (Phase 2): loaded once per shell page. Defines
+   StaffUI.toast / staffToast + error map only — no auto-render, no call
+   sites changed. Pages keep their own toast code untouched for now. #}
+{% include "biozone_web/templates/includes/staff_toast.html" %}
