@@ -61,18 +61,38 @@ def _load_discounts_tab(context):
 		context.has_next = False
 		return
 
-	filters = {"disabled": 0}
+	base_where = "`tabItem`.`disabled` = 0"
+	params: dict = {}
 	if search_term:
-		filters["item_name"] = ["like", f"%{search_term}%"]
+		# البحث الحر: الاسم أو الكود أو الباركود (OR) في استعلام واحد.
+		# الباركود عبر EXISTS على جدول Item Barcode بدل رحلة IN
+		# منفصلة (نمط items.py)، والقيمة مربوطة كبارامتر %(term)s
+		# فلا حقن SQL من مدخل المستخدم.
+		base_where += """ and (
+			`tabItem`.`item_name` like %(term)s
+			or `tabItem`.`item_code` like %(term)s
+			or exists (
+				select 1 from `tabItem Barcode` bc
+				where bc.parent = `tabItem`.`name`
+					and bc.parenttype = 'Item'
+					and bc.barcode like %(term)s
+			)
+		)"""
+		params["term"] = f"%{search_term}%"
 
-	total_count = frappe.db.count("Item", filters)
-	items = frappe.get_all(
-		"Item",
-		fields=["item_code", "item_name", "item_group"],
-		filters=filters,
-		order_by="item_name asc",
-		start=(page - 1) * PAGE_SIZE,
-		page_length=PAGE_SIZE,
+	total_row = frappe.db.sql(
+		f"select count(*) as c from `tabItem` where {base_where}",
+		params,
+		as_dict=True,
+	)
+	total_count = total_row[0].c if total_row else 0
+	items = frappe.db.sql(
+		f"""select `tabItem`.`item_code`, `tabItem`.`item_name`, `tabItem`.`item_group`
+			from `tabItem` where {base_where}
+			order by `tabItem`.`item_name` asc
+			limit %(limit)s offset %(offset)s""",
+		{**params, "limit": PAGE_SIZE, "offset": (page - 1) * PAGE_SIZE},
+		as_dict=True,
 	)
 
 	item_codes = [i.item_code for i in items]
