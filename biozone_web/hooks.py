@@ -152,9 +152,7 @@ website_route_rules = [
 # in Slice C. Takes effect on restart (no migrate needed).
 notification_skip_email_types = [
 	"BZ New Order",
-	"BZ Prep Started",
 	"BZ Delivered",
-	"BZ Escalation",
 ]
 
 # Awesome Bar
