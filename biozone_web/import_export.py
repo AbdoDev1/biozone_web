@@ -1239,6 +1239,7 @@ def run_import_job(run_name):
 			"result_json",
 			frappe.as_json(
 				{
+					"staged": staged,
 					"items": items_out,
 					"pricing": pricing_out,
 					"errors": errors,
