@@ -117,6 +117,126 @@
 </div>
 <div class="flex items-center gap-4 sm:gap-6">
 <span class="hidden sm:inline text-xs text-navy-text/50 font-medium">{{ today_display }}</span>
+<div class="relative" id="bz-bell-wrap">
+<button aria-expanded="false" aria-label="الإشعارات" class="relative w-10 h-10 flex items-center justify-center rounded-full text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle focus:outline-none" id="bz-bell-btn" onclick="bzBellToggle(event)" title="الإشعارات" type="button">
+<span class="material-symbols-outlined text-2xl">notifications</span>
+<span class="hidden absolute top-0.5 right-0.5 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-alert-red text-white text-[11px] font-bold leading-5 text-center" id="bz-bell-badge">0</span>
+</button>
+<div class="hidden absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-surface-subtle rounded-xl shadow-sm z-50 overflow-hidden" id="bz-bell-panel" role="dialog" aria-label="قائمة الإشعارات">
+<div class="flex items-center justify-between px-4 py-3 border-b border-surface-subtle">
+<span class="text-sm font-bold text-navy-text">الإشعارات</span>
+<button class="text-xs font-medium text-navy-text/60 hover:text-primary focus:outline-none" id="bz-bell-all" onclick="bzBellMarkAll(event)" type="button">تعليم الكل كمقروء</button>
+</div>
+<div class="max-h-80 overflow-y-auto" id="bz-bell-list"></div>
+<div class="hidden px-4 py-6 text-center text-sm text-navy-text/50" id="bz-bell-empty">لا إشعارات جديدة</div>
+</div>
+</div>
+<script>
+/* Staff bell (Phase 1): counter + latest-10 list. No polling on customer
+   pages (this partial is staff-only). Titles render via textContent only;
+   links must be relative (single leading slash) or the row is skipped. */
+(function () {
+  var API = "/api/method/biozone_web.services.notification_api";
+  var KEY = "bz_ntf_v1";
+  var btn = document.getElementById("bz-bell-btn");
+  var badge = document.getElementById("bz-bell-badge");
+  var panel = document.getElementById("bz-bell-panel");
+  var list = document.getElementById("bz-bell-list");
+  var empty = document.getElementById("bz-bell-empty");
+  if (!btn || !badge || !panel || !list || !empty) return;
+
+  function csrf() { return (window.frappe && window.frappe.csrf_token) || ""; }
+  function store(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} }
+  function safeLink(l) {
+    if (typeof l !== "string" || !l) return null;
+    if (l.charAt(0) !== "/" || l.charAt(1) === "/") return null;
+    return l;
+  }
+  function post(name, body) {
+    return fetch(API + "." + name, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": csrf() },
+      body: JSON.stringify(body || {}),
+    }).then(function (res) { if (!res.ok) throw new Error("bz-bell-" + res.status); return res.json(); })
+      .then(function (res) { return res.message || {}; });
+  }
+  function setBadge(n) {
+    n = Math.max(0, parseInt(n, 10) || 0);
+    badge.textContent = n > 99 ? "99+" : String(n);
+    var show = n > 0;
+    badge.classList.toggle("hidden", !show);
+    badge.classList.toggle("flex", show);
+    btn.setAttribute("aria-expanded", panel.classList.contains("hidden") ? "false" : "true");
+    store({ lastCount: n, at: Date.now() });
+  }
+  function fmtDate(s) {
+    try { return new Date(s).toLocaleString("ar"); } catch (e) { return ""; }
+  }
+  function render(items) {
+    while (list.firstChild) list.removeChild(list.firstChild);
+    var rows = (items || []).filter(function (it) { return safeLink(it.link); });
+    empty.classList.toggle("hidden", rows.length > 0);
+    rows.slice(0, 10).forEach(function (it) {
+      var a = document.createElement("a");
+      a.href = safeLink(it.link);
+      a.className = "flex flex-col gap-1 px-4 py-3 border-b border-surface-subtle hover:bg-surface-subtle" + (it.read ? " opacity-60" : "");
+      var t = document.createElement("span");
+      t.className = "text-sm font-medium text-navy-text";
+      t.textContent = it.title || "";
+      var d = document.createElement("span");
+      d.className = "text-xs text-navy-text/50";
+      d.textContent = fmtDate(it.creation);
+      a.appendChild(t);
+      a.appendChild(d);
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        var href = a.href;
+        post("notif_mark_read", { name: it.name }).catch(function () {});
+        setBadge((parseInt(badge.textContent, 10) || 1) - 1);
+        window.location.href = href;
+      });
+      list.appendChild(a);
+    });
+  }
+  function refresh() {
+    if (!(window.frappe && window.frappe.csrf_token)) return;
+    return post("notif_poll", {}).then(function (r) { setBadge(r.unread_count || 0); }).catch(function () {});
+  }
+  function openPanel() {
+    post("notif_list", { limit: 10 }).then(function (r) { render(r.items || []); }).catch(function () {});
+    panel.classList.remove("hidden");
+    btn.setAttribute("aria-expanded", "true");
+  }
+  window.bzBellToggle = function (ev) {
+    if (ev) ev.stopPropagation();
+    if (panel.classList.contains("hidden")) { openPanel(); }
+    else { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  };
+  window.bzBellMarkAll = function (ev) {
+    if (ev) ev.stopPropagation();
+    post("notif_mark_all_read", {}).then(function () { setBadge(0); render([]); }).catch(function () {});
+  };
+  document.addEventListener("click", function (ev) {
+    var wrap = document.getElementById("bz-bell-wrap");
+    if (wrap && !wrap.contains(ev.target)) { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+  // The CSRF token script is rendered later in this same partial: wait for
+  // it so the very first pulse never fires tokenless (400) on cold load.
+  // Bounded: ~25 tries x 200ms, then stops (R-i) — no endless timer.
+  var bootTries = 0;
+  function boot() {
+    if (window.frappe && window.frappe.csrf_token) { refresh(); }
+    else if (++bootTries < 25) { setTimeout(boot, 200); }
+  }
+  boot();
+  setInterval(refresh, 30000);
+})();
+</script>
 <a class="flex items-center gap-1.5 text-xs sm:text-sm text-navy-text/60 hover:text-alert-red font-medium transition-colors" href="/staff/login" onclick="event.preventDefault(); fetch('/api/method/logout', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''}, body: '{}'}).finally(function() { window.location.href = '/staff/login'; });">
 <span class="material-symbols-outlined text-base">logout</span>
 <span class="">تسجيل خروج</span>
