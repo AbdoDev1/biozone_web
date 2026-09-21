@@ -451,6 +451,19 @@ def biozone_confirm_order(items):
 		if so is None:
 			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
 
+		# Phase 1 (ND16/X1): staff bell — last write inside the
+		# transaction, outside the retry loop and the Administrator
+		# window. Lazy import inside try/except so api.py survives a
+		# half-deployed tree; safe no-op when the flag is off.
+		try:
+			from biozone_web.services.notifications import notify
+			notify("order_new", reference_doctype="Sales Order",
+			       reference_name=so.name, context={"order": so.name},
+			       actor=ordering_user)
+		except Exception:
+			frappe.log_error(title="Biozone notification call failed: order_new",
+			                 message=frappe.get_traceback())
+
 	except Exception:
 		frappe.db.rollback()
 		raise
