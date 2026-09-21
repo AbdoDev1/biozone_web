@@ -1683,6 +1683,19 @@ def staff_confirm_delivery(order_name: str):
 		frappe.db.rollback()
 		return {"ok": False, "error": _("تعذر إنشاء التسليم والفاتورة: {0}").format(exc)}
 
+	# Phase 2 (ND17/X1): customer bell — last write inside the
+	# transaction, on the success path only (never the already/partial/
+	# error branches above). Lazy import inside try/except so delivery
+	# never breaks on a half-deployed tree; safe no-op when off.
+	try:
+		from biozone_web.services.notifications import notify as _notify_delivered
+		_notify_delivered("order_delivered", reference_doctype="Sales Order",
+		                  reference_name=so.name, context={"order": so.name},
+		                  actor=frappe.session.user)
+	except Exception:
+		frappe.log_error(title="Biozone notification call failed: order_delivered",
+		                 message=frappe.get_traceback())
+
 	frappe.db.commit()
 	staff = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 	try:
