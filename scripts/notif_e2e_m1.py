@@ -42,6 +42,7 @@ def main():
 
     from biozone_web.services import notifications as N
     from biozone_web.services import notification_api as A
+    from biozone_web.services import notification_core as C
     from biozone_web.api import biozone_confirm_order
 
     frappe.local.conf.biozone_notifications_enabled = 1
@@ -107,7 +108,7 @@ def main():
                                   "title": "Dummy {order}",
                                   "link": lambda ref: f"/staff/orders?x={ref}",
                                   "dedupe": ("document_name", "type")}
-        A._BZ_TYPES.append("BZ Test Dummy")
+        C._BZ_TYPES.append("BZ Test Dummy")
         frappe.set_user(CUST_A)
         N.notify("test_dummy", reference_doctype="Sales Order",
                  reference_name="NTF-E2E-DUMMY", context={"order": "NTF-E2E-DUMMY"})
@@ -120,8 +121,8 @@ def main():
         show("S7", "dummy event", False, repr(e)[:120])
     finally:
         N.EVENTS.pop("test_dummy", None)
-        if "BZ Test Dummy" in A._BZ_TYPES:
-            A._BZ_TYPES.remove("BZ Test Dummy")
+        if "BZ Test Dummy" in C._BZ_TYPES:
+            C._BZ_TYPES.remove("BZ Test Dummy")
         frappe.db.rollback()
 
     print(f"\nE2E | pass={PASS_COUNT} fail={FAIL_COUNT}")

@@ -67,6 +67,7 @@ def main():
 
     from biozone_web.services import notifications as N
     from biozone_web.services import notification_api as A
+    from biozone_web.services import notification_core as C
     from biozone_web.hooks import _BZ_NOTIFICATION_TYPES
 
     DOC = "NTF-TEST-ORDER-001"
@@ -335,7 +336,7 @@ def main():
                                   "title": "Dummy {order}",
                                   "link": lambda ref: f"/staff/orders?x={ref}",
                                   "dedupe": ("document_name", "type")}
-        A._BZ_TYPES.append("BZ Test Dummy")
+        C._BZ_TYPES.append("BZ Test Dummy")
         frappe.set_user(CUST_A)
         n_staff = len(N.recipients_for(N.EVENTS["order_new"], DOC, actor=CUST_A))
         r = N.notify("test_dummy", reference_doctype="Sales Order",
@@ -350,8 +351,8 @@ def main():
         show("T1-10", "extensibility", False, repr(e)[:120])
     finally:
         N.EVENTS.pop("test_dummy", None)
-        if "BZ Test Dummy" in A._BZ_TYPES:
-            A._BZ_TYPES.remove("BZ Test Dummy")
+        if "BZ Test Dummy" in C._BZ_TYPES:
+            C._BZ_TYPES.remove("BZ Test Dummy")
         frappe.db.rollback()
 
     # ---------- T1-23: read rows never reappear (mark-all regression) ----------
