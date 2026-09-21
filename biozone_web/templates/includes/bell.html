@@ -1,0 +1,225 @@
+{# Shared notification bell — staff + customer (Phase 2 step 0).
+   Usage: {% set bz_bell_mode = "staff" %} (or "customer") then include this.
+   Staff branch is Phase-1 behavior byte-for-byte (classes, endpoints,
+   30s pulse). Customer branch uses the store palette, seeds its counter
+   from `bz_bell_count` (server context), never polls and never sounds —
+   it stays inert until Phase 2 wires it. #}
+{% if bz_bell_mode == "customer" %}
+{% set _b_btn = "relative w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors focus:outline-none" %}
+{% set _b_badge = "hidden absolute top-0.5 right-0.5 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-error text-on-error text-[11px] font-bold leading-5 text-center" %}
+{% set _b_panel = "hidden absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-outline-variant rounded-xl shadow-sm z-50 overflow-hidden" %}
+{% set _b_head = "flex items-center justify-between px-4 py-3 border-b border-outline-variant" %}
+{% set _b_title = "text-sm font-bold text-on-surface" %}
+{% set _b_all = "text-xs font-medium text-on-surface-variant hover:text-primary focus:outline-none" %}
+{% set _b_empty = "hidden px-4 py-6 text-center text-sm text-on-surface-variant" %}
+{% else %}
+{% set _b_btn = "relative w-10 h-10 flex items-center justify-center rounded-full text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle focus:outline-none" %}
+{% set _b_badge = "hidden absolute top-0.5 right-0.5 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-alert-red text-white text-[11px] font-bold leading-5 text-center" %}
+{% set _b_panel = "hidden absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-surface-subtle rounded-xl shadow-sm z-50 overflow-hidden" %}
+{% set _b_head = "flex items-center justify-between px-4 py-3 border-b border-surface-subtle" %}
+{% set _b_title = "text-sm font-bold text-navy-text" %}
+{% set _b_all = "text-xs font-medium text-navy-text/60 hover:text-primary focus:outline-none" %}
+{% set _b_empty = "hidden px-4 py-6 text-center text-sm text-navy-text/50" %}
+{% endif %}
+<div class="relative" id="bz-bell-wrap">
+<button aria-expanded="false" aria-label="الإشعارات" class="{{ _b_btn }}" id="bz-bell-btn" onclick="bzBellToggle(event)" title="الإشعارات" type="button">
+<span class="material-symbols-outlined text-2xl">notifications</span>
+<span class="{{ _b_badge }}" id="bz-bell-badge">0</span>
+</button>
+<div class="{{ _b_panel }}" id="bz-bell-panel" role="dialog" aria-label="قائمة الإشعارات">
+<div class="{{ _b_head }}">
+<span class="{{ _b_title }}">الإشعارات</span>
+<button class="{{ _b_all }}" id="bz-bell-all" onclick="bzBellMarkAll(event)" type="button">تعليم الكل كمقروء</button>
+</div>
+<div class="max-h-80 overflow-y-auto" id="bz-bell-list"></div>
+<div class="{{ _b_empty }}" id="bz-bell-empty">لا إشعارات جديدة</div>
+</div>
+</div>
+<script>
+/* Bell core (shared): counter + latest-10 list. Titles via textContent only;
+   links must be relative (single leading slash) or the row is skipped.
+   Staff: 30s POST pulse. Customer: counter seeded from the server, refresh
+   on open/visible/focus only — no polling, no sound, ever. */
+(function () {
+  var MODE = "{{ bz_bell_mode | default('staff') }}";
+  var API = MODE === "customer"
+    ? "/api/method/biozone_web.services.notification_customer"
+    : "/api/method/biozone_web.services.notification_api";
+  var KEY = "bz_ntf_v1";
+  var CLS = MODE === "customer" ? {
+    row: "flex flex-col gap-1 px-4 py-3 border-b border-outline-variant hover:bg-surface-container",
+    title: "text-sm font-medium text-on-surface",
+    date: "text-xs text-on-surface-variant"
+  } : {
+    row: "flex flex-col gap-1 px-4 py-3 border-b border-surface-subtle hover:bg-surface-subtle",
+    title: "text-sm font-medium text-navy-text",
+    date: "text-xs text-navy-text/50"
+  };
+  var btn = document.getElementById("bz-bell-btn");
+  var badge = document.getElementById("bz-bell-badge");
+  var panel = document.getElementById("bz-bell-panel");
+  var list = document.getElementById("bz-bell-list");
+  var empty = document.getElementById("bz-bell-empty");
+  if (!btn || !badge || !panel || !list || !empty) return;
+
+  function csrf() { return (window.frappe && window.frappe.csrf_token) || ""; }
+  function loadState() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+  function store(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} }
+  function safeLink(l) {
+    if (typeof l !== "string" || !l) return null;
+    if (l.charAt(0) !== "/" || l.charAt(1) === "/") return null;
+    return l;
+  }
+  function post(name, body) {
+    return fetch(API + "." + name, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": csrf() },
+      body: JSON.stringify(body || {}),
+    }).then(function (res) { if (!res.ok) throw new Error("bz-bell-" + res.status); return res.json(); })
+      .then(function (res) { return res.message || {}; });
+  }
+  function setBadge(n) {
+    n = Math.max(0, parseInt(n, 10) || 0);
+    badge.textContent = n > 99 ? "99+" : String(n);
+    var show = n > 0;
+    badge.classList.toggle("hidden", !show);
+    badge.classList.toggle("flex", show);
+    btn.setAttribute("aria-expanded", panel.classList.contains("hidden") ? "false" : "true");
+    var st = loadState();
+    st.lastCount = n;
+    st.at = Date.now();
+    store(st);
+  }
+  function fmtDate(s) {
+    try { return new Date(s).toLocaleString("ar"); } catch (e) { return ""; }
+  }
+  function render(items) {
+    while (list.firstChild) list.removeChild(list.firstChild);
+    var rows = (items || []).filter(function (it) { return safeLink(it.link); });
+    empty.classList.toggle("hidden", rows.length > 0);
+    rows.slice(0, 10).forEach(function (it) {
+      var a = document.createElement("a");
+      a.href = safeLink(it.link);
+      a.className = CLS.row + (it.read ? " opacity-60" : "");
+      var t = document.createElement("span");
+      t.className = CLS.title;
+      t.textContent = it.title || "";
+      var d = document.createElement("span");
+      d.className = CLS.date;
+      d.textContent = fmtDate(it.creation);
+      a.appendChild(t);
+      a.appendChild(d);
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        var href = a.href;
+        post("notif_mark_read", { name: it.name }).catch(function () {});
+        setBadge((parseInt(badge.textContent, 10) || 1) - 1);
+        window.location.href = href;
+      });
+      list.appendChild(a);
+    });
+  }
+  function refresh() {
+    if (!(window.frappe && window.frappe.csrf_token)) return;
+    return post("notif_poll", {}).then(function (r) {
+      var n = r.unread_count || 0;
+      if (MODE === "staff") {
+        var prev = loadState().lastCount;
+        if (prev === undefined) prev = n;  // first load never rings
+        maybeRing(n, prev);
+      }
+      setBadge(n);
+    }).catch(function () {});
+  }
+  function openPanel() {
+    post("notif_list", { limit: 10 }).then(function (r) { render(r.items || []); }).catch(function () {});
+    panel.classList.remove("hidden");
+    btn.setAttribute("aria-expanded", "true");
+  }
+  window.bzBellToggle = function (ev) {
+    if (ev) ev.stopPropagation();
+    if (panel.classList.contains("hidden")) { openPanel(); }
+    else { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  };
+  window.bzBellMarkAll = function (ev) {
+    if (ev) ev.stopPropagation();
+    post("notif_mark_all_read", {}).then(function () { setBadge(0); render([]); }).catch(function () {});
+  };
+  document.addEventListener("click", function (ev) {
+    var wrap = document.getElementById("bz-bell-wrap");
+    if (wrap && !wrap.contains(ev.target)) { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+  if (MODE === "staff") {
+    // Staff sound: always on, no mute control. The tone is generated
+    // (no file). The browser unlocks audio on the first interaction, so
+    // ringing starts from the first click/keypress onward. Rings only
+    // when the counter rises above the last seen value — never on first
+    // load. Two tabs ring once via the shared lastSoundAt stamp.
+    // Nothing here runs for customer pages.
+    var audioCtx = null;
+    var ensureAudio = function () {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+      }
+      if (audioCtx && audioCtx.state === "suspended") { try { audioCtx.resume(); } catch (e) {} }
+      return audioCtx;
+    };
+    var beep = function (when, freq) {
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(0.25, when + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + 0.18);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(when);
+      o.stop(when + 0.2);
+    };
+    var ring = function () {
+      var ctx = ensureAudio();
+      if (!ctx || ctx.state !== "running") return;
+      try {
+        var t = ctx.currentTime + 0.01;
+        beep(t, 880);
+        beep(t + 0.22, 1174.66);
+      } catch (e) {}
+    };
+    var maybeRing = function (n, prev) {
+      if (!(n > prev)) return;
+      var st = loadState();
+      var now = Date.now();
+      if (st.lastSoundAt && now - st.lastSoundAt < 5000) return;
+      st.lastSoundAt = now;
+      store(st);
+      ring();
+    };
+    window.bzMaybeRing = maybeRing;
+    document.addEventListener("pointerdown", function () { ensureAudio(); });
+    document.addEventListener("keydown", function () { ensureAudio(); });
+  } else {
+    window.bzMaybeRing = function () {};
+  }
+  if (MODE === "customer") {
+    setBadge({{ bz_bell_count | default(0) }});
+    window.addEventListener("focus", function () { refresh(); });
+  } else {
+    // The CSRF token script is rendered later in the host partial: wait for
+    // it so the very first pulse never fires tokenless (400) on cold load.
+    // Bounded: ~25 tries x 200ms, then stops (R-i) — no endless timer.
+    var bootTries = 0;
+    function boot() {
+      if (window.frappe && window.frappe.csrf_token) { refresh(); }
+      else if (++bootTries < 25) { setTimeout(boot, 200); }
+    }
+    boot();
+    setInterval(refresh, 30000);
+  }
+})();
+</script>

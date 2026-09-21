@@ -80,6 +80,20 @@ def require_staff_access():
 		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
 
 
+def require_customer_access():
+	"""بوابة نهايات جرس العميل: Website User مسجّل ومفعّل فقط.
+
+	الضيف وحسابات System User (بما فيها المعطلة) مرفوضون محليًا بـ403 —
+	بلا تحويل (النهايات API لا صفحات).
+	"""
+	user = frappe.session.user
+	if user == "Guest":
+		raise frappe.PermissionError(_("غير متاح على هذا النطاق"))
+	user_type, enabled = frappe.db.get_value("User", user, ["user_type", "enabled"])
+	if user_type != "Website User" or not enabled:
+		raise frappe.PermissionError(_("غير متاح على هذا النطاق"))
+
+
 def redirect_staff_away_from_store():
 	"""حارس نطاق صفحات المتجر/العميل (الاسم تاريخي — لم يعد يحوّل إطلاقًا).
 
@@ -290,18 +304,49 @@ def get_header_context():
 
 	- is_logged_in: any authenticated user
 	- user_full_name: shown in the header instead of the account icon
+	- notif_unread_count: customer bell counter — Website Users only and
+	  only when the notifications flag is on. Guests, staff and flag-off
+	  cost zero notification queries.
 	"""
 	user = frappe.session.user
 	is_logged_in = user != "Guest"
 
 	user_full_name = None
+	notif_unread_count = 0
 	if is_logged_in:
-		user_full_name = frappe.db.get_value("User", user, "full_name") or user
+		info = frappe.db.get_value("User", user,
+		                           ["full_name", "user_type", "enabled"],
+		                           as_dict=True)
+		if info:
+			user_full_name = info.full_name or user
+			if (info.user_type == "Website User" and info.enabled
+					and _notifications_flag_on()):
+				from biozone_web.hooks import _BZ_NOTIFICATION_TYPES
+				notif_unread_count = frappe.db.count(
+					"Notification Log",
+					{"for_user": user, "read": 0,
+					 "type": ("in", list(_BZ_NOTIFICATION_TYPES))})
 
 	return {
 		"is_logged_in": is_logged_in,
 		"user_full_name": user_full_name,
+		"notif_unread_count": notif_unread_count,
 	}
+
+
+def _notifications_flag_on():
+	"""Read-only flag check without importing the service (no cycles)."""
+	try:
+		val = frappe.get_conf().get("biozone_notifications_enabled", 0)
+	except Exception:
+		return False
+	if isinstance(val, bool):
+		return val
+	if isinstance(val, (int, float)):
+		return bool(val)
+	if isinstance(val, str):
+		return val.strip().lower() in ("1", "true", "yes", "on")
+	return False
 
 
 def find_customer_for_current_user():

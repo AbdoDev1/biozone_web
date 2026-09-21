@@ -61,6 +61,10 @@
         <a href="/account/orders" title="طلباتي" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-3"/><circle cx="7" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg>
         </a>
+        {# Customer bell (Phase 2): counter seeded from the server, no polling, no sound. #}
+        {% set bz_bell_mode = "customer" %}
+        {% set bz_bell_count = notif_unread_count | default(0) %}
+        {% include "biozone_web/templates/includes/bell.html" %}
         <a href="/login" title="تسجيل خروج" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center" onclick="event.preventDefault(); try { localStorage.removeItem('biozone_cart_items'); } catch (e) {} fetch('/api/method/logout', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''}, body: '{}'}).finally(function() { window.location.href = '/login'; });">
           <span class="material-symbols-outlined">logout</span>
         </a>
