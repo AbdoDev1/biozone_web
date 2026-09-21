@@ -147,6 +147,21 @@ website_route_rules = [
 
 # notification_config = "biozone_web.notifications.get_notification_config"
 
+# Biozone in-app notification types (single source: imported by the
+# notifications service and the registration patch — X4). The leading
+# underscore keeps the hooks loader from treating it as a hook.
+_BZ_NOTIFICATION_TYPES = (
+	"BZ New Order",
+	"BZ Delivered",
+	"BZ Escalation",
+	"BZ Escalation Reminder",
+)
+
+# Our types never send email (in-app only). Mandatory: new users are
+# seeded with every enabled non-skipped type, so without this line a
+# new customer would get BZ emails.
+notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
+
 # Awesome Bar
 # -----------
 # Extra search results: list of dicts with label, description, route, index.
