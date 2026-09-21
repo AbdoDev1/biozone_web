@@ -247,10 +247,16 @@
 {% if tab == 'import' %}
 <!-- BEGIN: ImportExportSection -->
 <section class="flex flex-col gap-4" data-purpose="import-export-section">
-<!-- تنبيه الكمية الإلزامي (نص القرار المقفل — ظاهر بجانب/فوق عمود الكمية وفي مساعدة التبويب) -->
-<div class="flex items-start gap-3 bg-amber-50 border border-amber-200/80 rounded-2xl px-4 py-3.5" data-purpose="qty-delta-notice">
-<span class="material-symbols-outlined text-amber-700 text-xl shrink-0 mt-0.5">warning</span>
-<div class="text-sm">
+<!-- تنبيه الكمية الإلزامي (نص القرار المقفل — مطوي افتراضيًا، يُفتح بزر بنمط السيستم) -->
+<div class="bg-amber-50 border border-amber-200/80 rounded-2xl px-4 py-3" data-purpose="qty-delta-notice">
+<button type="button" onclick="toggleImportHint('qty-delta-body', this)" aria-expanded="false" class="w-full flex items-center gap-3 text-right">
+<span class="material-symbols-outlined text-amber-700 text-xl shrink-0">warning</span>
+<span class="flex-1 text-sm font-black text-amber-800">تنبيه الكمية المضافة إلى المخزن الافتراضي</span>
+<svg class="w-4 h-4 shrink-0 text-amber-700 transition-transform" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<div id="qty-delta-body" class="hidden text-sm pt-2">
 <p class="font-black text-amber-800">الكمية = كمية مضافة جديدة إلى المخزن الافتراضي{% if import_warehouse %} ({{ import_warehouse }}){% endif %}، وليست الرصيد الكلي الحالي.</p>
 <p class="text-amber-700/90 text-xs mt-1 font-medium">تُسجَّل كل كمية مدخلة كحركة وارد (Material Receipt) حقيقية بتأثيرها المحاسبي الكامل. إعادة تشغيل نفس الملف ستضيف الكميات مرة أخرى — راجع التأكيد قبل الاعتماد.</p>
 </div>
@@ -258,11 +264,19 @@
 {% if import_warehouse_error %}
 <div class="bg-alert-bg/60 border border-alert-red/30 rounded-2xl px-4 py-3.5 text-sm font-bold text-alert-red">خطأ إعداد يمنع الاستيراد: {{ import_warehouse_error }}</div>
 {% endif %}
-<!-- مساعدة الأعمدة -->
-<div class="bg-white rounded-2xl border border-borderSubtle shadow-card p-5 text-sm text-slate-600 font-medium leading-7">
-<p class="font-black text-darkNavy mb-2">أعمدة القالب (رؤوس عربية):</p>
+<!-- مساعدة الأعمدة (مطوية افتراضيًا، تُفتح بزر بنمط السيستم) -->
+<div class="bg-white rounded-2xl border border-borderSubtle shadow-card px-5 py-4" data-purpose="import-columns-help">
+<button type="button" onclick="toggleImportHint('import-columns-body', this)" aria-expanded="false" class="w-full flex items-center gap-3 text-right">
+<span class="material-symbols-outlined text-lg shrink-0 text-primary">info</span>
+<span class="flex-1 text-sm font-black text-darkNavy">أعمدة القالب (رؤوس عربية)</span>
+<svg class="w-4 h-4 shrink-0 text-slate-400 transition-transform" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<div id="import-columns-body" class="hidden text-sm text-slate-600 font-medium leading-7 pt-2">
 <p><b>الاسم</b> مطلوب للصنف الجديد فقط • <b>الباركود</b> أو <b>الكود</b> أحدهما على الأقل لتحديد الصف (الكود وحده مفتاح صالح، ومعًا يجب أن يتفقا على نفس الصنف) • <b>سعر الجمهور</b> يُكتب فوق سعر قائمة {{ import_price_list }} ويبدأ فورًا بلا مدة صلاحية • <b>الوحدة</b> فارغها يعني وحدة الصنف الحالية (والجديد بلا وحدة = Nos) • <b>القسم</b> مطلوب للجديد فقط ويجب أن يكون قسمًا فرعيًا موجودًا • أعمدة <b>خصم: اسم الفئة</b> تُولَّد لكل فئة نشطة (الحالية: {% if import_groups %}{% for g in import_groups %}{{ g.name }}{% if not loop.last %}، {% endif %}{% endfor %}{% else %}لا يوجد{% endif %}) — القيمة 0 تعني إلغاء الخصم، والفارغ بجميع الأعمدة يعني <b>اترك القيمة الحالية دون تغيير</b> ولا يمسح شيئًا أبدًا.</p>
 <p class="mt-1 text-xs text-slate-400">الحدود: ملف حتى {{ import_max_mb }}MB وبحد أقصى {{ import_max_rows }} صف. الصيغ: xlsx أو csv بترميز UTF-8.</p>
+</div>
 </div>
 <!-- أزرار القالب والتصدير -->
 <div class="flex flex-wrap items-center gap-3">
@@ -280,9 +294,10 @@
 <div class="bg-white rounded-2xl border border-borderSubtle shadow-card p-5 flex flex-col gap-4" data-purpose="import-upload-card">
 <div class="flex flex-col sm:flex-row sm:items-center gap-3">
 <input id="import-file-input" type="file" accept=".xlsx,.csv" class="flex-1 text-sm text-slate-600 file:bg-surface-subtle file:border file:border-borderSubtle file:rounded-xl file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-darkNavy hover:file:border-primary cursor-pointer"/>
-<button id="import-upload-btn" onclick="uploadImportFile()" class="bg-primary hover:bg-primary-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap">رفع وتحقق</button>
+<button id="import-upload-btn" onclick="uploadImportFile()" class="bg-primary hover:bg-primary-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">رفع وتحقق</button>
 </div>
 <p id="import-error" class="hidden text-xs text-alert-red font-bold"></p>
+<p id="import-stall-hint" class="hidden text-xs text-amber-700 font-bold">طالت العملية دون تقدم — تأكد أن خدمة الـ worker تعمل ثم أعد الرفع إن لزم.</p>
 <!-- مؤشر المراحل -->
 <div id="import-stages" class="hidden flex flex-wrap items-center gap-1.5 text-[11px] font-bold" data-purpose="import-stages"></div>
 <!-- شريط التقدم والعدادات الحية -->
@@ -311,10 +326,10 @@
 <div id="import-preview-wrap" class="hidden flex-col gap-2">
 <p class="text-sm font-black text-darkNavy">معاينة الصفوف (أول 25 صفًا)</p>
 <div class="overflow-x-auto"><table class="w-full text-xs" id="import-preview-table">
-<thead><tr class="border-b border-borderSubtle text-slate-500 font-bold"><th class="py-2 px-2 text-right">صف</th><th class="py-2 px-2 text-right">الإجراء</th><th class="py-2 px-2 text-right">الكود</th><th class="py-2 px-2 text-right">الحالة</th></tr></thead>
+<thead><tr class="border-b border-borderSubtle text-slate-500 font-bold"><th class="py-2 px-2 text-right">صف</th><th class="py-2 px-2 text-right">الإجراء</th><th class="py-2 px-2 text-right">الكود</th><th class="py-2 px-2 text-right">السعر</th><th class="py-2 px-2 text-right">الكمية</th><th class="py-2 px-2 text-right">الخصومات</th><th class="py-2 px-2 text-right">الحالة</th></tr></thead>
 <tbody></tbody>
 </table></div>
-<button id="import-confirm-btn" onclick="confirmImportFile()" class="bg-primary hover:bg-primary-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition-all self-start">تأكيد وبدء التنفيذ</button>
+<button id="import-confirm-btn" onclick="confirmImportFile()" class="bg-primary hover:bg-primary-hover text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm transition-all self-start disabled:opacity-50 disabled:cursor-not-allowed">تأكيد وبدء التنفيذ</button>
 </div>
 <!-- النتائج: الإنشاء/التحديث مقابل التسعير + الأخطاء -->
 <div id="import-result-wrap" class="hidden flex-col gap-3">
@@ -642,6 +657,8 @@ function disableCurrentItem() {
 /* ===== تبويب الاستيراد/التصدير: رفع → تحقق → معاينة → تأكيد → تقدم → نتائج ===== */
 let importRunName = null;
 let importPollTimer = null;
+let importPollStart = 0;
+const IMPORT_STALL_MS = 5 * 60 * 1000;
 const IMPORT_STAGES = [
   ['uploading', 'الرفع'],
   ['validating', 'التحقق'],
@@ -658,6 +675,35 @@ function importShow(id, show, flexCol) {
   el.classList.toggle('hidden', !show);
   if (show && flexCol) { el.classList.add('flex'); el.classList.add('flex-col'); }
 }
+/* ===== صناديق تعليمات الاستيراد: مطوية افتراضيًا، تُفتح بزر بنمط السيستم =====
+   الحالة المفتوحة تُحفظ لكل صندوق (localStorage) فلا تُغلق مع كل زيارة. */
+function toggleImportHint(bodyId, btn) {
+  const body = document.getElementById(bodyId);
+  if (!body || !btn) return;
+  const collapsed = body.classList.toggle('hidden');
+  const open = !collapsed;
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const chev = btn.querySelector('svg');
+  if (chev) chev.classList.toggle('rotate-180', open);
+  try { localStorage.setItem('importHint:' + bodyId, open ? '1' : '0'); } catch (e) { /* تخزين غير متاح — يُتجاهل */ }
+}
+function restoreImportHints() {
+  ['qty-delta-body', 'import-columns-body'].forEach((bodyId) => {
+    let open = false;
+    try { open = localStorage.getItem('importHint:' + bodyId) === '1'; } catch (e) { open = false; }
+    if (!open) return;
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    body.classList.remove('hidden');
+    const btn = body.parentElement ? body.parentElement.querySelector('button[aria-expanded]') : null;
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'true');
+      const chev = btn.querySelector('svg');
+      if (chev) chev.classList.add('rotate-180');
+    }
+  });
+}
+restoreImportHints();
 function importFail(msg) {
   const err = document.getElementById('import-error');
   err.textContent = msg || 'حصل خطأ أثناء العملية';
@@ -667,6 +713,35 @@ function importClearFail() {
   const err = document.getElementById('import-error');
   err.textContent = '';
   err.classList.add('hidden');
+}
+function importEsc(s) {
+  return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function importCellText(x) {
+  const t = (x == null ? '' : String(x)).trim();
+  return t || '—';
+}
+function hideImportPreview() {
+  importShow('import-preview-wrap', false);
+  importShow('import-rerun-wrap', false);
+  const rl = document.getElementById('import-rerun-label');
+  if (rl) { rl.classList.add('hidden'); rl.classList.remove('flex'); }
+  const cb = document.getElementById('import-confirm-btn');
+  if (cb) cb.disabled = true;
+}
+function setImportUploadEnabled(on) {
+  const b = document.getElementById('import-upload-btn');
+  if (b) b.disabled = !on;
+}
+function importDiscountSummary(r) {
+
+  const dd = (r.values && r.values.discounts) || {};
+  const parts = [];
+  Object.keys(dd).forEach((g) => {
+    const v = (dd[g] || '').trim();
+    if (v) parts.push(g + ': ' + v + '%');
+  });
+  return parts.length ? parts.join('، ') : '—';
 }
 function renderImportStages(activeIdx) {
   const wrap = document.getElementById('import-stages');
@@ -689,9 +764,14 @@ function renderImportStages(activeIdx) {
 function renderImportCounts(prefix, d) {
   const el = document.getElementById('import-counts');
   importShow('import-progress-wrap', true, true);
-  el.textContent = prefix + ' — للإنشاء: ' + (d.rows_to_create || d.done_created || 0)
-    + ' • للتحديث: ' + (d.rows_to_update || d.done_updated || 0)
-    + ' • فاشلة: ' + (d.rows_failed || d.done_failed || 0);
+  const terminal = d.status === 'Completed' || d.status === 'Partial';
+  el.textContent = prefix + (terminal
+    ? ' — أُنشئ: ' + (d.done_created || 0)
+      + ' • حُدّث: ' + (d.done_updated || 0)
+      + ' • فشل: ' + (d.done_failed || 0)
+    : ' — للإنشاء: ' + (d.rows_to_create || 0)
+      + ' • للتحديث: ' + (d.rows_to_update || 0)
+      + ' • فاشلة: ' + (d.rows_failed || 0));
   const total = d.total_rows || 1;
   const done = (d.done_created || 0) + (d.done_updated || 0) + (d.done_failed || 0);
   const pct = d.status === 'Preview' ? 45 : Math.min(100, Math.round((done / total) * 100));
@@ -719,6 +799,8 @@ function uploadImportFile() {
   const input = document.getElementById('import-file-input');
   if (!input.files || !input.files.length) { importFail('اختر ملفًا أولًا (xlsx أو csv)'); return; }
   renderImportStages(0);
+  setImportUploadEnabled(false);
+  importPollStart = Date.now();
   const fd = new FormData();
   fd.append('file', input.files[0]);
   fetch('/api/method/biozone_web.import_export.staff_upload_import_file', {
@@ -729,11 +811,11 @@ function uploadImportFile() {
     .then((res) => { if (!res.ok) throw new Error('resok-import-upload'); return res.json(); })
     .then((res) => {
       const d = res.message || {};
-      if (!d.ok) { importFail(d.error); return; }
+      if (!d.ok) { importFail(d.error); setImportUploadEnabled(true); return; }
       importRunName = d.run_name;
       pollImportStatus(true);
     })
-    .catch(() => importFail('تعذر الاتصال بالسيرفر'));
+    .catch(() => { importFail('تعذر الاتصال بالسيرفر'); setImportUploadEnabled(true); });
 }
 function pollImportStatus(first) {
   if (!importRunName) return;
@@ -748,12 +830,23 @@ function pollImportStatus(first) {
       renderImportStages(idx);
       renderImportCounts('الحالة: ' + d.status, d);
       renderImportCallouts(d);
-      if (d.status === 'Preview') { stopImportPoll(); loadImportPreview(); }
-      else if (d.status === 'Completed' || d.status === 'Partial') { stopImportPoll(); renderImportStages(5); loadImportPreview(); renderImportResult(d.summary || {}); }
-      else if (d.status === 'Failed') { stopImportPoll(); importFail(d.error || 'فشل التشغيل'); }
-      else { startImportPoll(); }
+      if (d.status === 'Preview') { stopImportPoll(); hideImportStallHint(); setImportUploadEnabled(true); loadImportPreview(); }
+      else if (d.status === 'Completed' || d.status === 'Partial') { stopImportPoll(); hideImportStallHint(); renderImportStages(5); hideImportPreview(); setImportUploadEnabled(true); renderImportResult(d.summary || {}); }
+      else if (d.status === 'Failed') { stopImportPoll(); hideImportStallHint(); hideImportPreview(); setImportUploadEnabled(true); importFail(d.error || 'فشل التشغيل'); }
+      else { renderImportStallHint(); startImportPoll(); }
     })
-    .catch(() => { if (first) importFail('تعذر الاتصال بالسيرفر'); else startImportPoll(); });
+    .catch(() => { if (first) { importFail('تعذر الاتصال بالسيرفر'); setImportUploadEnabled(true); } else startImportPoll(); });
+}
+function renderImportStallHint() {
+  const hint = document.getElementById('import-stall-hint');
+  if (!hint) return;
+  if (importPollStart && Date.now() - importPollStart > IMPORT_STALL_MS) {
+    hint.classList.remove('hidden');
+  }
+}
+function hideImportStallHint() {
+  const hint = document.getElementById('import-stall-hint');
+  if (hint) hint.classList.add('hidden');
 }
 function startImportPoll() {
   stopImportPoll();
@@ -779,9 +872,13 @@ function loadImportPreview() {
         const badge = r.errors && r.errors.length
           ? '<span class="text-alert-red font-bold">أخطاء: ' + r.errors.join('؛ ') + '</span>'
           : '<span class="text-primary font-bold">' + (r.action === 'create' ? 'إنشاء' : 'تحديث') + '</span>';
+        const v = r.values || {};
         tr.innerHTML = '<td class="py-2 px-2 font-mono">' + r.n + '</td>'
           + '<td class="py-2 px-2">' + (r.action === 'create' ? 'إنشاء' : r.action === 'update' ? 'تحديث' : '—') + '</td>'
-          + '<td class="py-2 px-2 font-mono">' + ((r.item_code || '') .toString().replace(/</g, '&lt;')) + '</td>'
+          + '<td class="py-2 px-2 font-mono">' + importEsc(importCellText(r.item_code)) + '</td>'
+          + '<td class="py-2 px-2 font-mono">' + importEsc(importCellText(v.price)) + '</td>'
+          + '<td class="py-2 px-2 font-mono">' + importEsc(importCellText(v.qty)) + '</td>'
+          + '<td class="py-2 px-2">' + importEsc(importDiscountSummary(r)) + '</td>'
           + '<td class="py-2 px-2">' + badge + '</td>';
         tb.appendChild(tr);
       });
@@ -799,6 +896,7 @@ function loadImportPreview() {
 }
 function confirmImportFile() {
   importClearFail();
+  document.getElementById('import-confirm-btn').disabled = true;
   const rerun = document.getElementById('import-rerun-check').checked ? 1 : 0;
   fetch('/api/method/biozone_web.import_export.staff_confirm_import', {
     method: 'POST',
@@ -809,6 +907,7 @@ function confirmImportFile() {
     .then((res) => {
       const d = res.message || {};
       if (!d.ok) {
+        document.getElementById('import-confirm-btn').disabled = false;
         if (d.need_rerun_confirm) {
           const rw = document.getElementById('import-rerun-wrap');
           rw.textContent = d.error;
@@ -820,9 +919,10 @@ function confirmImportFile() {
       }
       renderImportStages(4);
       document.getElementById('import-confirm-btn').disabled = true;
+      importPollStart = Date.now();
       pollImportStatus(false);
     })
-    .catch(() => importFail('تعذر الاتصال بالسيرفر'));
+    .catch(() => { document.getElementById('import-confirm-btn').disabled = false; importFail('تعذر الاتصال بالسيرفر'); });
 }
 /* ===== ترقيم قوائم الاستيراد: عميل فقط، IMPORT_LIST_PAGE_SIZE عنصر في الصفحة =====
    الرد من staff_import_status يبقى كما هو (result_json كامل بلا تقطيع) —
