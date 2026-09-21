@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 SITE = "development.localhost"
 CUST_A = "abdo4@gmail.com"
+CUST_B = "abdo22@gmail.com"
 STAFF = "abdulrahmanali.h.t@gmail.com"
 
 PASS_COUNT = 0
@@ -93,6 +94,57 @@ def main():
              link_ok and before == after + 1, f"{before}->{after} link={link_ok}")
     except Exception as e:
         show("S2", "staff opens", False, repr(e)[:120])
+
+    # ---------- S3: staff delivers -> customer A notified, already silent ----------
+    dso = None
+    try:
+        from biozone_web.api import staff_confirm_delivery
+        frappe.set_user(CUST_A)
+        res = biozone_confirm_order([{"item_code": "123mg", "quantity": 1}])
+        dso = res.get("sales_order")
+        rows = frappe.get_all("Sales Order Item", {"parent": dso}, ["name"])
+        for r in rows:
+            frappe.db.set_value("Sales Order Item", r.name, "custom_confirmed", 1)
+        frappe.set_user(STAFF)
+        real_commit = frappe.db.commit
+        frappe.db.commit = lambda *a, **k: None
+        try:
+            out = staff_confirm_delivery(dso)
+            drows = frappe.db.get_all(
+                "Notification Log",
+                {"type": "BZ Delivered", "document_name": dso},
+                ["for_user", "link"])
+            out2 = staff_confirm_delivery(dso)
+            n2 = frappe.db.count(
+                "Notification Log",
+                {"type": "BZ Delivered", "document_name": dso})
+        finally:
+            frappe.db.commit = real_commit
+        users = sorted(r.for_user for r in drows)
+        link_ok = bool(drows) and drows[0].link == f"/account/orders/{dso}"
+        show("S3", "delivery notifies owner; already adds nothing",
+             out.get("ok") and users == [CUST_A] and link_ok
+             and out2.get("already") is True and n2 == 1,
+             f"dso={dso} users={users}")
+    except Exception as e:
+        show("S3", "staff delivers", False, repr(e)[:150])
+
+    # ---------- S4: customer B and guest see nothing ----------
+    try:
+        from biozone_web.services import notification_customer as CUSTEP
+        frappe.set_user(CUST_B)
+        b_items = CUSTEP.notif_list(limit=50)["items"]
+        b_mine = [i for i in b_items if i["document_name"] == dso]
+        guest_blocked = False
+        try:
+            frappe.set_user("Guest")
+            CUSTEP.notif_list()
+        except Exception:
+            guest_blocked = True
+        show("S4", "B sees none of A; guest refused",
+             b_mine == [] and guest_blocked, f"b_rows={len(b_mine)}")
+    except Exception as e:
+        show("S4", "isolation", False, repr(e)[:120])
     finally:
         frappe.db.rollback()
 
