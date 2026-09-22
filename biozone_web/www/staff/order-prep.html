@@ -29,8 +29,38 @@ body.is-resizing * { cursor: col-resize !important; }
 <!-- حالة ناعمة: طلب غير موجود / ملغى — بلا traceback -->
 <div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
 <p class="text-[20px] font-bold">{{ error_title }}</p>
+{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order }}</p>{% endif %}
 <p class="text-navy-text/70">{{ error_message }}</p>
 {% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+{% if read_only and items %}
+<div class="w-full text-right space-y-3 bg-surface-subtle/60 border border-surface-container rounded-xl p-4">
+<div class="flex items-center flex-wrap gap-2.5">
+<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono" dir="ltr">{{ order_name }}</span></div>
+<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name }}</span></div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-alert-bg text-alert-red text-xs font-bold">{{ state }}</span>
+</div>
+<div class="overflow-x-auto bg-white rounded-lg border border-surface-container">
+<table class="w-full text-right text-xs">
+<thead><tr class="bg-surface-subtle/60 text-navy-text/60 border-b border-surface-subtle">
+<th class="py-2 px-3 font-bold">#</th><th class="py-2 px-3 font-bold">الصنف</th><th class="py-2 px-3 font-bold text-center">الكمية</th><th class="py-2 px-3 font-bold text-center">الوحدة</th><th class="py-2 px-3 font-bold text-center">السعر</th><th class="py-2 px-3 font-bold text-center">الإجمالي</th>
+</tr></thead>
+<tbody class="divide-y divide-surface-subtle">
+{% for it in items %}
+<tr>
+<td class="py-2 px-3 text-navy-text/50">{{ it.idx }}</td>
+<td class="py-2 px-3 font-bold">{{ it.item_name }}<span class="block font-mono font-normal text-navy-text/50" dir="ltr">{{ it.item_code }}</span></td>
+<td class="py-2 px-3 text-center font-bold">{{ it.qty }}</td>
+<td class="py-2 px-3 text-center">{{ it.uom }}</td>
+<td class="py-2 px-3 text-center">{{ "%.2f"|format(it.rate) }}</td>
+<td class="py-2 px-3 text-center font-bold">{{ "%.2f"|format(it.qty * it.rate) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p class="text-xs text-navy-text/60">الإجمالي: <b class="text-navy-text">{{ "%.2f"|format(grand_total) }} ج.م</b><span class="text-navy-text/40"> — عرض مقفل للمراجعة فقط، بلا أي إجراء</span></p>
+</div>
+{% endif %}
 <div class="flex items-center gap-2 flex-wrap justify-center mt-2">
 <a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
 </div>
@@ -46,6 +76,7 @@ body.is-resizing * { cursor: col-resize !important; }
 </div>
 <div class="flex items-center gap-2.5 w-full lg:w-auto">
 <a href="/staff/orders" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
+<button onclick="openModal('cancelOrderModal')" type="button" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"><span class="material-symbols-outlined text-[18px]">cancel</span>إلغاء الطلب</button>
 </div>
 </section>
 
@@ -192,6 +223,8 @@ class="px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center g
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 
+<!-- مودالات إجراءات التجهيز — للصفحة العاملة فقط (بلا سكربت بلا فائدة) -->
+{% if not error_state %}
 <!-- مودال تعديل الكمية -->
 <div class="fixed inset-0 z-50 bg-navy-text/50 backdrop-blur-sm hidden items-center justify-center p-4" id="editQtyModal">
 <div class="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl space-y-4">
@@ -220,8 +253,22 @@ class="px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center g
 </div>
 </div>
 
+<!-- مودال إلغاء الطلب (S1 — مسودة فقط، بلا رجعة) -->
+<div class="fixed inset-0 z-50 bg-navy-text/50 backdrop-blur-sm hidden items-center justify-center p-4" id="cancelOrderModal">
+<div class="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+<h3 class="text-base font-bold">إلغاء الطلب</h3>
+<p class="text-xs leading-relaxed bg-surface-subtle p-3.5 rounded-lg border border-surface-container">هل تريد إلغاء هذا الطلب قبل التأكيد؟ لا يمكن التراجع، وسيظهر للعميل بحالة "ملغى". الطلبات المسلَّمة لا تُلغى من هنا — لها المرتجع.</p>
+<div class="flex items-center justify-end gap-2.5 pt-2">
+<button class="px-4 py-2 bg-surface-subtle text-navy-text text-xs font-bold rounded-lg hover:bg-surface-container transition-colors" onclick="closeModal('cancelOrderModal')" type="button">تراجع</button>
+<button id="btnConfirmCancelOrder" class="px-4 py-2 bg-alert-red text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors" onclick="confirmCancelOrder()" type="button">تأكيد الإلغاء</button>
+</div>
+</div>
+</div>
+{% endif %}
+
 <div class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none" id="toastContainer"></div>
 
+{% if not error_state %}
 <script>
 const CSRF_TOKEN = {{ csrf_token|tojson }};
 const ORDER_NAME = {{ order_name|tojson }};
@@ -385,6 +432,20 @@ async function saveAttention() {
   } catch (err) { showToast('تعذر الحفظ', err.message, 'error'); }
 }
 
+async function confirmCancelOrder() {
+  const btn = document.getElementById('btnConfirmCancelOrder');
+  btn.disabled = true;
+  try {
+    const r = await apiCall('staff_cancel_order', { order_name: ORDER_NAME });
+    closeModal('cancelOrderModal');
+    showToast('تم إلغاء الطلب', (r && r.already) ? 'الطلب ملغى مسبقًا — لا أثر جديد.' : 'أُلغي الطلب قبل التأكيد، وسيظهر للعميل بحالة ملغى.', 'warning');
+    window.location.href = '/staff/orders';
+  } catch (err) {
+    showToast('تعذر الإلغاء', err.message, 'error');
+    btn.disabled = false;
+  }
+}
+
 async function executeFinalDelivery() {
   if (!window.confirm('تأكيد تسليم الطلب ' + ORDER_NAME + '؟ سيُنشأ التسليم والفاتورة المعتمَدة معًا في نفس اللحظة.')) return;
   const btn = document.getElementById('btnFinalConfirmation');
@@ -441,4 +502,5 @@ function showToast(title, desc, type) {
 })();
 document.addEventListener('DOMContentLoaded', () => { const i = document.getElementById('barcodeInput'); if (i) i.focus(); });
 </script>
+{% endif %}
 </body></html>

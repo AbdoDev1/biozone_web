@@ -1688,6 +1688,51 @@ def staff_delete_item(order_name: str, so_detail: str):
 
 
 @frappe.whitelist(methods=["POST"])
+def staff_cancel_order(order_name: str):
+	"""إلغاء طلب مسودة من شاشة التجهيز (S1 — Contract v1.1 §3).
+
+	المسودة فقط (docstatus 0) وبلا مستندات مرتبطة — فلا حركة مخزنية
+	ولا مالية لعكسها. الطريق الأصيل للمسودة discard() (docstatus 2)
+	مع تثبيت status = "Cancelled" للعرض (discard لا تشغّل on_cancel).
+	المسلَّم يُرفض (422) ويُوجَّه للمرتجع. الملغى أصلًا = already:True.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+	order_name = (order_name or "").strip()
+	if not order_name or not frappe.db.exists("Sales Order", order_name):
+		return {"ok": False, "error": _("الطلب غير موجود")}
+	so = frappe.get_doc("Sales Order", order_name)
+	if so.docstatus == 2:
+		return {"ok": True, "already": True}
+	if so.docstatus != 0:
+		return {"ok": False, "error": _("لا يمكن إلغاء هذا الطلب بعد تسليمه — استخدم المرتجع")}
+	docs = _b9_existing_delivery_docs(order_name)
+	if docs.get("delivery_note") or docs.get("sales_invoice"):
+		return {"ok": False, "error": _("لا يمكن إلغاء هذا الطلب — له مستندات مرتبطة، استخدم المرتجع")}
+	so.flags.ignore_permissions = True
+	so.discard()
+	so.db_set("status", "Cancelled")
+	staff = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+	_b9_log(so, _("ألغى {0} الطلب قبل التأكيد").format(staff))
+	# إشعار العميل: آخر كتابة قبل الـcommit (X1)، معزول بـsavepoint
+	# داخله — فشله لا يفشل الإلغاء (A4). استيراد كسول (R-c).
+	try:
+		from biozone_web.services.notifications import notify
+
+		notify(
+			"order_cancelled",
+			reference_doctype="Sales Order",
+			reference_name=so.name,
+			context={"order": so.name},
+		)
+	except Exception:
+		frappe.log_error(title="Biozone notify order_cancelled failed")
+	frappe.db.commit()
+	return {"ok": True, "already": False, "order_name": so.name}
+
+
+@frappe.whitelist(methods=["POST"])
 def staff_set_order_attention(order_name: str, needs_attention: int = 0, note: str = ""):
 	"""ضبط فلاج الانتباه الداخلي (§2) — يبقى الطلب جارٍ التجهيز."""
 	from biozone_web.utils import require_staff_access

@@ -32,6 +32,14 @@ EVENTS = {
 		"link": lambda ref: f"/account/orders/{ref}",
 		"dedupe": ("document_name", "type"),
 	},
+	"order_cancelled": {
+		"type": "BZ Order Cancelled",
+		"audience": "order_owner",
+		"reference_doctype": "Sales Order",
+		"title": "تم إلغاء طلبك {order}",
+		"link": lambda ref: f"/account/orders/{ref}",
+		"dedupe": ("document_name", "type"),
+	},
 	"attention_raised": {
 		"type": "BZ Escalation",
 		"audience": "staff",

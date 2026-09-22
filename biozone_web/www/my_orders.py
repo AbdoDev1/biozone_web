@@ -14,7 +14,7 @@ STATUS_LABELS = {
 	"To Bill": "تم التسليم",
 	"To Deliver": "تم التأكيد",
 	"Completed": "تم التسليم بالكامل",
-	"Cancelled": "ملغي",
+	"Cancelled": "ملغى",
 	"Closed": "مغلق",
 }
 

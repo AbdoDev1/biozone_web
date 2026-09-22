@@ -1,7 +1,13 @@
 import frappe
 from urllib.parse import urlencode
 
-from biozone_web.b9_utils import STATE_DELIVERED, STATE_PREPARING, STATE_READY, get_order_prep_state
+from biozone_web.b9_utils import (
+	STATE_CANCELLED,
+	STATE_DELIVERED,
+	STATE_PREPARING,
+	STATE_READY,
+	get_order_prep_state,
+)
 from biozone_web.utils import get_csrf_token_safe, get_header_context, require_staff_access
 
 PAGE_SIZE = 20
@@ -32,6 +38,7 @@ def get_context(context):
 	context.ready_count = data["ready_count"]
 	context.delivered_count = data["delivered_count"]
 	context.attention_count = data["attention_count"]
+	context.cancelled_count = data["cancelled_count"]
 	context.customers = _customer_options()
 	context.page = data["page"]
 	context.total_pages = data["total_pages"]
@@ -42,7 +49,7 @@ def get_context(context):
 def _read_filters() -> dict:
 	"""فلاتر لوحة الفلترة المنظمة (§8): بحث + حالة + انتباه + عميل + نطاق تاريخ."""
 	state = (frappe.form_dict.get("state") or "all").strip()
-	if state not in ("all", "preparing", "ready", "delivered", "attention"):
+	if state not in ("all", "preparing", "ready", "delivered", "attention", "cancelled"):
 		state = "all"
 	return {
 		"q": (frappe.form_dict.get("q") or "").strip(),
@@ -174,7 +181,9 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 	)
 
 	# إسقاط الملغاة من الصف الخفيف مباشرة (status عمود مخزّن) — بلا get_doc.
-	rows = [r for r in rows if r.get("status") != "Cancelled"]
+	# تُستثنى من الإسقاط عند فلتر "ملغى" صراحة (S1: الملغى ظاهر ومقفل).
+	if filters["state"] != "cancelled":
+		rows = [r for r in rows if r.get("status") != "Cancelled"]
 
 	# حالة التجهيز لكل طلب دفعة واحدة: عدد البنود وعدد المؤكَّدة عبر
 	# GROUP BY واحد، بدل get_doc كامل (بكل جداوله الفرعية) لكل صف.
@@ -207,6 +216,8 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_DELIVERED]
 	elif state_filter == "attention":
 		filtered = [(r, s) for r, s in filtered if s["needs_attention"]]
+	elif state_filter == "cancelled":
+		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_CANCELLED]
 
 	total = len(filtered)
 	total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -272,4 +283,5 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		"ready_count": sum(1 for _, s in filtered if s["state"] == STATE_READY),
 		"delivered_count": sum(1 for _, s in filtered if s["state"] == STATE_DELIVERED),
 		"attention_count": sum(1 for _, s in filtered if s["needs_attention"]),
+		"cancelled_count": sum(1 for _, s in filtered if s["state"] == STATE_CANCELLED),
 	}

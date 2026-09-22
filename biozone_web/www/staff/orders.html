@@ -83,7 +83,7 @@
 </div>
 
 <!-- البطاقات الإحصائية -->
-<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+<div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
 <div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
 <div class="flex flex-col"><span class="text-3xl font-bold text-navy-text">{{ preparing_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">جارٍ التجهيز</span></div>
 <div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">pending_actions</span></div>
@@ -100,6 +100,10 @@
 <div class="flex flex-col"><span class="text-3xl font-bold text-alert-red">{{ attention_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">تحتاج انتباه</span></div>
 <div class="w-12 h-12 rounded-full bg-alert-bg text-alert-red flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">warning</span></div>
 </div>
+<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
+<div class="flex flex-col"><span class="text-3xl font-bold text-alert-red">{{ cancelled_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">ملغى (مقفل)</span></div>
+<div class="w-12 h-12 rounded-full bg-alert-bg text-alert-red flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">cancel</span></div>
+</div>
 </div>
 
 <!-- شرائح الحالة (active tab مضبوط من السيرفر) -->
@@ -109,6 +113,7 @@
 <a href="/staff/orders?state=ready&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'ready' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جاهز للتسليم</a>
 <a href="/staff/orders?state=delivered&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'delivered' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">تم التسليم</a>
 <a href="/staff/orders?state=attention&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'attention' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">تحتاج انتباه</a>
+<a href="/staff/orders?state=cancelled&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'cancelled' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">ملغى</a>
 </div>
 
 <!-- البحث ولوحة الفلترة المنظمة -->
@@ -183,6 +188,8 @@
 <td class="col-order py-4 px-5 whitespace-nowrap">
 {% if so.docstatus == 1 %}
 <span class="font-mono font-bold text-navy-text/70">{{ so.name }}</span>
+{% elif so.state == 'ملغى' %}
+<span class="font-mono font-bold text-navy-text/40">{{ so.name }}</span>
 {% else %}
 <a class="font-mono font-bold text-primary hover:underline" href="/staff/order-prep?order={{ so.name }}">{{ so.name }}</a>
 {% endif %}
@@ -194,8 +201,8 @@
 <td class="py-4 px-5">
 <div class="flex flex-col gap-2">
 <div class="flex items-center justify-between gap-2">
-<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold {% if so.state == 'تم التسليم' %}bg-emerald-50 text-emerald-700{% elif so.state == 'جاهز للتسليم' %}bg-primary/10 text-primary{% else %}bg-surface-container text-navy-text/70{% endif %}">
-<span class="w-1.5 h-1.5 rounded-full {% if so.state == 'تم التسليم' %}bg-emerald-600{% elif so.state == 'جاهز للتسليم' %}bg-primary{% else %}bg-navy-text/40{% endif %}"></span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold {% if so.state == 'تم التسليم' %}bg-emerald-50 text-emerald-700{% elif so.state == 'جاهز للتسليم' %}bg-primary/10 text-primary{% elif so.state == 'ملغى' %}bg-alert-bg text-alert-red{% else %}bg-surface-container text-navy-text/70{% endif %}">
+<span class="w-1.5 h-1.5 rounded-full {% if so.state == 'تم التسليم' %}bg-emerald-600{% elif so.state == 'جاهز للتسليم' %}bg-primary{% elif so.state == 'ملغى' %}bg-alert-red{% else %}bg-navy-text/40{% endif %}"></span>
 {{ so.state }}
 </span>
 {% if so.needs_attention %}
@@ -207,6 +214,8 @@
 <span class="text-[11px] text-navy-text/50">{{ so.progress_text }}</span>
 {% if so.state == 'تم التسليم' %}
 <a href="/staff/order-delivery?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-surface-subtle text-navy-text text-xs font-bold hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[16px]">receipt</span>عرض الفاتورة</a>
+{% elif so.state == 'ملغى' %}
+<a href="/staff/order-prep?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-surface-subtle text-navy-text/50 text-xs font-bold hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[16px]">lock</span>عرض (مقفل — بلا تجهيز)</a>
 {% elif so.state == 'جاهز للتسليم' %}
 <a href="/staff/order-prep?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary-accent transition-colors"><span class="material-symbols-outlined text-[16px]">task_alt</span>مراجعة وتأكيد التسليم</a>
 {% else %}

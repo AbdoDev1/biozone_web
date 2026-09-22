@@ -7,10 +7,11 @@ import frappe
 from frappe import _
 
 
-# الحالات المعروضة (3 فقط — §2 من البرومبت).
+# الحالات المعروضة (4 — §2 من البرومبت + الملغى S1).
 STATE_PREPARING = "جارٍ التجهيز"
 STATE_READY = "جاهز للتسليم"
 STATE_DELIVERED = "تم التسليم"
+STATE_CANCELLED = "ملغى"
 
 ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩"
 
@@ -26,6 +27,7 @@ def get_order_prep_state(so_doc) -> dict:
 	- جارٍ التجهيز: طلب Draft ولم تكتمل كل البنود (التمييز بنسبة التقدم فقط).
 	- جاهز للتسليم: كل البنود مؤكَّدة، وما زال Draft بانتظار التأكيد النهائي.
 	- تم التسليم: الطلب معتمَد (docstatus=1) وله فاتورة معتمَدة.
+	- ملغى: الطلب ملغى (docstatus=2) — مقفل، بلا تجهيز ولا حركات (S1).
 
 	يُرجع: state, total, confirmed, percent, progress_text, needs_attention.
 	"""
@@ -34,7 +36,9 @@ def get_order_prep_state(so_doc) -> dict:
 	confirmed = sum(1 for it in items if frappe.utils.cint(it.get("custom_confirmed")))
 	percent = round((confirmed / total) * 100) if total else 100
 
-	if so_doc.get("docstatus") == 1:
+	if so_doc.get("docstatus") == 2:
+		state = STATE_CANCELLED
+	elif so_doc.get("docstatus") == 1:
 		state = STATE_DELIVERED
 	elif total > 0 and confirmed == total:
 		state = STATE_READY
