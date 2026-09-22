@@ -105,10 +105,18 @@
       var t = document.createElement("span");
       t.className = CLS.title;
       t.textContent = it.title || "";
+      var m = document.createElement("span");
+      m.className = CLS.date;
+      var meta = [];
+      if (it.sender) meta.push(it.sender);
+      if (it.document_name) meta.push(it.document_name);
+      m.textContent = meta.join(" • ");
+      m.style.display = meta.length ? "" : "none";
       var d = document.createElement("span");
       d.className = CLS.date;
       d.textContent = fmtDate(it.creation);
       a.appendChild(t);
+      a.appendChild(m);
       a.appendChild(d);
       a.addEventListener("click", function (ev) {
         ev.preventDefault();

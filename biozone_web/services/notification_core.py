@@ -10,7 +10,7 @@ import frappe
 from biozone_web.hooks import _BZ_NOTIFICATION_TYPES
 
 _LIST_FIELDS = ["name", "type", "title", "link", "document_name",
-                "for_user", "creation", "read"]
+                "from_user", "for_user", "creation", "read"]
 _BZ_TYPES = list(_BZ_NOTIFICATION_TYPES)
 
 
@@ -22,18 +22,30 @@ def poll_count(user):
 
 
 def list_rows(user, limit=10):
-	"""Latest unread rows. One query."""
+	"""Latest unread rows. One query + one batched sender-name lookup."""
 	try:
 		limit = int(limit)
 	except (TypeError, ValueError):
 		limit = 10
 	limit = max(1, min(limit, 20))
-	return frappe.db.get_list("Notification Log",
+	rows = frappe.db.get_list("Notification Log",
 	                          filters={"for_user": user, "read": 0,
 	                                   "type": ("in", _BZ_TYPES)},
 	                          fields=_LIST_FIELDS,
 	                          order_by="creation desc",
 	                          limit=limit)
+	# Sender display names, batched (concise second line: sender • doc).
+	senders = sorted({(r.get("from_user") or "").strip() for r in rows if (r.get("from_user") or "").strip()})
+	names = {}
+	if senders:
+		for u in frappe.get_all("User", filters={"name": ["in", senders]},
+		                        fields=["name", "full_name"]):
+			if (u.full_name or "").strip():
+				names[u.name] = u.full_name.strip()
+	for r in rows:
+		raw = (r.get("from_user") or "").strip()
+		r["sender"] = names.get(raw, raw)
+	return rows
 
 
 def mark_one(user, name):

@@ -13,7 +13,7 @@ tailwind.config = { darkMode: "class", theme: { extend: {
 </script>
 <style>
 body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b1c30; -webkit-font-smoothing: antialiased; }
-.resizable-table { table-layout: fixed; width: 100%; min-width: 1080px; border-collapse: separate; border-spacing: 0; }
+.resizable-table { table-layout: fixed; width: 100%; min-width: 1220px; border-collapse: separate; border-spacing: 0; }
 .resizable-th { position: relative; background-color: #f1f5fd; border-bottom: 2px solid #d3e4fe; }
 .resizer { position: absolute; top: 0; left: 0; width: 10px; bottom: 0; cursor: col-resize; user-select: none; z-index: 20; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .resizer::after { content: ''; width: 3px; height: 60%; background-color: #cbd5e1; border-radius: 2px; transition: all 0.15s ease-in-out; }
@@ -94,6 +94,7 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <th class="resizable-th py-3.5 px-4" data-column="item" style="width:340px;min-width:220px;"><span>اسم الصنف والكود</span><div class="resizer"></div></th>
 <th class="resizable-th py-3.5 px-4" data-column="barcode" style="width:230px;min-width:170px;"><span>الباركود</span><div class="resizer"></div></th>
 <th class="resizable-th py-3.5 px-4 text-center" data-column="quantity" style="width:160px;min-width:130px;"><div class="flex flex-col items-center"><span>الكمية المطلوبة</span><span class="text-[10px] text-navy-text/50 font-normal">(معلومة عرض فقط)</span></div><div class="resizer"></div></th>
+<th class="resizable-th py-3.5 px-4 text-center" data-column="price" style="width:150px;min-width:125px;"><div class="flex flex-col items-center"><span>السعر</span><span class="text-[10px] text-navy-text/50 font-normal">(وحدة العميل / المرجع)</span></div><div class="resizer"></div></th>
 <th class="resizable-th py-3.5 px-4 text-center" data-column="status" style="width:180px;min-width:140px;"><span>الحالة</span><div class="resizer"></div></th>
 <th class="py-3.5 px-4 text-center" style="width:90px;min-width:75px;"><span>حذف</span></th>
 </tr>
@@ -123,6 +124,12 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <div class="inline-flex items-center gap-1.5 bg-surface-subtle px-2.5 py-1 rounded-lg">
 <span class="font-bold text-xs" id="qty-{{ it.name }}">{{ it.qty }} {{ it.uom }}</span>
 <button class="text-navy-text/50 hover:text-primary p-0.5 rounded transition-colors" onclick="openEditQtyModal('{{ it.name }}')" title="تعديل الكمية" type="button"><span class="material-symbols-outlined text-[15px]">edit</span></button>
+</div>
+</td>
+<td class="py-3 px-4 text-center">
+<div class="flex flex-col items-center gap-0.5">
+<span class="font-bold text-xs whitespace-nowrap">{{ "%.2f"|format(it.rate) }} / {{ it.uom }}</span>
+{% if it.public_price is not none %}<span class="text-[10px] text-navy-text/50 whitespace-nowrap">المرجع: {{ "%.2f"|format(it.public_price) }} / {{ it.public_uom }}</span>{% else %}<span class="text-[10px] text-navy-text/30 whitespace-nowrap">بلا سعر مرجع</span>{% endif %}
 </div>
 </td>
 <td class="py-3 px-4 text-center" id="status-{{ it.name }}">
@@ -158,6 +165,22 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 </div>
 </section>
 
+<!-- مصاريف الشحن (تظهر في الفاتورة النهائية فقط) -->
+<section class="bg-white border border-surface-container rounded-xl p-5 shadow-sm">
+<div class="flex flex-col sm:flex-row sm:items-center gap-3">
+<div>
+<h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-primary">local_shipping</span>مصاريف الشحن</h3>
+<p class="text-[11px] text-navy-text/50 mt-0.5">قيمة يدوية تُحفظ على الطلب وتظهر في الفاتورة النهائية فقط — لا يراها العميل في المتجر.</p>
+</div>
+<div class="flex items-center gap-2 sm:mr-auto">
+<input id="shippingInput" type="text" inputmode="decimal" value="{{ "%.2f"|format(shipping) }}" placeholder="0" class="w-28 bg-white border border-surface-container rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"/>
+<button onclick="saveShipping(false)" type="button" class="px-4 py-2 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-lg transition-colors">حفظ</button>
+<button onclick="saveShipping(true)" type="button" class="px-4 py-2 bg-white hover:bg-surface-subtle border border-surface-container text-navy-text text-xs font-bold rounded-lg transition-colors">إزالة</button>
+</div>
+</div>
+<p id="shippingMsg" class="hidden text-[11px] mt-2 font-bold"></p>
+<p class="mt-3 text-xs text-navy-text/60">الإجمالي الحالي للطلب: <b id="grandTotalLine" class="text-darkNavy">{{ "%.2f"|format(grand_total) }} ج.م</b><span class="text-navy-text/40"> (شامل الشحن الحالي)</span></p>
+</section>
 <!-- زر التأكيد النهائي -->
 <section class="bg-white border border-surface-container rounded-xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
 <p class="text-xs text-navy-text/60">عند اكتمال تأكيد كل الأصناف يُتاح زر التسليم، فيُنشأ التسليم والفاتورة المعتمَدة معًا في نفس اللحظة.</p>
@@ -228,6 +251,25 @@ function apiCall(method, args) {
     }
     return data.message;
   });
+}
+
+function saveShipping(clear) {
+  const input = document.getElementById('shippingInput');
+  const msg = document.getElementById('shippingMsg');
+  msg.classList.add('hidden');
+  const amount = clear ? 0 : input.value;
+  apiCall('staff_set_shipping', { order_name: ORDER_NAME, amount: amount })
+    .then((d) => {
+      input.value = (d.shipping != null ? d.shipping : 0).toFixed(2);
+      document.getElementById('grandTotalLine').textContent =
+        (d.grand_total != null ? d.grand_total : 0).toFixed(2) + ' ج.م';
+      msg.textContent = clear ? 'أُزيلت مصاريف الشحن' : 'حُفظت مصاريف الشحن — ستظهر في الفاتورة النهائية فقط';
+      msg.className = 'text-[11px] mt-2 font-bold text-primary';
+    })
+    .catch((e) => {
+      msg.textContent = (e && e.message) || 'تعذر الحفظ';
+      msg.className = 'text-[11px] mt-2 font-bold text-alert-red';
+    });
 }
 
 function refreshFromPayload(p) {

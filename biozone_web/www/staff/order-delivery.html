@@ -15,12 +15,18 @@ tailwind.config = { darkMode: "class", theme: { extend: {
 body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
 /* ارتفاع ثابت لمنطقة بنود الفاتورة حتى يبقى ملخص الإجماليات في نفس
    الموضع مهما قلّ عدد الأصناف (حتى صنف واحد) — شاشة وطباعة معًا. */
-.invoice-items { min-height: 300px; }
+.invoice-items { min-height: 480px; }
+/* ارتفاع ثابت لمنطقة البنود يسع 14 صنفًا كمقياس حتى لو صنف واحد. */
+.invoice-sheet, .invoice-sheet * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 @media print {
   aside, header, nav, .no-print { display: none !important; }
   .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
   .main-content-wrapper { margin: 0 !important; padding: 0 !important; }
-  .invoice-items { min-height: 300px; }
+  .invoice-items { min-height: 480px; }
+  .invoice-sheet tr { break-inside: avoid; }
 }
 </style>
 </head>
@@ -46,7 +52,6 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <p class="text-[18px] font-bold">تم إصدار الفاتورة المعتمَدة وخصم المخزون وتسليم الطلب بالكامل.</p>
 <div class="flex items-center gap-2 flex-wrap">
 <button class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all" onclick="window.print()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</button>
-<button class="flex items-center gap-1.5 px-4 py-2.5 bg-surface-subtle hover:bg-surface-container rounded-xl font-bold transition-all" onclick="window.print()" title="إعادة طباعة المستند نفسه"><span class="material-symbols-outlined text-[20px]">content_copy</span>طباعة نسخة إضافية</button>
 <a class="flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="/staff/orders"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
 </div>
 </div>
@@ -101,11 +106,17 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
 </tr>
 {% endfor %}
+{% if shipping %}
+<tr class="border-b border-black">
+<td class="border border-black py-1 px-2 text-center font-bold" colspan="5">مصاريف الشحن</td>
+<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(shipping) }}</td>
+</tr>
+{% endif %}
 </tbody>
 </table>
 </div>
 
-<div class="border-2 border-black border-t-0 text-[13px]">
+<div class="border-2 border-black text-[13px] mt-2">
 <div class="grid grid-cols-12 border-b border-black text-center font-bold">
 <div class="col-span-2 border-l border-black py-1 bg-neutral-100">عدد الأصناف</div>
 <div class="col-span-1 border-l border-black py-1 text-[15px]">{{ items_count }}</div>
@@ -127,6 +138,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="col-span-4 py-1 font-bold" dir="ltr">{{ print_time }}</div>
 </div>
 </div>
+</div>
 
 <div class="grid grid-cols-2 gap-6 mt-4 pt-2 border-t border-dashed border-gray-400 text-[13px]">
 <div class="flex flex-col gap-2">
@@ -142,7 +154,6 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="mt-4 pt-1 flex justify-between items-center text-[10px] text-gray-500 border-t border-neutral-200">
 <span>شركة بيو زون للمستلزمات الطبية</span>
 <span>صفحة 1 من 1</span>
-</div>
 </div>
 </div>
 {% endif %}

@@ -122,6 +122,14 @@ def get_context(context):
 	context.items_count = len(si.items or [])
 	context.net_total = float(si.net_total or 0)
 	context.grand_total = grand
+	# Phase-2 shipping row (print only): summed from the invoice taxes.
+	from biozone_web.api import SHIPPING_ACCOUNT
+
+	_shipping = 0
+	for t in (si.get("taxes") or []):
+		if (t.account_head or "").strip() == SHIPPING_ACCOUNT:
+			_shipping += float(t.get("tax_amount") or 0)
+	context.shipping = _shipping
 	context.previous_balance = previous_balance
 	context.current_balance = current_balance
 	context.amount_words = amount_in_arabic_words(grand)

@@ -147,7 +147,7 @@
                   <span class="text-xs text-on-surface-variant">
                     الكمية:
                     <span class="font-bold text-on-surface">
-                      {{ it.qty|int }}
+                      {{ it.qty|int }} {{ it.uom }}
                     </span>
                   </span>
 
@@ -156,7 +156,7 @@
                   <span class="text-xs text-outline">
                     سعر الوحدة:
                     {{ it.rate_display }}
-                    ج.م
+                    ج.م{% if it.uom %} / {{ it.uom }}{% endif %}
                   </span>
                 </div>
               </div>

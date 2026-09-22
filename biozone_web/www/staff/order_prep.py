@@ -54,7 +54,31 @@ def get_context(context):
 	context.attention_note = state["attention_note"]
 
 	items = []
+	# Phase-2: سعر وحدة العميل (سطر الطلب) + سعر الجمهور المرجعي (الصغرى)
+	# دفعة واحدة — قراءة فقط للعرض في عمود سعر موحد.
+	pub_map, stock_map = {}, {}
+	_codes = [(it.item_code or "").strip() for it in (so.items or []) if it.item_code]
+	if _codes:
+		for r in frappe.get_all(
+			"Item",
+			filters={"item_code": ["in", _codes]},
+			fields=["item_code", "stock_uom"],
+		):
+			stock_map[r.item_code] = r.stock_uom or ""
+		for r in frappe.get_all(
+			"Item Price",
+			filters={"price_list": "Standard Selling", "item_code": ["in", _codes]},
+			fields=["item_code", "price_list_rate", "uom"],
+		):
+			if r.item_code in pub_map:
+				continue
+			want = (stock_map.get(r.item_code) or "").strip()
+			got = (r.uom or "").strip()
+			if want and got and got != want:
+				continue
+			pub_map[r.item_code] = {"rate": r.price_list_rate, "uom": got or want}
 	for idx, it in enumerate(so.items or [], start=1):
+		pub = pub_map.get(it.item_code) or {}
 		items.append(
 			{
 				"idx": idx,
@@ -64,6 +88,9 @@ def get_context(context):
 				"barcodes": get_item_barcodes(it.item_code),
 				"qty": float(it.qty or 0),
 				"uom": it.uom or "",
+				"rate": float(it.rate or 0),
+				"public_price": pub.get("rate"),
+				"public_uom": (pub.get("uom") or "").strip() or stock_map.get(it.item_code, ""),
 				"confirmed": bool(frappe.utils.cint(it.get("custom_confirmed"))),
 				"confirmation_method": it.get("custom_confirmation_method") or "",
 				"confirmed_by": it.get("custom_confirmed_by") or "",
@@ -71,4 +98,14 @@ def get_context(context):
 		)
 	context.items = items
 	context.items_json = json.dumps(items, ensure_ascii=False, default=str)
+	# Phase-2 shipping (read-only here): current value + order total.
+	from biozone_web.api import SHIPPING_ACCOUNT
+
+	_shipping = 0
+	for t in (so.get("taxes") or []):
+		if (t.account_head or "").strip() == SHIPPING_ACCOUNT:
+			_shipping = float(t.get("tax_amount") or 0)
+			break
+	context.shipping = _shipping
+	context.grand_total = float(so.grand_total or 0)
 	return context

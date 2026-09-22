@@ -1730,6 +1730,64 @@ def _b9_existing_delivery_docs(order_name: str) -> dict:
 	return {"delivery_note": dn, "sales_invoice": si}
 
 
+# Phase-2 shipping: single Actual row on the draft order, copied to the
+# invoice by the existing taxes copy. Never in store/cart — staff only.
+SHIPPING_ACCOUNT = "مصاريف الشحن - BIO"
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_set_shipping(order_name, amount):
+	"""Set/replace (or remove with 0) the shipping charge on a DRAFT order.
+
+	Strict numeric check (Arabic error), draft-only (post-confirm edits
+	are rejected by the C4 rule), one row replaced never duplicated.
+	Returns the saved shipping + recomputed grand total for display.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+	order_name = (order_name or "").strip()
+	if not order_name or not frappe.db.exists("Sales Order", order_name):
+		return {"ok": False, "error": _("الطلب غير موجود")}
+	ok, value = _strict_num_local(amount)
+	if not ok or value < 0:
+		return {
+			"ok": False,
+			"error": _("مصاريف الشحن يجب أن تكون رقمًا لا يقل عن صفر"),
+		}
+	so = frappe.get_doc("Sales Order", order_name)
+	if so.docstatus != 0:
+		return {"ok": False, "error": _("لا يمكن تعديل الشحن بعد تأكيد الطلب")}
+	if not frappe.db.exists("Account", SHIPPING_ACCOUNT):
+		return {"ok": False, "error": _("حساب الشحن غير معرّف في الدليل")}
+	so.set(
+		"taxes",
+		[
+			t
+			for t in (so.get("taxes") or [])
+			if (t.account_head or "").strip() != SHIPPING_ACCOUNT
+		],
+	)
+	if value > 0:
+		so.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": SHIPPING_ACCOUNT,
+				"description": _("مصاريف الشحن"),
+				"tax_amount": value,
+			},
+		)
+	so.save(ignore_permissions=True)
+	frappe.db.commit()
+	so.reload()
+	return {
+		"ok": True,
+		"shipping": value if value > 0 else 0,
+		"grand_total": so.grand_total,
+	}
+
+
 @frappe.whitelist(methods=["POST"])
 def staff_confirm_delivery(order_name: str):
 	"""التأكيد النهائي: تسليم + فاتورة معتمَدة سويًا في نفس اللحظة (§6).
@@ -1953,17 +2011,18 @@ def _create_sales_invoice_for_delivery(so, dn):
 			"custom_previous_balance": previous_balance,
 			"taxes_and_charges": so.get("taxes_and_charges"),
 			"items": si_items,
-			"taxes": [
-				{
-					"charge_type": t.charge_type,
-					"account_head": t.account_head,
-					"description": t.description,
-					"rate": t.rate,
-					"included_in_print_rate": t.get("included_in_print_rate"),
-				}
-				for t in (so.get("taxes") or [])
-				if t.get("account_head")
-			],
+		"taxes": [
+			{
+				"charge_type": t.charge_type,
+				"account_head": t.account_head,
+				"description": t.description,
+				"rate": t.rate,
+				"tax_amount": t.get("tax_amount"),
+				"included_in_print_rate": t.get("included_in_print_rate"),
+			}
+			for t in (so.get("taxes") or [])
+			if t.get("account_head")
+		],
 		}
 	)
 	si.insert(ignore_permissions=True)
