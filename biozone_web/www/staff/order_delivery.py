@@ -113,6 +113,7 @@ def get_context(context):
 			"item_name": it.item_name,
 			"qty": float(it.qty or 0),
 			"rate": float(it.rate or 0),
+			"public_rate": float(it.price_list_rate or it.rate or 0),
 			"discount_percentage": float(it.discount_percentage or 0),
 			"discount_amount": float(it.discount_amount or 0),
 			"amount": float(it.amount or 0),
