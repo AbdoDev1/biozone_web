@@ -245,6 +245,16 @@ def main():
         own_only = all(i["for_user"] == CUST_A for i in mine)
         CUST.notif_mark_read(a_row)
         a_now = frappe.db.get_value("Notification Log", a_row, "read")
+        desk = frappe.new_doc("Notification Log")
+        desk.type = "Alert"
+        desk.title = "t2 desk row"
+        desk.subject = "t2 desk row"
+        desk.for_user = CUST_A
+        desk.from_user = STAFF
+        desk.document_name = "NTF-T2-DESK"
+        desk.insert(ignore_permissions=True)
+        CUST.notif_mark_all_read()
+        desk_still = frappe.db.get_value("Notification Log", desk.name, "read")
         guest_blocked = staff_blocked = False
         try:
             frappe.set_user("Guest")
@@ -256,10 +266,11 @@ def main():
             CUST.notif_list()
         except Exception:
             staff_blocked = True
-        show("T2-05", "B sees none; cross mark blocked; own works; guest+staff 403",
+        show("T2-05", "B sees none; cross mark blocked; own works; guest+staff 403; mark-all spares Desk",
              b_items == [] and int(a_still or 0) == 0 and own_only
-             and int(a_now or 0) == 1 and guest_blocked and staff_blocked,
-             f"b={len(b_items)} own_only={own_only}")
+             and int(a_now or 0) == 1 and guest_blocked and staff_blocked
+             and int(desk_still or 0) == 0,
+             f"b={len(b_items)} own_only={own_only} desk={desk_still}")
     except Exception as e:
         show("T2-05", "customer isolation", False, repr(e)[:150])
     finally:

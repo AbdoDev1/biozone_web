@@ -2,15 +2,24 @@
 
 Thin wrappers over :mod:`biozone_web.services.notification_core` with
 the customer guard: logged-in enabled Website Users. Guests and System
-Users are refused. No polling endpoint here by design — the customer
-counter comes from the server-rendered header context; these three
-serve the open panel only.
+Users are refused. No interval polling here by design — the counter is
+seeded from the server-rendered header context; ``notif_poll`` exists
+only for on-demand refresh (tab return / bell open), same count format
+as the rest of the bell path.
 """
+
 
 import frappe
 
 from biozone_web.services import notification_core as core
 from biozone_web.utils import require_customer_access
+
+
+@frappe.whitelist(methods=["POST"])
+def notif_poll():
+	"""Unread counter for focus/visibility refresh. One indexed query."""
+	require_customer_access()
+	return {"ok": True, "unread_count": core.poll_count(frappe.session.user)}
 
 
 @frappe.whitelist(methods=["POST"])

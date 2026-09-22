@@ -46,7 +46,8 @@ def mark_one(user, name):
 
 
 def mark_all(user):
-	"""Mark all own rows read."""
+	"""Mark all own *bell* rows read (our types only — Desk rows untouched)."""
 	frappe.db.set_value("Notification Log",
-	                    {"for_user": user, "read": 0},
+	                    {"for_user": user, "read": 0,
+	                     "type": ("in", _BZ_TYPES)},
 	                    "read", 1, update_modified=False)

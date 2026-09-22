@@ -120,8 +120,11 @@
       list.appendChild(a);
     });
   }
+  var refreshBusy = false;
   function refresh() {
     if (!(window.frappe && window.frappe.csrf_token)) return;
+    if (refreshBusy) return;  // focus+visibility firing together: one request
+    refreshBusy = true;
     return post("notif_poll", {}).then(function (r) {
       var n = r.unread_count || 0;
       if (MODE === "staff") {
@@ -130,7 +133,7 @@
         maybeRing(n, prev);
       }
       setBadge(n);
-    }).catch(function () {});
+    }).catch(function () {}).then(function () { refreshBusy = false; });
   }
   function openPanel() {
     post("notif_list", { limit: 10 }).then(function (r) { render(r.items || []); }).catch(function () {});
