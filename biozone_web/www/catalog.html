@@ -74,7 +74,7 @@ tailwind.config = {
         <h3 class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px]">{{ item.item_name }}</h3>
         <div class="mt-auto pt-2 flex items-center justify-between">
           {% if item.price %}
-          <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م</span>
+          <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ item.display_uom }}</span>{% endif %}</span>
           {% else %}
           <span class="text-sm text-outline">السعر غير متاح</span>
           {% endif %}
@@ -85,6 +85,7 @@ tailwind.config = {
           data-item-name="{{ item.item_name|e }}"
           data-item-group="{{ item.item_group|e }}"
           data-item-price="{{ item.price or 0 }}"
+          data-item-uom="{{ item.display_uom or '' }}"
         >
           <button
             class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"

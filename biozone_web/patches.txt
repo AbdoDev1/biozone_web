@@ -13,3 +13,5 @@ biozone_web.patches.v0_0.mark_existing_customers_category_reviewed
 biozone_web.patches.v0_0.add_category_assigned_by_staff_to_customer
 biozone_web.patches.v0_0.backfill_category_assigned_by_staff
 biozone_web.patches.v0_0.bz_notification_types_v2
+biozone_web.patches.v0_0.item_unit_phase_fields
+biozone_web.patches.v0_0.item_unit_phase_fields_v2

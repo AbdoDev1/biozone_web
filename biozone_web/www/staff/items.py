@@ -10,6 +10,11 @@ def get_context(context):
 	context.no_cache = 1
 	context.active_page = "items"
 	context.update(get_header_context())
+	# قائمة الوحدات المفعّلة لدرج الصنف (اختيار بدل الكتابة الحرة — المرحلة 0).
+	# تُمرَّر هنا قبل انقسام التبويبين لأن الدرج معروض في التبويبين معًا.
+	context.uoms = frappe.get_all(
+		"UOM", filters={"enabled": 1}, fields=["name"], order_by="name asc"
+	)
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
 	# الصفحة مش extending من web.html بتاع Frappe (زي باقي صفحات biozone_web)،
 	# يعني window.frappe.csrf_token مش متوفر تلقائي — بنمرره صراحة عشان
@@ -17,9 +22,24 @@ def get_context(context):
 	context.csrf_token = frappe.sessions.get_csrf_token()
 
 	tab = frappe.form_dict.get("tab") or "list"
-	if tab not in ("list", "import"):
+	if tab not in ("list", "import", "units"):
 		tab = "list"
 	context.tab = tab
+
+	if tab == "units":
+		_load_units_tab(context)
+		context.items = []
+		context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")
+		context.brands = []
+		context.search_term = ""
+		context.selected_group = None
+		context.selected_brand = None
+		context.page = 1
+		context.has_prev = False
+		context.has_next = False
+		context.prev_page = 1
+		context.next_page = 1
+		return context
 
 	if tab == "import":
 		_load_import_tab(context)
@@ -74,7 +94,7 @@ def get_context(context):
 	).run()[0][0]
 	items = frappe.get_all(
 		"Item",
-		fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "disabled"],
+		fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "disabled", "display_override"],
 		filters=filters,
 		or_filters=or_filters,
 		order_by="item_name asc",
@@ -83,6 +103,22 @@ def get_context(context):
 	)
 
 	item_codes = [i["item_code"] for i in items]
+
+	# Phase-2: أول صف تحويل + الراية لكل صنف (للدرج) — دفعة واحدة.
+	conv_map = {}
+	if item_codes:
+		for r in frappe.get_all(
+			"UOM Conversion Detail",
+			filters={"parent": ["in", item_codes], "parenttype": "Item"},
+			fields=["parent", "uom", "conversion_factor", "min_qty"],
+			order_by="idx asc",
+		):
+			if r.uom and r.parent not in conv_map:
+				conv_map[r.parent] = {
+					"uom": r.uom,
+					"factor": r.conversion_factor,
+					"min_qty": r.min_qty if r.min_qty not in (None, "") else 1,
+				}
 
 	# الكمية الحالية: مجموع actual_qty لكل صنف عبر كل المخازن — قراءة بس،
 	# مفيش أي تعديل عليها من الشاشة دي (Bin هو مصدر الحقيقة الوحيد).
@@ -134,6 +170,8 @@ def get_context(context):
 		it["price"] = price_map.get(it["item_code"])
 		it["discounts"] = discounts_map.get(it["item_code"], [])
 		it["barcodes"] = barcodes_map.get(it["item_code"], [])
+		it["display_override"] = (it.get("display_override") or "inherit").strip() or "inherit"
+		it["conversion"] = conv_map.get(it["item_code"])
 
 	context.items = items
 	context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")
@@ -148,6 +186,21 @@ def get_context(context):
 	context.next_page = page + 1
 
 	return context
+
+
+def _load_units_tab(context):
+	"""سياق تبويب وحدات العرض: كل فئة عميل ورقية + وحدة عرضها الحالية.
+	الغائب/الفارغ = الصغرى (نفس قاعدة المحلل). القراءة هنا للعرض فقط —
+	الحفظ عبر staff_save_display_setting."""
+	groups = frappe.get_all(
+		"Customer Group",
+		filters={"is_group": 0},
+		fields=["name", "disabled", "display_unit"],
+		order_by="name asc",
+	)
+	for g in groups:
+		g["display_unit"] = (g.get("display_unit") or "small").strip() or "small"
+	context.display_groups = groups
 
 
 def _load_import_tab(context):

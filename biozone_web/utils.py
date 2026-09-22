@@ -689,10 +689,31 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 
 	base_rows = frappe.get_all(
 		"Item Price",
-		fields=["item_code", "price_list_rate"],
+		fields=["item_code", "price_list_rate", "uom"],
 		filters={"price_list": PUBLIC_PRICE_LIST, "item_code": ["in", codes]},
 	)
-	base_map = {r["item_code"]: r["price_list_rate"] for r in base_rows}
+
+	meta_rows = frappe.get_all(
+		"Item",
+		fields=["item_code", "item_group", "stock_uom"],
+		filters={"item_code": ["in", codes]},
+	)
+	meta_map = {r["item_code"]: r for r in meta_rows}
+
+	# سد دفاعي (المرحلة 0): السعر المرجعي واحد بوحدة الصغرى. عند وجود
+	# أكثر من سعر للصنف يُفضَّل المطابق لوحدة المخزون (أو بلا وحدة)،
+	# وإلا الأول — السلوك القديم محفوظ عند السعر الوحيد.
+	by_code = {}
+	for r in base_rows:
+		by_code.setdefault(r["item_code"], []).append(r)
+	base_map = {}
+	for code, rows in by_code.items():
+		want = (meta_map.get(code) or {}).get("stock_uom") or ""
+		pick = next(
+			(r for r in rows if not (r.get("uom") or "").strip() or (r.get("uom") or "").strip() == want),
+			rows[0],
+		)
+		base_map[code] = pick["price_list_rate"]
 
 	pricable = [c for c in codes if base_map.get(c)]
 	if not pricable:
@@ -703,13 +724,6 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 
 	if customer is None:
 		customer = find_customer_for_current_user()
-
-	meta_rows = frappe.get_all(
-		"Item",
-		fields=["item_code", "item_group", "stock_uom"],
-		filters={"item_code": ["in", pricable]},
-	)
-	meta_map = {r["item_code"]: r for r in meta_rows}
 
 	company = get_default_company()
 	currency = frappe.db.get_value("Company", company, "default_currency")

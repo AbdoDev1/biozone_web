@@ -150,6 +150,10 @@
 <span class="material-symbols-outlined text-lg">upload_file</span>
 استيراد وتصدير
 </a>
+<a class="px-4 py-3.5 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors {% if tab == 'units' %}text-primary border-primary{% else %}text-slate-500 border-transparent hover:text-darkNavy{% endif %}" href="/staff/items?tab=units">
+<span class="material-symbols-outlined text-lg">straighten</span>
+وحدات العرض
+</a>
 </div>
 {% if tab == 'list' %}
 <!-- BEGIN: ItemsTableSection -->
@@ -207,7 +211,7 @@
 {% endif %}
 </td>
 <td class="py-4 px-6 text-center">
-<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
+<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes, "display_override": it.display_override, "conversion": it.conversion}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
@@ -275,6 +279,7 @@
 </button>
 <div id="import-columns-body" class="hidden text-sm text-slate-600 font-medium leading-7 pt-2">
 <p><b>الاسم</b> مطلوب للصنف الجديد فقط • <b>الباركود</b> أو <b>الكود</b> أحدهما على الأقل لتحديد الصف (الكود وحده مفتاح صالح، ومعًا يجب أن يتفقا على نفس الصنف) • <b>سعر الجمهور</b> يُكتب فوق سعر قائمة {{ import_price_list }} ويبدأ فورًا بلا مدة صلاحية • <b>الوحدة</b> فارغها يعني وحدة الصنف الحالية (والجديد بلا وحدة = Nos) • <b>القسم</b> مطلوب للجديد فقط ويجب أن يكون قسمًا فرعيًا موجودًا • أعمدة <b>خصم: اسم الفئة</b> تُولَّد لكل فئة نشطة (الحالية: {% if import_groups %}{% for g in import_groups %}{{ g.name }}{% if not loop.last %}، {% endif %}{% endfor %}{% else %}لا يوجد{% endif %}) — القيمة 0 تعني إلغاء الخصم، والفارغ بجميع الأعمدة يعني <b>اترك القيمة الحالية دون تغيير</b> ولا يمسح شيئًا أبدًا.</p>
+<p><b>الوحدة الكبرى</b> قبل <b>الوحدة</b> ثم <b>عدد الوحدات في الكبرى</b> (رقم أكبر من صفر — إلزامي مع الكبرى ومرفوض بدونها؛ اترك الكبرى فارغة للصنف الوحيد).</p>
 <p class="mt-1 text-xs text-slate-400">الحدود: ملف حتى {{ import_max_mb }}MB وبحد أقصى {{ import_max_rows }} صف. الصيغ: xlsx أو csv بترميز UTF-8.</p>
 </div>
 </div>
@@ -355,6 +360,42 @@
 </section>
 <!-- END: ImportExportSection -->
 {% endif %}
+{% if tab == 'units' %}
+<!-- BEGIN: DisplayUnitsSection -->
+<section class="flex flex-col gap-4" data-purpose="display-units-section">
+<div class="bg-white rounded-2xl border border-borderSubtle shadow-card p-5 text-sm text-slate-600 font-medium leading-7">
+<p>حدد لكل فئة عميل: هل يرى المتجر <b>الوحدة الصغرى</b> أم <b>الكبرى</b>؟ راية الصنف الخاص تغلب هذا الإعداد — والغائب يعني الصغرى. الحفظ هنا يسري على كل المتاجر فورًا (لا كاش).</p>
+</div>
+<p id="units-error" class="hidden text-xs text-alert-red font-bold"></p>
+<section class="bg-white rounded-2xl border border-borderSubtle shadow-card overflow-hidden">
+<div class="overflow-x-auto"><table class="w-full text-right text-sm" id="units-table">
+<thead><tr class="border-b border-borderSubtle bg-slate-50/70 text-slate-500 text-xs font-bold">
+<th class="py-3 px-6 text-right">الفئة</th>
+<th class="py-3 px-6 text-right">الحالة</th>
+<th class="py-3 px-6 text-right">وحدة العرض</th>
+</tr></thead>
+<tbody class="divide-y divide-borderSubtle">
+{% for g in display_groups %}
+<tr class="hover:bg-slate-50/60 transition-colors" data-group="{{ g.name }}">
+<td class="py-3 px-6 font-bold text-darkNavy">{{ g.name }}</td>
+<td class="py-3 px-6 text-xs text-slate-500">{% if g.disabled %}معطّلة{% else %}نشطة{% endif %}</td>
+<td class="py-3 px-6">
+<select onchange="markDisplayDirty(this)" data-group="{{ g.name }}" {% if g.disabled %}disabled{% endif %} class="appearance-none bg-white border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-darkNavy cursor-pointer disabled:opacity-50">
+<option value="small" {% if g.display_unit == 'small' %}selected{% endif %}>الصغرى</option>
+<option value="large" {% if g.display_unit == 'large' %}selected{% endif %}>الكبرى</option>
+</select>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table></div>
+</section>
+<div>
+<button id="units-save-btn" onclick="saveDisplaySettings()" disabled class="bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm transition-all">حفظ وحدات العرض</button>
+</div>
+</section>
+<!-- END: DisplayUnitsSection -->
+{% endif %}
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 <!-- BEGIN: SlideInSidePanelDrawer -->
@@ -418,12 +459,60 @@
 </span>
 </div>
 </div>
-<!-- 5. وحدة القياس -->
+<!-- 5. وحدة القياس (قائمة من الوحدات المفعّلة — بلا كتابة حرة) -->
 <div class="space-y-1.5">
 <label class="block text-xs font-bold text-darkNavy" for="item-unit">وحدة القياس</label>
-<input class="w-full bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-unit" type="text" value="كرتون (100 زوج)"/>
+<div class="relative">
+<select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-unit">
+<option value="">اختر الوحدة</option>
+{% for u in uoms %}
+<option value="{{ u.name }}">{{ u.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
 </div>
-<!-- 6. السعر (سعر الجمهور) -->
+</div>
+<!-- 5b. الوحدة الكبرى ومعامل التحويل (المرحلة 2 — اختياري) -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-large">الوحدة الكبرى (اختياري)</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-large">
+<option value="">بدون وحدة كبرى (صنف وحيد)</option>
+{% for u in uoms %}
+<option value="{{ u.name }}">{{ u.name }}</option>
+{% endfor %}
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-factor">عدد الوحدات في الكبرى</label>
+<input class="w-full bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-factor" dir="ltr" type="text" placeholder="12"/>
+</div>
+<!-- 5c. إعداد العرض الخاص -->
+<div class="space-y-1.5">
+<label class="block text-xs font-bold text-darkNavy" for="item-flag">إعداد العرض الخاص</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-flag">
+<option value="inherit">يتبع إعداد الفئة</option>
+<option value="small_only">الصغرى دائمًا</option>
+<option value="large_only">الكبرى دائمًا</option>
+</select>
+<span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</span>
+</div>
+</div>
 <div class="space-y-1.5">
 <label class="block text-xs font-bold text-darkNavy" for="item-price">السعر (سعر الجمهور)</label>
 <div class="relative">
@@ -432,6 +521,14 @@
               ج.م
             </span>
 </div>
+<div class="flex items-center gap-2 pt-1">
+<label class="text-[11px] font-bold text-slate-500 whitespace-nowrap" for="item-price-unit">السعر مدخل بـ:</label>
+<select id="item-price-unit" class="appearance-none bg-white border border-borderSubtle rounded-lg px-2.5 py-1.5 text-xs font-bold text-darkNavy cursor-pointer">
+<option value="small">الصغرى (المرجع)</option>
+<option value="large">الكبرى (تُحسب الصغرى)</option>
+</select>
+</div>
+<p id="item-price-note" class="hidden text-[11px] text-primary font-bold"></p>
 <!-- 7. Read-only summary line directly below the price field -->
 <div class="pt-1.5 pb-1 flex items-center justify-between text-xs">
 <div id="item-discounts-summary" class="flex items-center gap-1.5 flex-wrap">
@@ -552,8 +649,44 @@ function openItemPanel(data) {
     // الصنف السابق عند فتح صنف بلا علامة/وحدة مختلفة مباشرة بعده.
     document.getElementById('item-group').value = data.item_group || '';
     document.getElementById('item-brand').value = data.brand || '';
-    document.getElementById('item-unit').value = data.stock_uom || '';
+    // قيمة قديمة غير مدرجة في القائمة (وحدة معطّلة/محذوفة) تُحقن كخيار
+    // مؤقت موسوم بدل السكوت عليها واختيار أول القائمة خطأ.
+    (function () {
+      const sel = document.getElementById('item-unit');
+      const uv = data.stock_uom || '';
+      const known = Array.prototype.some.call(sel.options, (o) => o.value === uv);
+      sel.querySelectorAll('option[data-legacy-uom]').forEach((o) => o.remove());
+      if (uv && !known) {
+        const opt = document.createElement('option');
+        opt.value = uv;
+        opt.textContent = uv + ' (غير مدرجة)';
+        opt.setAttribute('data-legacy-uom', '1');
+        sel.appendChild(opt);
+      }
+      sel.value = uv;
+    })();
     document.getElementById('item-price').value = data.price != null ? data.price : '';
+    document.getElementById('item-price-unit').value = 'small';
+    // المرحلة 2: حقول التحويل والراية — تُضبط دائمًا بلا شرط (نفس مبرر
+    // المجموعة/العلامة أعلاه). القيمة القديمة الغريبة تُحقن موسومة.
+    (function () {
+      const sel = document.getElementById('item-large');
+      const conv = data.conversion || null;
+      const lv = (conv && conv.uom) || '';
+      const known = Array.prototype.some.call(sel.options, (o) => o.value === lv);
+      sel.querySelectorAll('option[data-legacy-uom]').forEach((o) => o.remove());
+      if (lv && !known) {
+        const opt = document.createElement('option');
+        opt.value = lv;
+        opt.textContent = lv + ' (غير مدرجة)';
+        opt.setAttribute('data-legacy-uom', '1');
+        sel.appendChild(opt);
+      }
+      sel.value = lv;
+      document.getElementById('item-factor').value = (conv && conv.factor != null) ? conv.factor : '';
+      document.getElementById('item-flag').value = data.display_override || 'inherit';
+    })();
+    updatePriceNote();
     document.getElementById('item-active-toggle').checked = !data.disabled;
     disableWrapper.classList.remove('hidden');
     // البند 3: المسار الصحيح لتاب الخصومات (pricing بدل discounts الميت).
@@ -575,8 +708,15 @@ function openItemPanel(data) {
     document.getElementById('item-sku').disabled = false;
     document.getElementById('item-group').selectedIndex = 0;
     document.getElementById('item-brand').selectedIndex = 0;
+    document.getElementById('item-unit').querySelectorAll('option[data-legacy-uom]').forEach((o) => o.remove());
     document.getElementById('item-unit').value = '';
     document.getElementById('item-price').value = '';
+    document.getElementById('item-price-unit').value = 'small';
+    document.getElementById('item-large').querySelectorAll('option[data-legacy-uom]').forEach((o) => o.remove());
+    document.getElementById('item-large').value = '';
+    document.getElementById('item-factor').value = '';
+    document.getElementById('item-flag').value = 'inherit';
+    updatePriceNote();
     document.getElementById('item-active-toggle').checked = true;
     disableWrapper.classList.add('hidden');
     manageLink.href = '/staff/pricing?tab=discounts';
@@ -589,6 +729,26 @@ function openItemPanel(data) {
   drawer.classList.remove('hidden');
   backdrop.classList.remove('hidden');
 }
+
+function updatePriceNote() {
+  const note = document.getElementById('item-price-note');
+  const unit = document.getElementById('item-price-unit').value;
+  const rawPrice = (document.getElementById('item-price').value || '').trim().replace(/,/g, '');
+  const rawFactor = (document.getElementById('item-factor').value || '').trim().replace(/,/g, '');
+  const large = (document.getElementById('item-large').value || '').trim();
+  const price = parseFloat(rawPrice), factor = parseFloat(rawFactor);
+  if (unit === 'large' && large && isFinite(price) && isFinite(factor) && factor > 0) {
+    note.textContent = 'سيُحفظ سعر الصغرى: ' + (Math.round((price / factor) * 100) / 100) + ' (نصف لأعلى لقرشين)';
+    note.classList.remove('hidden');
+  } else {
+    note.textContent = '';
+    note.classList.add('hidden');
+  }
+}
+['item-price', 'item-price-unit', 'item-factor', 'item-large'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updatePriceNote);
+});
 
 function closeItemPanel() {
   document.getElementById('item-drawer').classList.add('hidden');
@@ -605,6 +765,10 @@ function saveItemPanel() {
     brand: document.getElementById('item-brand').value,
     stock_uom: document.getElementById('item-unit').value,
     price: document.getElementById('item-price').value,
+    price_unit: document.getElementById('item-price-unit').value,
+    large_uom: document.getElementById('item-large').value,
+    factor: document.getElementById('item-factor').value,
+    display_override: document.getElementById('item-flag').value,
     disabled: document.getElementById('item-active-toggle').checked ? 0 : 1,
     barcodes: currentBarcodes,
   };
@@ -923,6 +1087,47 @@ function confirmImportFile() {
       pollImportStatus(false);
     })
     .catch(() => { document.getElementById('import-confirm-btn').disabled = false; importFail('تعذر الاتصال بالسيرفر'); });
+}
+/* ===== تبويب وحدات العرض: تغيير يُعلَّم + زر حفظ صريح يسري فورًا =====
+   القراءة من القاعدة حية بلا كاش — الحفظ يظهر في كل المتاجر مباشرة. */
+let displayDirty = {};
+
+function markDisplayDirty(sel) {
+  displayDirty[sel.dataset.group] = sel.value;
+  const tr = sel.closest('tr');
+  if (tr) tr.classList.add('bg-amber-50/60');
+  document.getElementById('units-save-btn').disabled = false;
+  const err = document.getElementById('units-error');
+  if (err) err.classList.add('hidden');
+}
+
+function saveDisplaySettings() {
+  const btn = document.getElementById('units-save-btn');
+  const err = document.getElementById('units-error');
+  const entries = Object.entries(displayDirty);
+  if (!entries.length) return;
+  btn.disabled = true;
+  (async () => {
+    for (const [group, mode] of entries) {
+      const res = await fetch('/api/method/biozone_web.units.staff_save_display_setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+        body: JSON.stringify({ customer_group: group, display_unit: mode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const d = data.message || {};
+      if (!res.ok || !d.ok) throw new Error(d.error || 'تعذر الحفظ');
+      delete displayDirty[group];
+      document.querySelectorAll('#units-table tr[data-group="' + group + '"]').forEach((tr) => {
+        tr.classList.remove('bg-amber-50/60');
+      });
+    }
+    StaffUI.toast('تم الحفظ', 'وحدات العرض تسري على كل المتاجر فورًا', 'success');
+  })().catch((e) => {
+    err.textContent = (e && e.message) || 'تعذر الحفظ';
+    err.classList.remove('hidden');
+    btn.disabled = Object.keys(displayDirty).length === 0;
+  });
 }
 /* ===== ترقيم قوائم الاستيراد: عميل فقط، IMPORT_LIST_PAGE_SIZE عنصر في الصفحة =====
    الرد من staff_import_status يبقى كما هو (result_json كامل بلا تقطيع) —

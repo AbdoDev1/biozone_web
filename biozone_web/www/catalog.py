@@ -74,9 +74,32 @@ def get_context(context):
     # لا السعر الأساسي الخام — الزائر/غير المفعّل يرى سعر الجمهور، والمفعّل
     # يرى سعر فئته فقط. الأصناف بلا سعر أساسي تبقى price=None (غير متاحة).
     effective = get_effective_item_prices(item_codes)
-    for item in items:
-        item["price"] = effective.get(item["item_code"], {}).get("price")
+    # Phase-2 display units: price converted to the customer's group unit;
+    # misconfigured (large without conversion) items are hidden, never
+    # priced by guess. Missing price still hides the item as before.
+    try:
+        from biozone_web.units import money2, resolve_items_display
+        from biozone_web.utils import get_customer_price_group
 
+        try:
+            _group = get_customer_price_group()
+        except Exception:
+            _group = None
+        _display = resolve_items_display(item_codes, _group)
+    except Exception:
+        _display = {}
+    visible = []
+    for item in items:
+        d = (_display.get(item["item_code"]) or {}) if isinstance(_display, dict) else {}
+        if not d.get("ok", True) or not d.get("displayable", True):
+            continue
+        factor = d.get("factor") or 1.0
+        price = effective.get(item["item_code"], {}).get("price")
+        item["price"] = money2(price * factor) if price is not None else None
+        item["display_uom"] = d.get("uom") or ""
+        visible.append(item)
+    items = visible
+    context.items = items
     # Category chip list: every distinct item_group that has active items.
     categories = [
         d.item_group

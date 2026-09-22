@@ -202,8 +202,8 @@ tailwind.config = {
       img.alt = item.item_name;
       node.querySelector('.cart-item-category').textContent = item.item_group || '';
       node.querySelector('.cart-item-name').textContent = item.item_name;
-      node.querySelector('.cart-item-unit-price').textContent = formatPrice(item.price);
-      node.querySelector('.cart-item-qty').textContent = item.quantity;
+      node.querySelector('.cart-item-unit-price').textContent = formatPrice(item.price) + (item.uom ? ' / ' + item.uom : '');
+      node.querySelector('.cart-item-qty').textContent = item.quantity + (item.uom ? ' ' + item.uom : '');
       node.querySelector('.cart-item-subtotal').textContent = formatPrice(lineSubtotal);
 
       const decBtn = node.querySelector('.cart-item-decrement');
@@ -264,6 +264,9 @@ tailwind.config = {
         const p = prices[it.item_code];
         if (p && p.price !== null && p.price !== undefined) {
           it.price = p.price;
+          // Phase-2: unit always refreshed from server (old lines may
+          // predate units or carry a stale group unit — never trusted).
+          if (p.display_uom) it.uom = p.display_uom;
           kept.push(it);
         } else {
           outcome.removedCount += 1;

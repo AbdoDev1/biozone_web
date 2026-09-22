@@ -46,13 +46,16 @@ PREVIEW_ROWS = 25
 PUBLIC_PRICE_LIST = "Standard Selling"
 
 # Internal column keys -> Arabic headers (template order).
+# Phase-2 columns: large unit BEFORE small unit, then the count.
 BASE_COLUMNS = [
 	("name", "الاسم"),
 	("barcode", "الباركود"),
 	("item_code", "الكود"),
 	("price", "سعر الجمهور"),
 	("qty", "الكمية"),
+	("large_uom", "الوحدة الكبرى"),
 	("uom", "الوحدة"),
+	("factor", "عدد الوحدات في الكبرى"),
 	("item_group", "القسم"),
 ]
 BASE_KEY_BY_HEADER = {label: key for key, label in BASE_COLUMNS}
@@ -483,6 +486,23 @@ def validate_rows(raw_rows, key_by_index, active_groups):
 		uom = (values.get("uom") or "").strip()
 		if uom and not frappe.db.exists("UOM", uom):
 			row["errors"].append(_("الوحدة غير معرّفة: {0}").format(uom))
+		# Phase-2 unit columns: large unit + count per large.
+		large = (values.get("large_uom") or "").strip()
+		factor_raw = (values.get("factor") or "").strip()
+		small_unit = uom or "Nos"
+		if large:
+			if not frappe.db.exists("UOM", {"name": large, "enabled": 1}):
+				row["errors"].append(_("الوحدة الكبرى غير معرّفة أو معطّلة: {0}").format(large))
+			if large == small_unit:
+				row["errors"].append(_("الوحدة الكبرى تطابق الوحدة — اترك الكبرى فارغة للصنف الوحيد"))
+			if not factor_raw:
+				row["errors"].append(_("عدد الوحدات في الكبرى مطلوب مع الوحدة الكبرى"))
+			else:
+				ok, factor_value = _strict_num(factor_raw)
+				if not ok or factor_value <= 0:
+					row["errors"].append(_("عدد الوحدات في الكبرى يجب أن يكون رقمًا أكبر من صفر"))
+		elif factor_raw:
+			row["errors"].append(_("عدد وحدات بلا وحدة كبرى"))
 		price = (values.get("price") or "").strip()
 		if price:
 			ok, amount = _strict_num(price)
@@ -695,6 +715,40 @@ def _import_apply_qty(item_code, qty_cell, uom_cell, warehouse, run_name, row_n)
 	return stock_entry.name
 
 
+def _import_upsert_conversion(doc, large, factor_raw, min_raw):
+	"""Create/update the single large-unit conversion row (Phase 2).
+
+	Blank large = leave conversions untouched (decision 5). Returns True
+	when a row was created or changed. Raises ValidationError (Arabic) on
+	bad numbers — validation pre-catches these; this is the race-safe net.
+	"""
+	large = (large or "").strip()
+	if not large:
+		return False
+	ok, factor = _strict_num(factor_raw or "")
+	if not ok or factor <= 0:
+		raise frappe.ValidationError(_("معامل التحويل يجب أن يكون رقمًا أكبر من صفر"))
+	min_value = 1.0
+	if (min_raw or "").strip():
+		ok, min_value = _strict_num(min_raw)
+		if not ok or min_value < 0:
+			raise frappe.ValidationError(_("الحد الأدنى يجب أن يكون رقمًا لا يقل عن صفر"))
+	for r in (doc.get("uoms") or []):
+		if (r.uom or "").strip() == large:
+			changed = False
+			if frappe.utils.flt(r.conversion_factor) != factor:
+				r.conversion_factor = factor
+				changed = True
+			if frappe.utils.flt(r.min_qty) != min_value:
+				r.min_qty = min_value
+				changed = True
+			return changed
+	doc.append(
+		"uoms", {"uom": large, "conversion_factor": factor, "min_qty": min_value}
+	)
+	return True
+
+
 def _process_staged_row(row, warehouse, run_name):
 	"""Create/update one staged row. Returns (item_outcome, pricing_outcomes).
 
@@ -745,6 +799,14 @@ def _process_staged_row(row, warehouse, run_name):
 						).format(barcode)
 					)
 				doc.append("barcodes", {"barcode": barcode})
+		# Phase-2: conversion only (large + count); min defaults to 1 —
+		# brand/flag/extras/status are staff-screen concerns, not sheets.
+		_import_upsert_conversion(
+			doc,
+			values.get("large_uom", ""),
+			values.get("factor", ""),
+			"",
+		)
 		doc.save(ignore_permissions=True)
 		action = "update"
 	else:
@@ -765,6 +827,13 @@ def _process_staged_row(row, warehouse, run_name):
 						"BARCODE_CONFLICT_WITH_OTHER_ITEM: الباركود {0} مسجل بالفعل للصنف {1}"
 					).format(bc, conflict)
 				)
+		large = (values.get("large_uom") or "").strip()
+		conv_rows = []
+		if large:
+			ok, factor = _strict_num(values.get("factor", ""))
+			if not ok or factor <= 0:
+				raise frappe.ValidationError(_("عدد الوحدات في الكبرى يجب أن يكون رقمًا أكبر من صفر"))
+			conv_rows = [{"uom": large, "conversion_factor": factor, "min_qty": 1.0}]
 		doc = frappe.get_doc(
 			{
 				"doctype": "Item",
@@ -774,6 +843,7 @@ def _process_staged_row(row, warehouse, run_name):
 				"stock_uom": uom or "Nos",
 				"is_stock_item": 1,
 				"barcodes": [{"barcode": bc} for bc in new_barcodes],
+				"uoms": conv_rows,
 			}
 		)
 		doc.insert(ignore_permissions=True)
@@ -1296,8 +1366,12 @@ def _warehouse_for_sheet():
 		return ""
 
 
-def _export_headers(groups):
+def _export_headers(groups, include_archive=False):
 	headers = [label for _, label in BASE_COLUMNS]
+	if include_archive:
+		# أعمدة أرشفة المرحلة 1 (محفوظة للتوافق): التحويلات بصيغة حرة +
+		# التقييم المخزني. الاستيراد الحالي يتجاهلها بتحذير فقط.
+		headers.extend(["التحويلات", "التقييم"])
 	headers.extend(_discount_header(g["name"]) for g in groups)
 	return headers
 
@@ -1317,12 +1391,12 @@ def staff_download_import_template():
 
 @frappe.whitelist()
 def staff_export_items():
-	"""Live-data export in the template layout (enabled items only).
+	"""Live-data export in the template layout plus archive columns.
 
-	Enabled-only by design: the layout has no disabled flag, and disabled
-	items would fail quantity rows on re-upload with a clear row error.
-	Discount percents are per-Item rules only (never group-derived), so a
-	re-upload never materializes group rules into item rules.
+	Archive columns: free-form conversions + Bin valuation (pre-wipe
+	safety net). Unknown to the import (warned and ignored, never
+	breaking re-upload). Discount percents are per-Item rules only
+	(never group-derived).
 	"""
 	from biozone_web.utils import require_staff_access
 
@@ -1334,12 +1408,12 @@ def staff_export_items():
 	groups = _active_customer_groups()
 	items = frappe.get_all(
 		"Item",
-		filters={"disabled": 0},
 		fields=["item_code", "item_name", "item_group", "stock_uom"],
 		order_by="item_name asc",
 	)
 	codes = [i.item_code for i in items]
 	stock_map, price_map, barcode_map, discount_map = {}, {}, {}, {}
+	valuation_map, conversion_map = {}, {}
 	if codes:
 		for r in frappe.db.sql(
 			"select item_code, actual_qty from `tabBin` "
@@ -1348,6 +1422,14 @@ def staff_export_items():
 			as_dict=True,
 		):
 			stock_map[r.item_code] = r.actual_qty or 0
+		for r in frappe.db.sql(
+			"select item_code, valuation_rate from `tabBin` "
+			"where item_code in %(codes)s and warehouse = %(wh)s",
+			{"codes": codes, "wh": warehouse},
+			as_dict=True,
+		):
+			if r.valuation_rate:
+				valuation_map[r.item_code] = r.valuation_rate
 		for r in frappe.db.sql(
 			"select item_code, price_list_rate from `tabItem Price` "
 			"where price_list = 'Standard Selling' and item_code in %(codes)s",
@@ -1361,8 +1443,22 @@ def staff_export_items():
 			fields=["parent", "barcode"],
 			order_by="idx asc",
 		):
-			if r.barcode and r.parent not in barcode_map:
-				barcode_map[r.parent] = r.barcode
+			if r.barcode:
+				barcode_map.setdefault(r.parent, []).append(r.barcode)
+		for r in frappe.get_all(
+			"UOM Conversion Detail",
+			filters={"parent": ["in", codes], "parenttype": "Item"},
+			fields=["parent", "uom", "conversion_factor", "min_qty"],
+			order_by="idx asc",
+		):
+			if r.uom and r.conversion_factor:
+				conversion_map.setdefault(r.parent, []).append(
+					{
+						"uom": r.uom,
+						"conversion_factor": r.conversion_factor,
+						"min_qty": r.min_qty,
+					}
+				)
 		if groups:
 			for r in frappe.db.sql(
 				"""
@@ -1379,20 +1475,32 @@ def staff_export_items():
 				discount_map[(r.item_code, r.customer_group)] = r.discount_percentage
 	data_rows = []
 	for it in items:
+		bcs = barcode_map.get(it.item_code, [])
+		convs = conversion_map.get(it.item_code, [])
+		first = convs[0] if convs else {}
+		large = (first.get("uom") or "").strip()
+		factor = first.get("conversion_factor") or ""
 		row = [
 			it.item_name or "",
-			barcode_map.get(it.item_code, ""),
+			bcs[0] if bcs else "",
 			it.item_code,
 			price_map.get(it.item_code, ""),
 			stock_map.get(it.item_code, 0),
+			large,
 			it.stock_uom or "",
+			"" if factor == "" else ("%g" % frappe.utils.flt(factor)),
 			it.item_group or "",
+			";".join(
+				"{}={}".format(c["uom"], "%g" % frappe.utils.flt(c["conversion_factor"]))
+				for c in convs
+			),
+			valuation_map.get(it.item_code, ""),
 		]
 		for g in groups:
 			v = discount_map.get((it.item_code, g.name))
 			row.append("" if v is None else v)
 		data_rows.append(row)
-	content = _build_workbook(_export_headers(groups), data_rows, groups)
+	content = _build_workbook(_export_headers(groups, include_archive=True), data_rows, groups)
 	run = frappe.get_doc(
 		{
 			"doctype": "Biozone Item Import",

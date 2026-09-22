@@ -11,7 +11,7 @@
 <script>
   const CART_STORAGE_KEY = 'biozone_cart_items';
 
-  function addToCart(itemCode, itemName, itemGroup, price, buttonEl) {
+  function addToCart(itemCode, itemName, itemGroup, price, buttonEl, uom) {
     let items = [];
     try {
       items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
@@ -22,6 +22,7 @@
     const existing = items.find((it) => it.item_code === itemCode);
     if (existing) {
       existing.quantity += 1;
+      if (uom) existing.uom = uom;
     } else {
       items.push({
         item_code: itemCode,
@@ -30,6 +31,7 @@
         price: price,
         image: '',
         quantity: 1,
+        uom: uom || '',
       });
     }
 
@@ -134,6 +136,7 @@
     const itemName = el.dataset.itemName;
     const itemGroup = el.dataset.itemGroup;
     const price = parseFloat(el.dataset.itemPrice) || 0;
+    const uom = el.dataset.itemUom || '';
 
     let items = getCartItemsList();
     const idx = items.findIndex((it) => it.item_code === itemCode);
@@ -147,11 +150,13 @@
           price: price,
           image: '',
           quantity: 1,
+          uom: uom,
         });
         showCartToast(itemName + ' أُضيف إلى السلة');
       }
     } else {
       items[idx].quantity += delta;
+      if (uom) items[idx].uom = uom;
       if (items[idx].quantity <= 0) {
         items.splice(idx, 1);
       }

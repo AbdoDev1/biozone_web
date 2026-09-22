@@ -210,13 +210,36 @@ def biozone_get_cart_prices(item_codes):
 
 	ctx = get_storefront_price_context()
 
+	prices = get_effective_item_prices(
+		codes,
+		customer=ctx["customer"],
+		customer_group=ctx["customer_group"],
+	)
+
+	# Phase-2 display units: same small-unit engine price, converted for
+	# the customer's group unit. Non-displayable items keep price=None so
+	# the cart drops them like priceless items (setup error, never guess).
+	try:
+		from biozone_web.units import money2, resolve_items_display
+
+		display = resolve_items_display(codes, ctx["customer_group"])
+	except Exception:
+		display = {}
+	for code, entry in prices.items():
+		d = (display.get(code) or {}) if isinstance(display, dict) else {}
+		if not d.get("ok") or not d.get("displayable", True):
+			entry["price"] = None
+			entry["display_uom"] = None
+			continue
+		factor = d.get("factor") or 1.0
+		entry["display_uom"] = d.get("uom")
+		entry["display_factor"] = factor
+		if entry.get("price") is not None:
+			entry["price"] = money2(frappe.utils.flt(entry["price"]) * factor)
+
 	return {
 		"ok": True,
-		"prices": get_effective_item_prices(
-			codes,
-			customer=ctx["customer"],
-			customer_group=ctx["customer_group"],
-		),
+		"prices": prices,
 		"customer_group": ctx["customer_group"],
 		"is_active": ctx["is_active"],
 		"is_guest": ctx["is_guest"],
@@ -290,6 +313,7 @@ def biozone_confirm_order(items):
 	for it in items:
 		item_code = (it.get("item_code") or "").strip()
 		qty = frappe.utils.flt(it.get("quantity"))
+		uom = (it.get("uom") or "").strip()
 
 		if not item_code or qty <= 0:
 			frappe.throw(_("بيانات صنف غير صحيحة في السلة"))
@@ -310,6 +334,7 @@ def biozone_confirm_order(items):
 			{
 				"item_code": item_code,
 				"qty": qty,
+				"uom": uom,
 			}
 		)
 
@@ -332,6 +357,42 @@ def biozone_confirm_order(items):
 		# لا تُنشأ صفوف يتيمة من محاولات مرفوضة، وتُرجع الفئة المؤكدة
 		# لتمريرها صراحة للطلب أدناه.
 		customer, customer_group = require_active_price_customer()
+
+		# Phase-2 unit gate (definitive; the store sends freely, staff
+		# confirmation decides): every line must match the group's display
+		# unit resolved server-side, meet its minimum, and carry the item's
+		# own conversion factor (client values never trusted). The snapshot
+		# (uom + factor) freezes into the order lines.
+		from biozone_web.units import resolve_items_display
+
+		display = resolve_items_display(
+			[it["item_code"] for it in so_items], customer_group
+		)
+		final_items = []
+		for it in so_items:
+			d = display.get(it["item_code"]) or {}
+			if not d.get("ok") or not d.get("displayable", True):
+				frappe.throw(
+					_("الصنف {0} غير متاح بوحدة عرض صالحة حاليًا — حدّث السلة").format(
+						it["item_code"]
+					)
+				)
+			want_uom = d.get("uom")
+			if (it.get("uom") or "").strip() and (it.get("uom") or "").strip() != want_uom:
+				frappe.throw(
+					_("الوحدة المرسلة للصنف {0} لا تطابق وحدة العرض لفئتك — حدّث السلة").format(
+						it["item_code"]
+					)
+				)
+			final_items.append(
+				{
+					"item_code": it["item_code"],
+					"qty": it["qty"],
+					"uom": want_uom,
+					"conversion_factor": d.get("factor") or 1.0,
+				}
+			)
+		so_items = final_items
 
 		# الملكية: ordering_user هو الجلسة الحقيقية قبل أي انتحال.
 		# نافذة الانتحال أدناه تضبط owner مؤقتًا على Administrator،
@@ -616,6 +677,18 @@ def _sync_item_barcodes(doc, new_barcodes: list):
 			doc.append("barcodes", {"barcode": bc})
 
 
+def _strict_num_local(raw):
+	"""Strict numeric parse (mirrors import_export._strict_num — no flt
+	coercion of garbage). Returns (ok_bool, float_value)."""
+	text = (str(raw) if raw is not None else "").strip().replace(",", "")
+	if not text:
+		return False, 0.0
+	try:
+		return True, float(text)
+	except (ValueError, TypeError):
+		return False, 0.0
+
+
 @frappe.whitelist(methods=["POST"])
 def staff_save_item(
 	item_code: str | None,
@@ -627,6 +700,10 @@ def staff_save_item(
 	price: str | float | None = None,
 	disabled: int = 0,
 	barcodes=None,
+	price_unit: str | None = None,
+	large_uom: str | None = None,
+	factor: str | float | None = None,
+	display_override: str | None = None,
 ):
 	"""حفظ صنف + سعره + باركوداته (جدول Item Barcode القياسي — بند 4).
 
@@ -651,6 +728,77 @@ def staff_save_item(
 			"ok": False,
 			"error": _("من فضلك أكمل اسم الصنف والكود والمجموعة"),
 		}
+
+	# حارس الوحدة المبكر (المرحلة 0): رفض عربي واضح قبل أي كتابة،
+	# بدل انفجار LinkValidationError الخام عند الحفظ. الفارغ مسموح
+	# (الافتراضي Nos لاحقًا) — المرفوض فقط قيمة غير معرّفة/معطّلة.
+	submitted_unit = (stock_uom or "").strip()
+	if submitted_unit and not frappe.db.exists(
+		"UOM", {"name": submitted_unit, "enabled": 1}
+	):
+		return {
+			"ok": False,
+			"error": _("الوحدة غير معرّفة أو معطّلة: {0}").format(submitted_unit),
+		}
+
+	# Phase-2 conversion fields (same rules as the item import).
+	large = (large_uom or "").strip()
+	factor_raw = (factor if factor not in (None, "") else "")
+	factor_raw = str(factor_raw).strip()
+	if large:
+		if not frappe.db.exists("UOM", {"name": large, "enabled": 1}):
+			return {
+				"ok": False,
+				"error": _("الوحدة الكبرى غير معرّفة أو معطّلة: {0}").format(large),
+			}
+		small_unit = submitted_unit or "Nos"
+		if large == small_unit:
+			return {
+				"ok": False,
+				"error": _("الوحدة الكبرى تطابق الصغرى — اترك الكبرى فارغة للصنف الوحيد"),
+			}
+		ok_factor, factor_value = _strict_num_local(factor_raw)
+		if not ok_factor or factor_value <= 0:
+			return {
+				"ok": False,
+				"error": _("معامل التحويل يجب أن يكون رقمًا أكبر من صفر"),
+			}
+	elif factor_raw:
+		return {
+			"ok": False,
+			"error": _("معامل تحويل بلا وحدة كبرى"),
+		}
+	flag = (display_override or "").strip()
+	if flag and flag not in ("inherit", "small_only", "large_only"):
+		return {
+			"ok": False,
+			"error": _("إعداد العرض غير صالح"),
+		}
+
+	# Phase-2 price entry unit: the stored reference is always the SMALL
+	# price. Entering the large price (staff screen only) computes small
+	# = round_half_up(large / factor) and shows it before save (drawer).
+	price_unit = (price_unit or "small").strip() or "small"
+	if price_unit not in ("small", "large"):
+		return {
+			"ok": False,
+			"error": _("وحدة إدخال السعر يجب أن تكون صغرى أو كبرى"),
+		}
+	if price not in (None, "") and price_unit == "large":
+		if not large:
+			return {
+				"ok": False,
+				"error": _("أدخل الوحدة الكبرى ومعاملها أولًا لحساب سعر الصغرى"),
+			}
+		ok_price, large_price = _strict_num_local(price)
+		if not ok_price or large_price < 0:
+			return {
+				"ok": False,
+				"error": _("سعر الجمهور يجب أن يكون رقمًا لا يقل عن صفر"),
+			}
+		from biozone_web.units import money2
+
+		price = money2(large_price / factor_value)
 
 	# تطبيع قائمة الباركودات: نصوص مقصوصة بلا فراغات ولا تكرار.
 	# الغياب (None) ≠ الإفراغ الصريح ([]): المفتاح الغائب يعني أن الواجهة
@@ -723,6 +871,12 @@ def staff_save_item(
 		# المزامنة فقط عند إرسال المفتاح فعلًا — الغائب يترك الموجود.
 		if barcodes_provided:
 			_sync_item_barcodes(doc, new_barcodes)
+		if flag:
+			doc.display_override = flag
+		if large:
+			from biozone_web.import_export import _import_upsert_conversion
+
+			_import_upsert_conversion(doc, large, factor_raw, "")
 		doc.save(ignore_permissions=True)
 
 	else:
@@ -742,7 +896,19 @@ def staff_save_item(
 				"stock_uom": stock_uom or "Nos",
 				"is_stock_item": 1,
 				"disabled": frappe.utils.cint(disabled),
+				"display_override": flag or "inherit",
 				"barcodes": [{"barcode": bc} for bc in new_barcodes],
+				"uoms": (
+					[
+						{
+							"uom": large,
+							"conversion_factor": factor_value,
+							"min_qty": 1.0,
+						}
+					]
+					if large
+					else []
+				),
 			}
 		)
 
