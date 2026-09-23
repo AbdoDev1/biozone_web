@@ -1,0 +1,67 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>{% if print_kind == 'credit' %}إشعار مرتجع{% else %}فاتورة{% endif %} - بيوزون</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+tailwind.config = { darkMode: "class", theme: { extend: {
+  colors: { primary: "#00685f", "primary-accent": "#008378", "navy-text": "#0b1c30", surface: "#f8f9ff", "surface-subtle": "#eff4ff" },
+  fontFamily: { sans: ['Tajawal', 'sans-serif'] } } } }
+</script>
+<style>
+body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b1c30; }
+.invoice-sheet, .invoice-sheet * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* ارتفاع ثابت لمنطقة البنود لثبات طول المستند؛ الملخص والتوقيعات
+   داخل .sheet-footer لا تنقسم أبدًا فترحل معًا لنهاية آخر صفحة. */
+.invoice-items { min-height: 420px; }
+.sheet-footer { break-inside: avoid; }
+@media print {
+  .no-print { display: none !important; }
+  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
+  .invoice-sheet tr { break-inside: avoid; }
+  .sheet-footer { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<main class="flex-1 p-4 sm:p-6 w-full max-w-[1000px] mx-auto flex flex-col gap-4">
+{% if error_state %}
+<div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
+<p class="text-[20px] font-bold">{{ error_title }}</p>
+{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order }}</p>{% endif %}
+<p class="text-navy-text/70">{{ error_message }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<div class="flex items-center gap-2 flex-wrap justify-center mt-2">
+<a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
+</div>
+</div>
+{% else %}
+<div class="no-print bg-white border border-surface-container rounded-xl px-4 py-3 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+<p class="text-sm font-bold">مستند جاهز للطباعة: <span class="text-primary font-mono" dir="ltr">{% if print_kind == 'credit' %}{{ credit_print.name }}{% else %}{{ invoice_name }}{% endif %}</span></p>
+<div class="flex items-center gap-2">
+<a class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-all" href="/staff/order-delivery?order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}">عودة للتسليم</a>
+<button class="inline-flex items-center gap-1.5 px-5 py-2 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-lg transition-all" onclick="window.print()" type="button"><span class="material-symbols-outlined text-[18px]">print</span>طباعة</button>
+</div>
+</div>
+<div class="w-full flex flex-col items-center justify-center">
+{% if print_kind == 'credit' %}
+{% if credit_print %}
+{% include "biozone_web/templates/includes/biozone_print_credit.html" %}
+{% else %}
+<div class="bg-white border border-surface-container rounded-xl p-8 text-center text-sm text-navy-text/60">لا يوجد إشعار مرتجع لهذا الطلب بعد.</div>
+{% endif %}
+{% else %}
+{% include "biozone_web/templates/includes/biozone_print_invoice.html" %}
+{% endif %}
+</div>
+{% endif %}
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+</body></html>

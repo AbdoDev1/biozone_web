@@ -1918,7 +1918,7 @@ def staff_create_return(order_name: str, items=None):
 			"order_returned",
 			reference_doctype="Sales Order",
 			reference_name=so.name,
-			context={"order": so.name},
+			context={"order": so.name, "credit": si_ret.name},
 		)
 	except Exception:
 		frappe.log_error(title="Biozone notify order_returned failed")

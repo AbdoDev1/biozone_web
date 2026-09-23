@@ -13,24 +13,6 @@ tailwind.config = { darkMode: "class", theme: { extend: {
 </script>
 <style>
 body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
-/* ارتفاع ثابت لمنطقة بنود الفاتورة حتى يبقى ملخص الإجماليات في نفس
-   الموضع مهما قلّ عدد الأصناف (حتى صنف واحد) — شاشة وطباعة معًا. */
-.invoice-items { min-height: 480px; }
-/* ارتفاع ثابت لمنطقة البنود يسع 14 صنفًا كمقياس حتى لو صنف واحد. */
-.invoice-sheet, .invoice-sheet * {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-@media print {
-  aside, header, nav, .no-print { display: none !important; }
-  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
-  .main-content-wrapper { margin: 0 !important; padding: 0 !important; }
-  .invoice-items { min-height: 480px; }
-  .invoice-sheet tr { break-inside: avoid; }
-  /* طباعة انتقائية: زر الفاتورة يخفي شيت الإشعار، وزر الإشعار يخفي شيت الفاتورة */
-  body.print-invoice-only #creditSheet { display: none !important; }
-  body.print-credit-only #invoiceSheet { display: none !important; }
-}
 </style>
 </head>
 {% include "biozone_web/templates/includes/staff_shell_top.html" %}
@@ -54,8 +36,8 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-subtle">
 <p class="text-[18px] font-bold">تم إصدار الفاتورة المعتمَدة وخصم المخزون وتسليم الطلب بالكامل.</p>
 <div class="flex items-center gap-2 flex-wrap">
-<button class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all" onclick="printInvoiceSheet()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</button>
-{% if credit_print %}<button class="flex items-center gap-1.5 px-5 py-2.5 bg-alert-red text-white rounded-xl font-bold shadow-md hover:bg-red-700 transition-all" onclick="printCreditSheet()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة إشعار المرتجع</button>{% endif %}
+<a href="/staff/print?doc=invoice&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</a>
+{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-alert-red text-white rounded-xl font-bold shadow-md hover:bg-red-700 transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة إشعار المرتجع</a>{% endif %}
 <a class="flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="/staff/orders"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
 </div>
 </div>
@@ -164,22 +146,6 @@ function apiCall(method, args) {
 
 function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
 function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
-
-// طباعة انتقائية: كل زر يطبع شيت مستنده فقط (الآخر يُخفى عبر body class
-// تُزال بعد الطباعة حتى لا تعلق مخفية).
-function printInvoiceSheet() {
-  document.body.classList.remove('print-credit-only');
-  document.body.classList.add('print-invoice-only');
-  window.print();
-}
-function printCreditSheet() {
-  document.body.classList.remove('print-invoice-only');
-  document.body.classList.add('print-credit-only');
-  window.print();
-}
-window.addEventListener('afterprint', () => {
-  document.body.classList.remove('print-invoice-only', 'print-credit-only');
-});
 function showToast(title, desc, type) { return window.StaffUI.toast(title, desc, type); }
 
 // تحويل الأرقام العربية/الفارسية إلى لاتينية قبل parseFloat — لوحة
@@ -266,153 +232,15 @@ document.getElementById('btnDoReturn').addEventListener('click', () => {
 });
 </script>
 
-<!-- الفاتورة الورقية (تصميم واحد فقط — إعادة الطباعة تعيد المستند نفسه) -->
-<div class="w-full flex flex-col items-center justify-center" id="invoiceSheet">
-<div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
-<div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
-<div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">فاتورة رقم</span><span class="col-span-2 text-center font-bold text-[16px]">{{ invoice_name }}</span></div>
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">التاريخ</span><span class="col-span-2 text-center">{{ posting_date }}</span></div>
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">اسم العميل</span><span class="col-span-2 font-bold text-[14px]">{{ customer_name }}</span></div>
-<div class="grid grid-cols-3 py-1 px-1"><span class="font-bold col-span-1">العنوان</span><span class="col-span-2 text-[12px]">{{ customer_address }}</span></div>
-<div class="border-t border-dashed border-gray-400 mt-1 pt-1 text-[10px] text-gray-700 flex justify-between"><span>طلب: {{ order_name }}</span><span>تسليم: {{ delivery_note or '—' }}</span></div>
+<!-- المستندات: روابط خارجية بأسمائها تفتح صفحة طباعة مستقلة -->
+<div class="no-print bg-white rounded-2xl p-6 shadow-sm border border-surface-subtle flex flex-col gap-4">
+<p class="text-[16px] font-bold">مستندات الطلب للطباعة</p>
+<div class="flex items-center gap-2.5 flex-wrap">
+<a href="/staff/print?doc=invoice&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">receipt</span>فتح الفاتورة {{ invoice_name }}</a>
+{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">print</span>فتح إشعار المرتجع {{ credit_print.name }}</a>{% endif %}
 </div>
-<div class="col-span-8 text-center flex flex-col items-center justify-center">
-<h2 class="text-[24px] font-bold tracking-wide">Bio Zone - بيو زون</h2>
-<p class="text-[14px] font-bold mt-1">للمستلزمات الطبية ومستحضرات التجميل</p>
-<p class="text-[12px] mt-1">فاتورة معتمَدة</p>
+<p class="text-[11px] text-navy-text/50">كل مستند يفتح في صفحة طباعة مستقلة باسمه — بلا عرض مباشر هنا.</p>
 </div>
-</div>
-
-<div class="w-full overflow-x-auto invoice-items">
-<table class="w-full border-collapse border border-black text-center text-[14px]">
-<thead>
-<tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
-<th class="border border-black py-1 px-1 w-10">م</th>
-<th class="border border-black py-1 px-2 text-center">الصنف</th>
-<th class="border border-black py-1 px-1 w-16">الكمية</th>
-<th class="border border-black py-1 px-1 w-20">السعر</th>
-<th class="border border-black py-1 px-1 w-20">الخصم %</th>
-<th class="border border-black py-1 px-1 w-24">الإجمالي</th>
-</tr>
-</thead>
-<tbody class="text-black">
-{% for it in items %}
-<tr class="border-b border-black">
-<td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
-<td class="border border-black py-1 px-2 text-center font-medium">{{ it.item_name }}</td>
-<td class="border border-black py-1 px-1 font-bold">{{ it.qty }}</td>
-<td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.public_rate) }}</td>
-<td class="border border-black py-1 px-1">{{ "{:g}".format(it.discount_percentage) }}</td>
-<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
-</tr>
-{% endfor %}
-{% if shipping %}
-<tr class="border-b border-black">
-<td class="border border-black py-1 px-2 text-center font-bold" colspan="5">مصاريف الشحن</td>
-<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(shipping) }}</td>
-</tr>
-{% endif %}
-</tbody>
-</table>
-</div>
-
-<div class="border-2 border-black text-[13px] mt-2">
-<div class="grid grid-cols-12 border-b border-black text-center font-bold">
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100">عدد الأصناف</div>
-<div class="col-span-1 border-l border-black py-1 text-[15px]">{{ items_count }}</div>
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100">صافي الفاتورة</div>
-<div class="col-span-2 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(grand_total) }}</div>
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100">الحساب السابق</div>
-<div class="col-span-3 py-1 text-[15px]">{{ "{:,.2f}".format(previous_balance) }}</div>
-</div>
-<div class="grid grid-cols-12 border-b border-black text-center">
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">الرصيد الحالي</div>
-<div class="col-span-2 border-l border-black py-1 font-bold text-[14px]">{{ "{:,.2f}".format(current_balance) }}</div>
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">المبلغ كتابة</div>
-<div class="col-span-6 py-1 font-bold text-right px-2">{{ amount_words }}</div>
-</div>
-<div class="grid grid-cols-12 text-center text-[12px]">
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">الموظف المؤكِّد</div>
-<div class="col-span-4 border-l border-black py-1 font-bold">{{ confirmed_by }}</div>
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">وقت الطباعة</div>
-<div class="col-span-4 py-1 font-bold" dir="ltr">{{ print_time }}</div>
-</div>
-</div>
-</div>
-
-<div class="grid grid-cols-2 gap-6 mt-4 pt-2 border-t border-dashed border-gray-400 text-[13px]">
-<div class="flex flex-col gap-2">
-<span class="font-bold">توقيع المستلم:</span>
-<div class="h-12 border-b border-black border-dashed flex items-end"><span class="text-gray-400 text-[11px]">الاسم والتوقيع: ...............................................</span></div>
-</div>
-<div class="flex flex-col gap-2">
-<span class="font-bold">توقيع الموظف:</span>
-<div class="h-12 border-b border-black border-dashed flex items-end justify-end"><span class="text-gray-400 text-[11px]">{{ confirmed_by }}</span></div>
-</div>
-</div>
-
-<div class="mt-4 pt-1 flex justify-between items-center text-[10px] text-gray-500 border-t border-neutral-200">
-<span>شركة بيو زون للمستلزمات الطبية</span>
-<span>صفحة 1 من 1</span>
-</div>
-</div>
-
-{% if credit_print %}
-<!-- إشعار المرتجع المختصر (S3a) — البنود المرتجعة + القيمة + رقم الأصل + الموظف -->
-<div class="w-full flex flex-col items-center justify-center mt-8 break-before-page" id="creditSheet">
-<div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
-<div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
-<div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">إشعار رقم</span><span class="col-span-2 text-center font-bold text-[16px]">{{ credit_print.name }}</span></div>
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">التاريخ</span><span class="col-span-2 text-center">{{ credit_print.posting_date }}</span></div>
-<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">اسم العميل</span><span class="col-span-2 font-bold text-[14px]">{{ credit_print.customer_name }}</span></div>
-<div class="grid grid-cols-3 py-1 px-1"><span class="font-bold col-span-1">فاتورة الأصل</span><span class="col-span-2 text-center font-bold">{{ credit_print.original }}</span></div>
-<div class="border-t border-dashed border-gray-400 mt-1 pt-1 text-[10px] text-gray-700 flex justify-between"><span>طلب: {{ order_name }}</span><span>الموظف: {{ credit_print.staff_name }}</span></div>
-</div>
-<div class="col-span-8 text-center flex flex-col items-center justify-center">
-<h2 class="text-[24px] font-bold tracking-wide">Bio Zone - بيو زون</h2>
-<p class="text-[14px] font-bold mt-1">للمستلزمات الطبية ومستحضرات التجميل</p>
-<p class="text-[12px] mt-1">إشعار مرتجع (Credit Note)</p>
-</div>
-</div>
-
-<div class="w-full overflow-x-auto invoice-items">
-<table class="w-full border-collapse border border-black text-center text-[14px]">
-<thead>
-<tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
-<th class="border border-black py-1 px-1 w-10">م</th>
-<th class="border border-black py-1 px-2 text-center">الصنف</th>
-<th class="border border-black py-1 px-1 w-16">الكمية المرتجعة</th>
-<th class="border border-black py-1 px-1 w-20">السعر</th>
-<th class="border border-black py-1 px-1 w-24">الإجمالي</th>
-</tr>
-</thead>
-<tbody class="text-black">
-{% for it in credit_print.lines %}
-<tr class="border-b border-black">
-<td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
-<td class="border border-black py-1 px-2 text-center font-medium">{{ it.item_name }}</td>
-<td class="border border-black py-1 px-1 font-bold">{{ it.qty }} {{ it.uom }}</td>
-<td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.rate) }}</td>
-<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-
-<div class="border-2 border-black text-[13px] mt-2">
-<div class="grid grid-cols-12 border-b border-black text-center font-bold">
-<div class="col-span-4 border-l border-black py-1 bg-neutral-100">إجمالي المرتجع</div>
-<div class="col-span-3 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(credit_print.total) }}</div>
-<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">وقت الطباعة</div>
-<div class="col-span-3 py-1 font-bold" dir="ltr">{{ credit_print.print_time }}</div>
-</div>
-</div>
-</div>
-</div>
-{% endif %}
 {% endif %}
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}

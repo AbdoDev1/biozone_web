@@ -5,6 +5,7 @@ from biozone_web.utils import (
 	find_customer_for_current_user,
 	get_header_context,
 	get_portal_users_for_customer,
+	is_unique_customer_binding,
 	redirect_staff_away_from_store,
 )
 from biozone_web.www.my_orders import build_customer_invoices_list, build_customer_orders_list
@@ -69,6 +70,26 @@ def get_context(context):
 	orders, orders_count = build_customer_orders_list()
 	context.orders_count = orders_count
 	context.recent_orders = orders[:RECENT_ORDERS_LIMIT]
+
+	# أحدث المرتجعات (S3b — قراءة فقط): آخر 3 إشعارات دائنة للعميل.
+	context.recent_returns = []
+	if customer and is_unique_customer_binding(customer, frappe.session.user):
+		for r in frappe.get_all(
+			"Sales Invoice",
+			filters={"customer": customer, "is_return": 1, "docstatus": 1},
+			fields=["name", "posting_date", "grand_total"],
+			order_by="creation desc",
+			limit_page_length=3,
+		):
+			context.recent_returns.append(
+				{
+					"name": r.name,
+					"date_display": frappe.utils.format_date(r.posting_date, "d MMMM yyyy")
+					if r.posting_date
+					else "",
+					"value_display": f"{abs(float(r.grand_total or 0)):,.2f}",
+				}
+			)
 
 	# تبويبا /account (قرار B10): أساسية (افتراضي) ومديونية — رسم
 	# سيرفر-سايد بلا API. قيم الفلاتر تُمرَّر دائمًا لإعادة ملئها،

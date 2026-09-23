@@ -45,7 +45,8 @@ EVENTS = {
 		"audience": "order_owner",
 		"reference_doctype": "Sales Order",
 		"title": "تم قبول المرتجع على طلبك {order}",
-		"link": lambda ref: f"/account/orders/{ref}",
+		"link": lambda ref, ctx: f"/account/returns/{ctx['credit']}",
+		"link_needs_context": True,
 		"dedupe": None,  # كل مرتجع جزئي حدث مقصود مستقل — لا كتم للاحق
 	},
 	"attention_raised": {
@@ -126,7 +127,7 @@ def notify(event_key, *, reference_doctype, reference_name, context=None, actor=
 	except Exception:
 		frappe.log_error(title=f"Biozone notification bad context: {event_key}")
 		return 0
-	link = _safe_link(event, reference_name)
+	link = _safe_link(event, reference_name, context)
 	if link is None:
 		frappe.log_error(title=f"Biozone notification bad link: {event_key}",
 		                 message=f"ref={reference_name}")
@@ -190,9 +191,12 @@ def _render_title(event, context):
 	return event.get("title", "").format(**clean)
 
 
-def _safe_link(event, reference_name):
+def _safe_link(event, reference_name, context=None):
 	try:
-		raw = event["link"](reference_name)
+		if event.get("link_needs_context"):
+			raw = event["link"](reference_name, context or {})
+		else:
+			raw = event["link"](reference_name)
 	except Exception:
 		return None
 	if not isinstance(raw, str):

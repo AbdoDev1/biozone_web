@@ -93,6 +93,9 @@ website_route_rules = [
 	# تفاصيل طلب العميل: /account/orders/<name> تُحسم إلى الصفحة الثابتة
 	# account/order-detail، والاسم المطابَق يصل في frappe.form_dict.
 	{"from_route": "/account/orders/<order_name>", "to_route": "account/order-detail"},
+	# تفاصيل إشعار مرتجع: /account/returns/<name> تُحسم إلى الصفحة الثابتة
+	# account/return-detail (إشعار العميل يفتحه مباشرة).
+	{"from_route": "/account/returns/<credit_name>", "to_route": "account/return-detail"},
 ]
 
 # automatically load and sync documents of this doctype from downstream apps

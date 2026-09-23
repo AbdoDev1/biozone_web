@@ -68,6 +68,18 @@ def build_customer_orders_list():
 			fields=["name", "transaction_date", "status", "grand_total"],
 			order_by="creation desc",
 		)
+		# الطلبات ذات مرتجع معتمد — استعلام واحد للصفحة (شارة "مرتجع").
+		returned_names = set()
+		if rows:
+			returned_names = {
+				r[0]
+				for r in frappe.db.sql(
+					"""select distinct ch.sales_order from `tabSales Invoice Item` ch
+					inner join `tabSales Invoice` par on par.name = ch.parent
+					where ch.sales_order in %(names)s and par.is_return = 1 and par.docstatus = 1""",
+					{"names": [r.name for r in rows]},
+				)
+			}
 		for so in rows:
 			orders.append(
 				{
@@ -77,6 +89,7 @@ def build_customer_orders_list():
 					"status_style": STATUS_STYLES.get(so.status, "bg-surface-container text-on-surface-variant"),
 					"items_count": frappe.db.count("Sales Order Item", {"parent": so.name}),
 					"grand_total": so.grand_total,
+					"has_return": so.name in returned_names,
 				}
 			)
 

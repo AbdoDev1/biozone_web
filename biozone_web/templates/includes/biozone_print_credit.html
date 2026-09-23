@@ -1,0 +1,62 @@
+{# ورقة إشعار المرتجع للطباعة — نفس هيكل الفاتورة: ترويسة + بنود
+   (ارتفاع ثابت للثبات) + ملخص + توقيعات مدمجة في النهاية. #}
+<div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
+<div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
+<div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">إشعار رقم</span><span class="col-span-2 text-center font-bold text-[16px]">{{ credit_print.name }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">التاريخ</span><span class="col-span-2 text-center">{{ credit_print.posting_date }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">اسم العميل</span><span class="col-span-2 font-bold text-[14px]">{{ credit_print.customer_name }}</span></div>
+<div class="grid grid-cols-3 py-1 px-1"><span class="font-bold col-span-1">فاتورة الأصل</span><span class="col-span-2 text-center font-bold">{{ credit_print.original }}</span></div>
+<div class="border-t border-dashed border-gray-400 mt-1 pt-1 text-[10px] text-gray-700 flex justify-between"><span>طلب: {{ order_name }}</span><span>الموظف: {{ credit_print.staff_name }}</span></div>
+</div>
+<div class="col-span-8 text-center flex flex-col items-center justify-center">
+<h2 class="text-[24px] font-bold tracking-wide">Bio Zone - بيو زون</h2>
+<p class="text-[14px] font-bold mt-1">للمستلزمات الطبية ومستحضرات التجميل</p>
+<p class="text-[12px] mt-1">إشعار مرتجع</p>
+</div>
+</div>
+
+<div class="w-full overflow-x-auto invoice-items">
+<table class="w-full border-collapse border border-black text-center text-[14px]">
+<thead>
+<tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
+<th class="border border-black py-1 px-1 w-10">م</th>
+<th class="border border-black py-1 px-2 text-center">الصنف</th>
+<th class="border border-black py-1 px-1 w-16">الكمية المرتجعة</th>
+<th class="border border-black py-1 px-1 w-20">السعر</th>
+<th class="border border-black py-1 px-1 w-24">الإجمالي</th>
+</tr>
+</thead>
+<tbody class="text-black">
+{% for it in credit_print.lines %}
+<tr class="border-b border-black">
+<td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
+<td class="border border-black py-1 px-2 text-center font-medium">{{ it.item_name }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ it.qty }} {{ it.uom }}</td>
+<td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.rate) }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="sheet-footer">
+<div class="border-2 border-black text-[13px] mt-2">
+<div class="grid grid-cols-12 border-b border-black text-center font-bold">
+<div class="col-span-4 border-l border-black py-1 bg-neutral-100">إجمالي المرتجع</div>
+<div class="col-span-3 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(credit_print.total) }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">وقت الطباعة</div>
+<div class="col-span-3 py-1 font-bold" dir="ltr">{{ credit_print.print_time }}</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-6 mt-2 pt-1 text-[12px] font-bold">
+<div class="border-b border-black border-dashed pb-1">توقيع المستلم: ..............................</div>
+<div class="border-b border-black border-dashed pb-1 text-left">توقيع الموظف ({{ credit_print.staff_name }}): ..............................</div>
+</div>
+<div class="mt-1 flex justify-between items-center text-[10px] text-gray-500">
+<span>شركة بيو زون للمستلزمات الطبية</span>
+<span>صفحة 1 من 1</span>
+</div>
+</div>
+</div>

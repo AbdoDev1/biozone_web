@@ -150,11 +150,33 @@ tailwind.config = {
           <div class="flex items-center gap-2.5">
             <span class="text-sm font-bold text-on-surface whitespace-nowrap">{{ "{:,.2f}".format(order.grand_total) }} ج.م</span>
             <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ order.status_style }}">{{ order.status_label }}</span>
+            {% if order.has_return %}<span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-surface-container text-on-surface-variant">مرتجع</span>{% endif %}
           </div>
         </a>
         {% endfor %}
       </div>
       {% endif %}
+    </div>
+    {% endif %}
+
+    {% if recent_returns %}
+    <!-- آخر المرتجعات -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
+      <div class="font-bold text-on-surface mb-3">آخر المرتجعات</div>
+      <div class="flex flex-col gap-2.5">
+        {% for ret in recent_returns %}
+        <a
+          href="/account/returns/{{ ret.name }}"
+          class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3 hover:border-primary/40 transition-all"
+        >
+          <div>
+            <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ ret.name }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display }}</div>
+          </div>
+          <span class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display }} ج.م</span>
+        </a>
+        {% endfor %}
+      </div>
     </div>
     {% endif %}
 
