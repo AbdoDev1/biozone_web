@@ -276,8 +276,10 @@ def set_host_aware_home_page():
 	  فيُعتمد frappe.session.user بأمان.
 	- الضيف: خريطة ثابتة صريحة للمضيفات المتبقية فقط — بلا DB وبلا أي
 	  state خارج frappe.local (مضيف مجهول/تطوير → نترك الإطار الافتراضي).
-	- www.biozone.pro → تحويل 301 للجذر canonical مع الحفاظ على المسار
-	  والاستعلام — GET/HEAD فقط حتى لا تُكسر POSTs نادرة.
+	- www.biozone.pro يُعامل معاملة الجذر (يخدم المتجر عند الوصول
+	  المباشر للأصل) — التحويل canonical الـ301 يتم على حافة Cloudflare
+	  (قاعدة www-to-root)، لا raise تحويلية هنا أبدًا: معالج الاستثناءات
+	  العام لا ينتج Location من before_request.
 	- المسجلون: المنطق الواعي الكامل عبر get_website_user_home_page
 	  (يحتاج الأدوار = قراءة DB — مقبول لمسار "/" فقط؛ البديل هو كاش
 	  الإطار المسموم عبر المضيفات لنفس المستخدم).
@@ -290,22 +292,11 @@ def set_host_aware_home_page():
 	forwarded = headers.get("X-Forwarded-Host") if hasattr(headers, "get") else None
 	host = (forwarded or getattr(request, "host", "") or "").split(":")[0].lower()
 	path = getattr(request, "path", "") or ""
-	if host == "www.biozone.pro":
-		if (getattr(request, "method", "GET") or "GET").upper() in ("GET", "HEAD"):
-			qs = getattr(request, "query_string", "") or ""
-			if isinstance(qs, bytes):
-				qs = qs.decode("utf-8", "ignore")
-			dest = f"https://biozone.pro{path or '/'}"
-			if qs:
-				dest += f"?{qs}"
-			frappe.local.flags.redirect_location = dest
-			raise frappe.Redirect
-		return
 	if path.strip("/") != "":
 		return
 	user = getattr(getattr(frappe, "session", None), "user", None) or "Guest"
 	if user == "Guest":
-		if host == "biozone.pro":
+		if host in ("biozone.pro", "www.biozone.pro"):
 			home = "/biozone-home"
 		elif host == "staff.biozone.pro":
 			home = "/staff/login"
