@@ -231,6 +231,8 @@
 {% set qs = '&group=' + selected_group if selected_group else '' %}
 {% set qs = qs + '&brand=' + selected_brand if selected_brand else qs %}
 {% set qs = qs + '&q=' + search_term if search_term else qs %}
+{% set qs = qs + '&code=' + selected_code if selected_code else qs %}
+{% set qs = qs + '&tab=list' %}
 {% if has_prev %}
 <a href="/staff/items?page={{ prev_page }}{{ qs }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">السابق</a>
 {% else %}

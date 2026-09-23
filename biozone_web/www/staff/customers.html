@@ -94,55 +94,6 @@
 </div>
 {% endif %}
 
-<!-- 2. بطاقات الإحصاءات الأربعة (Stat Cards) -->
-<section aria-label="ملخص إحصاءات العملاء" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
-<div>
-<p class="text-xs font-bold text-navy-text/50">إجمالي العملاء</p>
-<p class="text-2xl font-extrabold text-navy-text mt-1">{{ stats.customer_display }}</p>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
-<span class="material-symbols-outlined text-2xl">group</span>
-</div>
-</div>
-<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
-<div>
-<p class="text-xs font-bold text-navy-text/50">إجمالي الفواتير</p>
-<p class="text-2xl font-extrabold text-navy-text mt-1">{{ stats.invoice_display }}</p>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
-<span class="material-symbols-outlined text-2xl">receipt_long</span>
-</div>
-</div>
-<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border border-surface-container flex items-center justify-between">
-<div>
-<p class="text-xs font-bold text-navy-text/50">إجمالي المبيعات</p>
-<div class="flex items-baseline gap-1 mt-1">
-<span class="text-2xl font-extrabold text-navy-text">{{ stats.sales_display }}</span>
-</div>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-subtle text-primary flex items-center justify-center">
-<span class="material-symbols-outlined text-2xl">payments</span>
-</div>
-</div>
-<div class="bg-white rounded-2xl shadow-sm p-4 sm:p-5 border {% if stats.has_debt %}border-alert-bg{% else %}border-surface-container{% endif %} flex items-center justify-between relative overflow-hidden">
-<div>
-<div class="flex items-center gap-1.5">
-<p class="text-xs font-bold {% if stats.has_debt %}text-alert-red{% else %}text-navy-text/50{% endif %}">إجمالي المديونية</p>
-{% if stats.has_debt %}
-<span class="text-[10px] bg-alert-bg text-alert-red px-1.5 py-0.5 rounded-full font-bold">مستحقة</span>
-{% endif %}
-</div>
-<div class="flex items-baseline gap-1 mt-1">
-<span class="text-2xl font-extrabold {% if stats.has_debt %}text-alert-red{% else %}text-navy-text{% endif %}">{{ stats.debt_display }}</span>
-</div>
-</div>
-<div class="w-12 h-12 rounded-xl {% if stats.has_debt %}bg-alert-bg text-alert-red{% else %}bg-surface-subtle text-primary{% endif %} flex items-center justify-center">
-<span class="material-symbols-outlined text-2xl">account_balance_wallet</span>
-</div>
-</div>
-</section>
-
 <!-- 3. شريط البحث والفلاتر -->
 <section aria-label="أدوات البحث والفلترة" class="bg-white rounded-2xl shadow-sm p-4 space-y-3.5 border border-surface-container">
 <form class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3" method="get" action="/staff/customers">
@@ -294,7 +245,7 @@
 </tbody>
 </table>
 </div>
-<div class="hidden py-16 px-4 text-center border-t border-surface-container" id="no-results-container">
+<div class="py-16 px-4 text-center border-t border-surface-container {% if customers %}hidden{% endif %}" id="no-results-container">
 {% if not customers %}
 {% if show == 'unreviewed' and not search_term and selected_group == 'all' %}
 <div class="flex flex-col items-center justify-center text-navy-text/40 py-6">

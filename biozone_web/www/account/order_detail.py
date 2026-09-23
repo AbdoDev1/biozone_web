@@ -76,4 +76,31 @@ def get_context(context):
 	context.grand_total = grand_total
 	context.grand_total_display = f"{grand_total:,.2f}"
 
+	# المرتجعات على هذا الطلب (S3b — قراءة فقط): إشعارات دائنة معتمدة
+	# مرتبطة ببنود الطلب تخفض مديونية العميل. غيابها = لا قسم في العرض.
+	credit_names = frappe.db.sql_list(
+		"""select distinct ch.parent from `tabSales Invoice Item` ch
+		inner join `tabSales Invoice` par on par.name = ch.parent
+		where ch.sales_order = %s and par.is_return = 1 and par.docstatus = 1
+		order by par.creation desc""",
+		order_name,
+	)
+	context.returns = []
+	if credit_names:
+		context.returns = [
+			{
+				"name": r.name,
+				"date_display": frappe.utils.format_date(r.posting_date, "d MMMM yyyy")
+				if r.posting_date
+				else "",
+				"value_display": f"{abs(float(r.grand_total or 0)):,.2f}",
+			}
+			for r in frappe.get_all(
+				"Sales Invoice",
+				filters={"name": ["in", credit_names]},
+				fields=["name", "posting_date", "grand_total"],
+				order_by="creation desc",
+			)
+		]
+
 	return context

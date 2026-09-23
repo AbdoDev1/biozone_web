@@ -89,26 +89,6 @@
 <p class="text-xs text-navy-text/50 mt-1">{{ email + ' — ' if email else '' }}منذ {{ created_display }}</p>
 </section>
 
-<!-- الملخص المالي -->
-<section aria-label="الملخص المالي" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-<div class="bg-white rounded-xl p-4 border border-surface-container">
-<p class="text-[11px] font-bold text-navy-text/50">إجمالي الفواتير</p>
-<p class="text-lg font-black text-navy-text mt-0.5">{{ invoice_count }} فواتير</p>
-</div>
-<div class="bg-white rounded-xl p-4 border border-surface-container">
-<p class="text-[11px] font-bold text-navy-text/50">إجمالي المشتريات</p>
-<p class="text-lg font-black text-navy-text mt-0.5">{{ billed_display }}</p>
-</div>
-<div class="bg-white rounded-xl p-4 border border-surface-container">
-<p class="text-[11px] font-bold text-navy-text/50">إجمالي المدفوع</p>
-<p class="text-lg font-black text-navy-text mt-0.5">{{ paid_display }}</p>
-</div>
-<div class="bg-white rounded-xl p-4 border border-alert-bg/60">
-<p class="text-[11px] font-bold text-alert-red">المديونية الحالية</p>
-<p class="text-lg font-black text-alert-red mt-0.5">{{ outstanding_display }}</p>
-</div>
-</section>
-
 <!-- الفواتير -->
 <section aria-label="فواتير العميل" class="bg-white rounded-2xl shadow-sm border border-surface-container overflow-hidden flex flex-col">
 <div class="flex items-center justify-between px-5 py-4 border-b border-surface-container">

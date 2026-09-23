@@ -8,7 +8,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
 tailwind.config = { darkMode: "class", theme: { extend: {
-  colors: { primary: "#00685f", "navy-text": "#0b1c30", surface: "#f8f9ff", "surface-subtle": "#eff4ff" },
+  colors: { primary: "#00685f", "navy-text": "#0b1c30", surface: "#f8f9ff", "surface-subtle": "#eff4ff", "alert-red": "#ba1a1a", "alert-bg": "#ffdad6" },
   fontFamily: { sans: ['Tajawal', 'sans-serif'] } } } }
 </script>
 <style>
@@ -27,6 +27,9 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
   .main-content-wrapper { margin: 0 !important; padding: 0 !important; }
   .invoice-items { min-height: 480px; }
   .invoice-sheet tr { break-inside: avoid; }
+  /* طباعة انتقائية: زر الفاتورة يخفي شيت الإشعار، وزر الإشعار يخفي شيت الفاتورة */
+  body.print-invoice-only #creditSheet { display: none !important; }
+  body.print-credit-only #invoiceSheet { display: none !important; }
 }
 </style>
 </head>
@@ -51,7 +54,8 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-subtle">
 <p class="text-[18px] font-bold">تم إصدار الفاتورة المعتمَدة وخصم المخزون وتسليم الطلب بالكامل.</p>
 <div class="flex items-center gap-2 flex-wrap">
-<button class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all" onclick="window.print()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</button>
+<button class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all" onclick="printInvoiceSheet()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</button>
+{% if credit_print %}<button class="flex items-center gap-1.5 px-5 py-2.5 bg-alert-red text-white rounded-xl font-bold shadow-md hover:bg-red-700 transition-all" onclick="printCreditSheet()"><span class="material-symbols-outlined text-[20px]">print</span>طباعة إشعار المرتجع</button>{% endif %}
 <a class="flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="/staff/orders"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
 </div>
 </div>
@@ -65,8 +69,205 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 </div>
 </div>
 
+<!-- المرتجع (S2b) — كلي أو جزئي بالكميات، لا يُطبع [return-section v3] -->
+<div class="no-print bg-white rounded-2xl p-6 shadow-sm border border-surface-subtle flex flex-col gap-4">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-surface-subtle">
+<div class="flex items-center gap-2">
+<p class="text-[16px] font-bold">مرتجع الأصناف</p>
+{% if return_state %}<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-alert-bg text-alert-red">{{ return_state }}</span>{% endif %}
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+<button type="button" onclick="fillFullReturn()" class="px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold transition-colors">تعبئة الكامل المتبقي</button>
+<button type="button" id="btnDoReturn" disabled class="px-5 py-2 rounded-xl bg-alert-red text-white text-xs font-bold transition-colors opacity-40 cursor-not-allowed">حفظ وتنفيذ المرتجع</button>
+</div>
+</div>
+{% if returns_history %}
+<div class="flex items-center gap-2 flex-wrap text-xs">
+<span class="text-navy-text/60 font-bold">مرتجعات سابقة:</span>
+{% for h in returns_history %}
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-subtle font-bold" dir="ltr">{{ h.name }}</span>
+{% endfor %}
+</div>
+{% endif %}
+{% if not return_rows %}
+<p class="text-sm text-navy-text/60 font-bold">لا بنود قابلة للمرتجع حاليًا — إما اكتمل مرتجع الطلب أو لا يوجد تسليم معتمد بعد.</p>
+{% else %}
+<div class="overflow-x-auto">
+<table class="w-full text-right text-sm" id="returnTable">
+<thead>
+<tr class="text-navy-text/60 text-xs border-b border-surface-subtle">
+<th class="py-2 px-3 font-bold">الصنف</th>
+<th class="py-2 px-3 font-bold text-center">المسلَّمة</th>
+<th class="py-2 px-3 font-bold text-center">المرتجَعة</th>
+<th class="py-2 px-3 font-bold text-center">المتبقية</th>
+<th class="py-2 px-3 font-bold text-center">كمية المرتجع</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-subtle">
+{% for r in return_rows %}
+<tr>
+<td class="py-2.5 px-3 font-bold">{{ r.item_name }}<span class="block text-[11px] font-normal text-navy-text/50">{{ r.uom }}</span></td>
+<td class="py-2.5 px-3 text-center">{{ r.delivered }}</td>
+<td class="py-2.5 px-3 text-center">{{ r.returned }}</td>
+<td class="py-2.5 px-3 text-center font-bold">{{ r.remaining }}</td>
+<td class="py-2.5 px-3 text-center">
+{% if r.remaining > 0 %}
+<input type="number" min="0" max="{{ r.remaining }}" step="any" value="0" data-so-detail="{{ r.so_detail }}" data-max="{{ r.remaining }}"
+class="ret-qty w-24 text-center text-sm font-bold p-2 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary">
+{% else %}
+<span class="text-navy-text/40 text-xs">مكتمل</span>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p class="text-[11px] text-navy-text/50">المرتجع يعيد المخزون ويُنشئ إشعارًا دائنًا يُخفض مديونية العميل ويُشعره فورًا. الكميات بوحدة البيع الظاهرة، والسقف هو المتبقي — أي تجاوز مرفوض.</p>
+<p class="text-xs font-bold text-primary" id="returnLiveLine">المدخَل الآن: لا كمية — أدخل كمية ثم اضغط "حفظ وتنفيذ المرتجع".</p>
+{% endif %}
+</div>
+
+<!-- مودال تأكيد المرتجع -->
+<div class="no-print fixed inset-0 z-50 bg-navy-text/50 backdrop-blur-sm hidden items-center justify-center p-4" id="returnConfirmModal">
+<div class="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+<h3 class="text-base font-bold">تأكيد المرتجع</h3>
+<p class="text-xs leading-relaxed bg-surface-subtle p-3.5 rounded-lg border border-surface-container" id="returnConfirmText"></p>
+<div class="flex items-center justify-end gap-2.5 pt-2">
+<button class="px-4 py-2 bg-surface-subtle text-navy-text text-xs font-bold rounded-lg hover:bg-surface-container transition-colors" onclick="closeModal('returnConfirmModal')" type="button">تراجع</button>
+<button id="btnConfirmReturn" class="px-4 py-2 bg-alert-red text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-colors" onclick="confirmReturn()" type="button">تأكيد التنفيذ</button>
+</div>
+</div>
+</div>
+
+<div class="no-print fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none" id="toastContainer"></div>
+
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+const ORDER_NAME = {{ order_name|tojson }};
+
+function apiCall(method, args) {
+  return fetch('/api/method/biozone_web.api.' + method, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+    body: JSON.stringify(args),
+  }).then(async (res) => {
+    const data = await res.json();
+    if (!res.ok || (data.message && data.message.ok === false)) {
+      const apiError = (data && data.message && typeof data.message.error === 'string')
+        ? data.message.error : '';
+      throw new Error(apiError || 'تعذر تنفيذ العملية');
+    }
+    return data.message;
+  });
+}
+
+function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
+function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+
+// طباعة انتقائية: كل زر يطبع شيت مستنده فقط (الآخر يُخفى عبر body class
+// تُزال بعد الطباعة حتى لا تعلق مخفية).
+function printInvoiceSheet() {
+  document.body.classList.remove('print-credit-only');
+  document.body.classList.add('print-invoice-only');
+  window.print();
+}
+function printCreditSheet() {
+  document.body.classList.remove('print-invoice-only');
+  document.body.classList.add('print-credit-only');
+  window.print();
+}
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('print-invoice-only', 'print-credit-only');
+});
+function showToast(title, desc, type) { return window.StaffUI.toast(title, desc, type); }
+
+// تحويل الأرقام العربية/الفارسية إلى لاتينية قبل parseFloat — لوحة
+// المفاتيح العربية تدخل ٢٣ فيفشل parseFloat بصمت (NaN) فيبقى الزر معطلًا.
+function numVal(s) {
+  const t = String(s == null ? '' : s)
+    .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  const v = parseFloat(t);
+  return isNaN(v) ? 0 : v;
+}
+
+function collectReturn() {
+  const rows = [];
+  document.querySelectorAll('.ret-qty').forEach((inp) => {
+    const v = numVal(inp.value);
+    const max = numVal(inp.dataset.max);
+    if (v > 0) rows.push({ so_detail: inp.dataset.soDetail, qty: Math.min(v, max) });
+  });
+  return rows;
+}
+
+function fillFullReturn() {
+  const inputs = document.querySelectorAll('.ret-qty');
+  if (!inputs.length) { showToast('لا بنود', 'لا بنود قابلة للمرتجع حاليًا.', 'error'); return; }
+  inputs.forEach((inp) => { inp.value = inp.dataset.max; });
+  refreshReturnLine();
+  showToast('تمت التعبئة', 'مُلئت كل البنود بكامل الكمية المتبقية — راجع ثم اضغط حفظ وتنفيذ المرتجع.', 'success');
+}
+
+function refreshReturnLine() {
+  const rows = collectReturn();
+  const btn = document.getElementById('btnDoReturn');
+  const line = document.getElementById('returnLiveLine');
+  if (!rows.length) {
+    btn.disabled = true;
+    btn.classList.add('opacity-40', 'cursor-not-allowed');
+    line.textContent = 'المدخَل الآن: لا كمية — أدخل كمية ثم اضغط "حفظ وتنفيذ المرتجع".';
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('opacity-40', 'cursor-not-allowed');
+    const total = rows.reduce((s, r) => s + r.qty, 0);
+    line.textContent = 'المدخَل الآن: ' + rows.length + ' بندًا بإجمالي ' + total + ' — جاهز للحفظ والتنفيذ.';
+  }
+}
+
+document.querySelectorAll('.ret-qty').forEach((inp) => {
+  inp.addEventListener('input', () => {
+    const max = numVal(inp.dataset.max);
+    let v = numVal(inp.value);
+    if (v > max) { inp.value = max; v = max; }
+    if (v <= 0) { inp.value = 0; }
+    refreshReturnLine();
+  });
+});
+refreshReturnLine();
+
+async function confirmReturn() {
+  const rows = collectReturn();
+  if (!rows.length) { closeModal('returnConfirmModal'); showToast('لا كمية', 'أدخل كمية موجبة لبند واحد على الأقل.', 'error'); return; }
+  const btn = document.getElementById('btnConfirmReturn');
+  btn.disabled = true;
+  try {
+    const r = await apiCall('staff_create_return', { order_name: ORDER_NAME, items: rows });
+    closeModal('returnConfirmModal');
+    showToast('تم المرتجع', 'مستند التسليم ' + r.delivery_return + ' والإشعار الدائن ' + r.credit_note + (r.fully ? ' — اكتمل مرتجع الطلب.' : '.'), 'warning');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (err) {
+    closeModal('returnConfirmModal');
+    showToast('تعذر المرتجع', err.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btnDoReturn').addEventListener('click', () => {
+  const rows = collectReturn();
+  if (!rows.length) {
+    showToast('لا كمية', 'أدخل كمية موجبة لبند واحد على الأقل قبل التنفيذ.', 'error');
+    return;
+  }
+  document.getElementById('returnConfirmText').textContent =
+    'سيتم إرجاع ' + rows.length + ' بندًا للطلب ' + ORDER_NAME + ' — المخزون يعود والمديونية تنخفض ولا يمكن التراجع إلا بمرتجع معاكس.';
+  openModal('returnConfirmModal');
+});
+</script>
+
 <!-- الفاتورة الورقية (تصميم واحد فقط — إعادة الطباعة تعيد المستند نفسه) -->
-<div class="w-full flex flex-col items-center justify-center">
+<div class="w-full flex flex-col items-center justify-center" id="invoiceSheet">
 <div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
 <div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
 <div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
@@ -156,6 +357,62 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <span>صفحة 1 من 1</span>
 </div>
 </div>
+
+{% if credit_print %}
+<!-- إشعار المرتجع المختصر (S3a) — البنود المرتجعة + القيمة + رقم الأصل + الموظف -->
+<div class="w-full flex flex-col items-center justify-center mt-8 break-before-page" id="creditSheet">
+<div class="invoice-sheet w-full max-w-[960px] bg-white text-black p-6 shadow-xl rounded-lg border border-neutral-300">
+<div class="grid grid-cols-12 items-center border-b-2 border-black pb-4 mb-2 gap-2 text-right">
+<div class="col-span-4 border border-black p-1 text-[14px] leading-tight">
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">إشعار رقم</span><span class="col-span-2 text-center font-bold text-[16px]">{{ credit_print.name }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">التاريخ</span><span class="col-span-2 text-center">{{ credit_print.posting_date }}</span></div>
+<div class="grid grid-cols-3 border-b border-black py-1 px-1"><span class="font-bold col-span-1">اسم العميل</span><span class="col-span-2 font-bold text-[14px]">{{ credit_print.customer_name }}</span></div>
+<div class="grid grid-cols-3 py-1 px-1"><span class="font-bold col-span-1">فاتورة الأصل</span><span class="col-span-2 text-center font-bold">{{ credit_print.original }}</span></div>
+<div class="border-t border-dashed border-gray-400 mt-1 pt-1 text-[10px] text-gray-700 flex justify-between"><span>طلب: {{ order_name }}</span><span>الموظف: {{ credit_print.staff_name }}</span></div>
+</div>
+<div class="col-span-8 text-center flex flex-col items-center justify-center">
+<h2 class="text-[24px] font-bold tracking-wide">Bio Zone - بيو زون</h2>
+<p class="text-[14px] font-bold mt-1">للمستلزمات الطبية ومستحضرات التجميل</p>
+<p class="text-[12px] mt-1">إشعار مرتجع (Credit Note)</p>
+</div>
+</div>
+
+<div class="w-full overflow-x-auto invoice-items">
+<table class="w-full border-collapse border border-black text-center text-[14px]">
+<thead>
+<tr class="bg-neutral-100 border-b border-black font-bold text-[14px]">
+<th class="border border-black py-1 px-1 w-10">م</th>
+<th class="border border-black py-1 px-2 text-center">الصنف</th>
+<th class="border border-black py-1 px-1 w-16">الكمية المرتجعة</th>
+<th class="border border-black py-1 px-1 w-20">السعر</th>
+<th class="border border-black py-1 px-1 w-24">الإجمالي</th>
+</tr>
+</thead>
+<tbody class="text-black">
+{% for it in credit_print.lines %}
+<tr class="border-b border-black">
+<td class="border border-black py-1 px-1 font-bold">{{ it.idx }}</td>
+<td class="border border-black py-1 px-2 text-center font-medium">{{ it.item_name }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ it.qty }} {{ it.uom }}</td>
+<td class="border border-black py-1 px-1">{{ "{:,.2f}".format(it.rate) }}</td>
+<td class="border border-black py-1 px-1 font-bold">{{ "{:,.2f}".format(it.amount) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="border-2 border-black text-[13px] mt-2">
+<div class="grid grid-cols-12 border-b border-black text-center font-bold">
+<div class="col-span-4 border-l border-black py-1 bg-neutral-100">إجمالي المرتجع</div>
+<div class="col-span-3 border-l border-black py-1 text-[15px]">{{ "{:,.2f}".format(credit_print.total) }}</div>
+<div class="col-span-2 border-l border-black py-1 bg-neutral-100 font-bold">وقت الطباعة</div>
+<div class="col-span-3 py-1 font-bold" dir="ltr">{{ credit_print.print_time }}</div>
+</div>
+</div>
+</div>
+</div>
+{% endif %}
 {% endif %}
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}

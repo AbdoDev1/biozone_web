@@ -156,6 +156,7 @@ _BZ_NOTIFICATION_TYPES = (
 	"BZ Escalation",
 	"BZ Escalation Reminder",
 	"BZ Order Cancelled",
+	"BZ Order Returned",
 )
 
 # Our types never send email (in-app only). Mandatory: new users are

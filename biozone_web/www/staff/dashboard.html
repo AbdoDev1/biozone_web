@@ -50,43 +50,7 @@
 <!-- Section Title Area -->
 <div class="flex items-center justify-between">
 <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">نظرة عامة</h1>
-<span class="text-xs text-primary font-medium bg-primary/10 px-3 py-1 rounded-full">محدث لحظياً</span>
-</div>
-<!-- 4 KPI Cards -->
-<!-- Desktop: 4 in 1 row (grid-cols-4) | Laptop & Tablet: 2x2 (grid-cols-2) | Mobile: 1 col with compact horizontal flow -->
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-<!-- KPI 1: إجمالي الأصناف -->
-<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
-<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-2xl">inventory_2</span>
-</div>
-<div class="text-left sm:text-right flex flex-col">
-<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ "{:,}".format(total_items) }}</span>
-<span class="text-sm text-navy-text/60 font-medium mt-1">إجمالي الأصناف</span>
-</div>
-</div>
-<!-- KPI 2: أصناف منخفضة المخزون -->
-<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
-<div class="w-12 h-12 rounded-full bg-alert-bg/60 text-alert-red flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-2xl">warning</span>
-</div>
-<div class="text-left sm:text-right flex flex-col">
-<span class="text-3xl sm:text-4xl font-bold text-alert-red tracking-tight">{{ low_stock_count }}</span>
-<span class="text-sm text-navy-text/60 font-medium mt-1">أصناف منخفضة المخزون</span>
-</div>
-</div>
-<!-- KPI 3: حركات اليوم -->
-<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
-<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-2xl">sync_alt</span>
-</div>
-<div class="text-left sm:text-right flex flex-col">
-<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ today_movements_count }}</span>
-<span class="text-sm text-navy-text/60 font-medium mt-1">حركات اليوم</span>
-</div>
-</div>
-<!-- KPI 4: آخر حركة مخزون -->
-
+<span class="text-xs text-primary font-medium bg-primary/10 px-3 py-1 rounded-full">بيانات عند التحميل</span>
 </div>
 <!-- Action Links (Minimal, airy, fast-scan) -->
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

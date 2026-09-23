@@ -296,6 +296,10 @@ tailwind.config = {
     const errorEl = document.getElementById('confirm-order-error');
     errorEl.classList.add('hidden');
     if (items.length === 0) return;
+    // منع النقر المزدوج: تعطيل الزر أثناء الطلب وإعادته عند أي فشل
+    // (الناجح يحوّل لصفحة أخرى فلا حاجة لإعادة التفعيل).
+    const confirmBtn = document.getElementById('confirm-order-btn');
+    confirmBtn.disabled = true;
 
     // Default user-facing message; replaced only with curated text below.
     // Raw network / framework text must never reach the page.
@@ -343,6 +347,7 @@ tailwind.config = {
     } catch (err) {
       errorEl.textContent = failMessage;
       errorEl.classList.remove('hidden');
+      confirmBtn.disabled = false;
     }
   });
 

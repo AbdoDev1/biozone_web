@@ -44,33 +44,9 @@ def get_context(context):
 		"Portal User", {"parenttype": "Customer", "parent": doc.name}, "user"
 	) or ""
 	context.created_display = frappe.utils.format_datetime(doc.creation, "dd MMM yyyy")
-
-	stats = _invoice_stats(doc.name)
-	billed = float(stats.get("billed_total") or 0)
-	outstanding = float(stats.get("outstanding_total") or 0)
-	context.invoice_count = int(stats.get("invoice_count") or 0)
-	context.billed_display = f"{billed:,.2f} ج.م"
-	context.paid_display = f"{billed - outstanding:,.2f} ج.م"
-	context.outstanding_display = f"{outstanding:,.2f} ج.م"
 	context.invoices = _all_invoices(doc.name)
 
 	return context
-
-
-def _invoice_stats(customer):
-	"""نفس تجميع customers.py حرفيًا (عدد/مفوتر/مستحق من المرحّلة فقط)."""
-	rows = frappe.db.sql(
-		"""
-		select count(*) as invoice_count,
-			coalesce(sum(grand_total), 0) as billed_total,
-			coalesce(sum(outstanding_amount), 0) as outstanding_total
-		from `tabSales Invoice`
-		where docstatus = 1 and customer = %(name)s
-		""",
-		{"name": customer},
-		as_dict=True,
-	)
-	return rows[0] if rows else {}
 
 
 def _all_invoices(customer):

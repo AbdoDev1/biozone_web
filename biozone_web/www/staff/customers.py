@@ -77,8 +77,6 @@ def get_context(context):
 		if has_review_field
 		else 0
 	)
-	context.stats = _global_stats()
-
 	emails = _portal_emails(names)
 	stats = _invoice_stats(names)
 	recents = _recent_invoices(names)
@@ -159,34 +157,6 @@ def _build_filters(show, search_term, has_review_field, selected_group="all"):
 		)
 		filters["name"] = ["in", sorted(matched)] if matched else ["in", ["__no_match__"]]
 	return filters
-
-
-def _global_stats():
-	"""إحصاءات البطاقات العلوية: إجمالي العملاء والفواتير والمبيعات والمديونية.
-
-	الفواتير المرحّلة فقط (docstatus = 1) — نفس مصدر الملخصات الفردية.
-	"""
-	row = frappe.db.sql(
-		"""
-		select count(*) as invoice_count,
-			coalesce(sum(grand_total), 0) as sales_total,
-			coalesce(sum(outstanding_amount), 0) as debt_total
-		from `tabSales Invoice`
-		where docstatus = 1
-		""",
-		as_dict=True,
-	)[0]
-	customer_count = frappe.db.count("Customer")
-	debt = float(row.debt_total or 0)
-	return {
-		"customer_count": customer_count,
-		"customer_display": f"{customer_count:,}",
-		"invoice_count": int(row.invoice_count or 0),
-		"invoice_display": f"{int(row.invoice_count or 0):,}",
-		"sales_display": f"{float(row.sales_total or 0):,.0f} ج.م",
-		"debt_display": f"{debt:,.0f} ج.م",
-		"has_debt": debt > 0,
-	}
 
 
 def _portal_emails(names):

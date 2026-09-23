@@ -40,6 +40,14 @@ EVENTS = {
 		"link": lambda ref: f"/account/orders/{ref}",
 		"dedupe": ("document_name", "type"),
 	},
+	"order_returned": {
+		"type": "BZ Order Returned",
+		"audience": "order_owner",
+		"reference_doctype": "Sales Order",
+		"title": "تم قبول المرتجع على طلبك {order}",
+		"link": lambda ref: f"/account/orders/{ref}",
+		"dedupe": None,  # كل مرتجع جزئي حدث مقصود مستقل — لا كتم للاحق
+	},
 	"attention_raised": {
 		"type": "BZ Escalation",
 		"audience": "staff",

@@ -82,41 +82,15 @@
 <span class="text-xs text-navy-text/50 font-medium">{{ today_display }}</span>
 </div>
 
-<!-- البطاقات الإحصائية -->
-<div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
-<div class="flex flex-col"><span class="text-3xl font-bold text-navy-text">{{ preparing_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">جارٍ التجهيز</span></div>
-<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">pending_actions</span></div>
-</div>
-<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
-<div class="flex flex-col"><span class="text-3xl font-bold text-navy-text">{{ ready_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">جاهز للتسليم</span></div>
-<div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">fact_check</span></div>
-</div>
-<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
-<div class="flex flex-col"><span class="text-3xl font-bold text-navy-text">{{ delivered_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">تم التسليم</span></div>
-<div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">task_alt</span></div>
-</div>
-<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
-<div class="flex flex-col"><span class="text-3xl font-bold text-alert-red">{{ attention_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">تحتاج انتباه</span></div>
-<div class="w-12 h-12 rounded-full bg-alert-bg text-alert-red flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">warning</span></div>
-</div>
-<div class="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between gap-4">
-<div class="flex flex-col"><span class="text-3xl font-bold text-alert-red">{{ cancelled_count }}</span><span class="text-sm text-navy-text/60 font-medium mt-1">ملغى (مقفل)</span></div>
-<div class="w-12 h-12 rounded-full bg-alert-bg text-alert-red flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-2xl">cancel</span></div>
-</div>
-</div>
-
-<!-- شرائح الحالة (active tab مضبوط من السيرفر) -->
-<div class="flex flex-wrap items-center gap-2" id="stateChips">
-<a href="/staff/orders?page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'all' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">الكل ({{ orders_count }})</a>
-<a href="/staff/orders?state=preparing&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'preparing' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جارٍ التجهيز</a>
-<a href="/staff/orders?state=ready&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'ready' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">جاهز للتسليم</a>
-<a href="/staff/orders?state=delivered&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'delivered' %}bg-primary text-white shadow-sm{% else %}bg-surface-container text-navy-text hover:bg-surface-subtle{% endif %}">تم التسليم</a>
-<a href="/staff/orders?state=attention&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'attention' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">تحتاج انتباه</a>
-<a href="/staff/orders?state=cancelled&page=1" class="px-4 py-2 rounded-full text-sm font-bold transition-colors {% if filters.state == 'cancelled' %}bg-alert-red text-white shadow-sm{% else %}bg-alert-bg text-alert-red hover:bg-alert-bg/70{% endif %}">ملغى</a>
-</div>
-
-<!-- البحث ولوحة الفلترة المنظمة -->
+<!-- عدد النتائج الحالية -->
+<p class="text-sm font-bold text-navy-text/70 -mt-3">
+{% if orders_count == 0 %}لا توجد نتائج
+{% elif orders_count == 1 %}طلب واحد
+{% elif orders_count == 2 %}طلبان
+{% elif orders_count <= 10 %}{{ orders_count }} طلبات
+{% else %}{{ orders_count }} طلبًا{% endif %}
+</p>
+<!-- البحث والفلاتر -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-surface-subtle/60 flex flex-col gap-4">
 <form method="get" action="/staff/orders" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
 <input type="hidden" name="page" value="1">
@@ -127,16 +101,27 @@
 </div>
 <button type="button" id="filterToggleBtn" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text transition-all text-sm font-bold">
 <span class="material-symbols-outlined text-[18px] text-primary">tune</span>
-<span>فلترة منظمة</span>
+<span>الفلاتر</span>
 <span class="material-symbols-outlined text-[16px] text-navy-text/50">expand_more</span>
 </button>
 <button type="submit" class="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-accent transition-colors">بحث</button>
 </form>
 <div id="filterPanel" class="hidden border-t border-surface-subtle pt-4">
-<form method="get" action="/staff/orders" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<form method="get" action="/staff/orders" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 <input type="hidden" name="page" value="1">
 <input type="hidden" name="q" value="{{ filters.q }}">
-<input type="hidden" name="state" value="{{ filters.state }}">
+<div class="flex flex-col gap-1.5">
+<label class="text-xs font-bold text-navy-text">حالة الطلب</label>
+<select name="state" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
+<option value="all" {% if filters.state == 'all' %}selected{% endif %}>كل الحالات</option>
+<option value="preparing" {% if filters.state == 'preparing' %}selected{% endif %}>جارٍ التجهيز</option>
+<option value="ready" {% if filters.state == 'ready' %}selected{% endif %}>جاهز للتسليم</option>
+<option value="delivered" {% if filters.state == 'delivered' %}selected{% endif %}>تم التسليم</option>
+<option value="attention" {% if filters.state == 'attention' %}selected{% endif %}>تحتاج انتباه</option>
+<option value="cancelled" {% if filters.state == 'cancelled' %}selected{% endif %}>ملغى</option>
+<option value="returned" {% if filters.state == 'returned' %}selected{% endif %}>مرتجع</option>
+</select>
+</div>
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">العميل</label>
 <select name="customer" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
@@ -162,12 +147,26 @@
 </div>
 </div>
 
+<!-- الفلاتر المفعلة -->
+{% if filter_urls %}
+<div class="flex flex-wrap items-center gap-2">
+<span class="text-xs font-bold text-navy-text/60">الفلاتر المفعلة:</span>
+{% if filter_urls.q %}<a href="{{ filter_urls.q }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">بحث: {{ filters.q }}<span class="material-symbols-outlined text-[14px]">close</span></a>{% endif %}
+{% if filter_urls.state %}<a href="{{ filter_urls.state }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">{% if filters.state == 'preparing' %}جارٍ التجهيز{% elif filters.state == 'ready' %}جاهز للتسليم{% elif filters.state == 'delivered' %}تم التسليم{% elif filters.state == 'attention' %}تحتاج انتباه{% elif filters.state == 'cancelled' %}ملغى{% elif filters.state == 'returned' %}مرتجع{% else %}{{ filters.state }}{% endif %}<span class="material-symbols-outlined text-[14px]">close</span></a>{% endif %}
+{% if filter_urls.customer %}<a href="{{ filter_urls.customer }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">{{ filters.customer }}<span class="material-symbols-outlined text-[14px]">close</span></a>{% endif %}
+{% if filter_urls.date_from %}<a href="{{ filter_urls.date_from }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">من {{ filters.date_from }}<span class="material-symbols-outlined text-[14px]">close</span></a>{% endif %}
+{% if filter_urls.date_to %}<a href="{{ filter_urls.date_to }}" class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">إلى {{ filters.date_to }}<span class="material-symbols-outlined text-[14px]">close</span></a>{% endif %}
+<a href="/staff/orders" class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-surface-subtle text-navy-text/70 text-xs font-bold hover:bg-surface-subtle transition-colors">مسح الفلاتر</a>
+</div>
+{% endif %}
+
 <!-- الجدول (أعمدة قابلة للسحب + دمج الحالة مع الإجراء) -->
 <div class="bg-white rounded-2xl shadow-sm border border-surface-subtle/60 overflow-hidden flex flex-col">
 {% if orders_count == 0 %}
 <div class="flex flex-col items-center justify-center py-20 text-center">
 <span class="material-symbols-outlined text-4xl text-navy-text/30">inbox</span>
 <p class="text-navy-text/50 text-sm mt-3">لا توجد طلبات مطابقة للفلاتر الحالية</p>
+<a href="/staff/orders" class="mt-4 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-accent transition-colors">مسح الفلاتر</a>
 </div>
 {% else %}
 <div class="overflow-x-auto w-full">
@@ -262,7 +261,6 @@
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 <script>
-const CSRF_TOKEN = {{ csrf_token|tojson }};
 document.getElementById('filterToggleBtn').addEventListener('click', () => {
   document.getElementById('filterPanel').classList.toggle('hidden');
 });

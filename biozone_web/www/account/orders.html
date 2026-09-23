@@ -75,7 +75,7 @@ tailwind.config = {
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center gap-3">
             <div class="w-11 h-11 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-primary"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-primary"><path d="M6 3h12v18l-3-2-3 2-3 2-3 2V3z"/><path d="M9 8h6M9 12h6"/></svg>
             </div>
             <div>
               <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ order.name }}</div>
@@ -92,6 +92,23 @@ tailwind.config = {
       </a>
       {% endfor %}
     </div>
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-between mt-5 text-sm">
+      <span class="text-on-surface-variant font-medium">صفحة {{ page }} من {{ total_pages }}</span>
+      <div class="flex items-center gap-2">
+        {% if page > 1 %}
+        <a href="/account/orders?page={{ page - 1 }}" class="px-4 py-2 rounded-full border border-outline-variant text-on-surface font-bold hover:bg-surface-container-low transition-colors">السابق</a>
+        {% else %}
+        <span class="px-4 py-2 rounded-full border border-outline-variant/40 text-on-surface-variant/50 font-bold cursor-not-allowed">السابق</span>
+        {% endif %}
+        {% if page < total_pages %}
+        <a href="/account/orders?page={{ page + 1 }}" class="px-4 py-2 rounded-full border border-outline-variant text-on-surface font-bold hover:bg-surface-container-low transition-colors">التالي</a>
+        {% else %}
+        <span class="px-4 py-2 rounded-full border border-outline-variant/40 text-on-surface-variant/50 font-bold cursor-not-allowed">التالي</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
   </div>

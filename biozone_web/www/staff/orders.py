@@ -8,7 +8,7 @@ from biozone_web.b9_utils import (
 	STATE_READY,
 	get_order_prep_state,
 )
-from biozone_web.utils import get_csrf_token_safe, get_header_context, require_staff_access
+from biozone_web.utils import get_header_context, require_staff_access
 
 PAGE_SIZE = 20
 
@@ -19,7 +19,6 @@ def get_context(context):
 	context.active_page = "orders"
 	context.update(get_header_context())
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
-	context.csrf_token = get_csrf_token_safe()
 
 	filters = _read_filters()
 	context.filters = filters
@@ -34,11 +33,7 @@ def get_context(context):
 
 	context.orders = data["orders"]
 	context.orders_count = data["total"]
-	context.preparing_count = data["preparing_count"]
-	context.ready_count = data["ready_count"]
-	context.delivered_count = data["delivered_count"]
-	context.attention_count = data["attention_count"]
-	context.cancelled_count = data["cancelled_count"]
+	context.filter_urls = data["filter_urls"]
 	context.customers = _customer_options()
 	context.page = data["page"]
 	context.total_pages = data["total_pages"]
@@ -49,7 +44,7 @@ def get_context(context):
 def _read_filters() -> dict:
 	"""فلاتر لوحة الفلترة المنظمة (§8): بحث + حالة + انتباه + عميل + نطاق تاريخ."""
 	state = (frappe.form_dict.get("state") or "all").strip()
-	if state not in ("all", "preparing", "ready", "delivered", "attention", "cancelled"):
+	if state not in ("all", "preparing", "ready", "delivered", "attention", "cancelled", "returned"):
 		state = "all"
 	return {
 		"q": (frappe.form_dict.get("q") or "").strip(),
@@ -77,6 +72,23 @@ def _build_querystring(filters: dict) -> str:
 		if filters.get(key):
 			params[key] = filters[key]
 	return urlencode(params)
+
+
+def _filter_urls_without(filters: dict) -> dict:
+	"""روابط إسقاط كل فلتر مفرد (لشارات الفلاتر المفعلة) — تحفظ الباقي."""
+	urls = {}
+	for key in ("q", "state", "customer", "date_from", "date_to"):
+		val = filters.get(key)
+		if not val or val == "all":
+			continue
+		rest = {
+			k: v
+			for k, v in filters.items()
+			if k != key and v and v != "all"
+		}
+		qs = urlencode({"page": 1, **rest})
+		urls[key] = f"/staff/orders?{qs}" if rest else "/staff/orders"
+	return urls
 
 
 def _customer_options() -> list:
@@ -218,6 +230,17 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		filtered = [(r, s) for r, s in filtered if s["needs_attention"]]
 	elif state_filter == "cancelled":
 		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_CANCELLED]
+	elif state_filter == "returned":
+		# الطلبات ذات مرتجع معتمد (DN مرتجع) — استعلام واحد بلا API/مخطط جديد.
+		returned_orders = {
+			r[0]
+			for r in frappe.db.sql(
+				"""select distinct ch.against_sales_order from `tabDelivery Note Item` ch
+				inner join `tabDelivery Note` par on par.name = ch.parent
+				where par.is_return = 1 and par.docstatus = 1"""
+			)
+		}
+		filtered = [(r, s) for r, s in filtered if r.name in returned_orders]
 
 	total = len(filtered)
 	total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -279,9 +302,5 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		"total": total,
 		"page": page,
 		"total_pages": total_pages,
-		"preparing_count": sum(1 for _, s in filtered if s["state"] == STATE_PREPARING),
-		"ready_count": sum(1 for _, s in filtered if s["state"] == STATE_READY),
-		"delivered_count": sum(1 for _, s in filtered if s["state"] == STATE_DELIVERED),
-		"attention_count": sum(1 for _, s in filtered if s["needs_attention"]),
-		"cancelled_count": sum(1 for _, s in filtered if s["state"] == STATE_CANCELLED),
+		"filter_urls": _filter_urls_without(filters),
 	}

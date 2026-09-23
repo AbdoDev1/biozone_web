@@ -177,6 +177,7 @@ def get_context(context):
 	context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")
 	context.brands = frappe.get_all("Brand", fields=["name"], order_by="name asc")
 	context.search_term = search_term
+	context.selected_code = exact_code
 	context.selected_group = item_group
 	context.selected_brand = brand
 	context.page = page

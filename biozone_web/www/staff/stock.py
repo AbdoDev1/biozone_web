@@ -133,8 +133,6 @@ def get_context(context):
 	context.prev_page = page - 1
 	context.next_page = page + 1
 
-	context.total_items = frappe.db.count("Item", {"disabled": 0})
-
 	# Item picker data for the "تسجيل حركة" panel: every active item's
 	# code/name/stock_uom plus its valid alternate UOMs (for the unit
 	# dropdown that changes per selected item). Embedded as JSON and

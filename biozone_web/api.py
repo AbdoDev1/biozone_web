@@ -1122,7 +1122,11 @@ def staff_log_stock_movement(
 		}
 	)
 
-	stock_entry.insert()
+	# نفس نمط كل نهايات الستاف في هذا الملف: البوابة require_staff_access
+	# أعلى الدالة، والإدراج بتجاوز الصلاحيات — أدوار الستاف (عدا
+	# Biozone Stock Staff) لا تملك Stock Entry أصلًا (مثبت حيًا)،
+	# والصفحة متاحة لكل الستاف. submit يرث علم المستند.
+	stock_entry.insert(ignore_permissions=True)
 	stock_entry.submit()
 
 	return {
@@ -1429,7 +1433,9 @@ def staff_set_item_discount(
 # ---------------------------------------------------------------------------
 # المرحلة B9 — تجهيز الطلبات (فحص الباركود + الفاتورة + التسليم)
 #
-# نموذج الحالات (3 فقط): جارٍ التجهيز / جاهز للتسليم / تم التسليم + فلاج
+# نموذج الحالات (4 + فلتر مرتجع في القائمة): جارٍ التجهيز / جاهز للتسليم /
+# تم التسليم / ملغى + فلاج needs_attention داخلي. "مرتجع" فلتر قائمة فقط
+# (DN مرتجع معتمد) وليست حالة في get_order_prep_state.
 # needs_attention داخلي. التأكيد ثنائي على مستوى الصنف فقط (مسحة واحدة =
 # الصنف كاملًا، بلا تتبع كمية). التزامن: الاعتماد على modified المدمج، مع
 # حماية إلزامية من تكرار DN/SI عند إعادة إرسال تأكيد التسليم.
@@ -1730,6 +1736,209 @@ def staff_cancel_order(order_name: str):
 		frappe.log_error(title="Biozone notify order_cancelled failed")
 	frappe.db.commit()
 	return {"ok": True, "already": False, "order_name": so.name}
+
+
+def _b9_single_delivery_pair(order_name: str):
+	"""الزوج الأصلي الوحيد (DN + SI) غير المرتجع للطلب — أو (None, None, error).
+
+	تدفقنا ينتج زوجًا واحدًا لكل طلب مسلَّم. التعدد أو الغياب = بنية
+	غير متوقعة تُرفض صراحة بدل التخمين (Contract v1.1 §4).
+	"""
+	dn_parents = frappe.get_all(
+		"Delivery Note Item",
+		filters={"against_sales_order": order_name, "docstatus": ["!=", 2]},
+		fields=["parent"],
+	)
+	dn_names = sorted(
+		{
+			r.parent
+			for r in dn_parents
+			if frappe.db.get_value("Delivery Note", r.parent, "docstatus") == 1
+			and not frappe.db.get_value("Delivery Note", r.parent, "is_return")
+		}
+	)
+	si_parents = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"sales_order": order_name, "docstatus": ["!=", 2]},
+		fields=["parent"],
+	)
+	si_names = sorted(
+		{
+			r.parent
+			for r in si_parents
+			if frappe.db.get_value("Sales Invoice", r.parent, "docstatus") == 1
+			and not frappe.db.get_value("Sales Invoice", r.parent, "is_return")
+		}
+	)
+	if len(dn_names) != 1 or len(si_names) != 1:
+		return None, None, _("بنية مستندات غير متوقعة لهذا الطلب — راجع الدعم")
+	return dn_names[0], si_names[0], None
+
+
+def _b9_apply_partial(ret_doc, requested: dict):
+	"""يضبط أسطر مسودة المرتجع على كميات الموظف (سالبة) ويُسقط الصفرية.
+
+	الكميات الممررة موجبة بوحدة البيع — وهي نفس وحدة الأسطر (R1/R2)
+	فلا تحويل هنا؛ `stock_qty` تُضبط بالمعامل المنسوخ من السطر الأصلي.
+	التجاوز يُرفض برسالة عربية قبل الاعتماد (الحكم النهائي أصيلًا R4).
+	"""
+	for row in list(ret_doc.items or []):
+		remaining = abs(frappe.utils.flt(row.qty))
+		want = frappe.utils.flt(requested.get((row.so_detail or "").strip(), 0))
+		if want <= 0:
+			ret_doc.items.remove(row)
+			continue
+		if want - remaining > 1e-9:
+			frappe.throw(
+				_("الكمية المطلوبة للصنف {0} تتجاوز المتبقي القابل للمرتجع ({1})").format(
+					row.item_code, remaining
+				)
+			)
+		cf = frappe.utils.flt(row.conversion_factor) or 1
+		row.qty = -1 * want
+		row.stock_qty = -1 * want * cf
+	if not ret_doc.items:
+		frappe.throw(_("لا كمية قابلة للمرتجع في البنود المحددة"))
+
+
+def _b9_check_return_stock(dn_ret):
+	"""فحص مبكر عربي: المرتجع يجب ألا يُبقي رصيد المخزن سالبًا (F18).
+
+	المحرك الأصيل يرفض أي رصيد نهائي سالب (`NegativeStockError` —
+	`stock_ledger.py:1227`)، ولو كان المرتجع نفسه يحسّن الرصيد. يُفحص
+	هنا قبل أي كتابة برسالة عربية تذكر الرصيد الحالي، ويبقى الفحص
+	الأصيل هو الحكم النهائي عند الاعتماد (حماية السباق).
+	"""
+	for row in list(dn_ret.items or []):
+		ret_stock = frappe.utils.flt(row.stock_qty)
+		if ret_stock >= 0:
+			continue
+		wh = row.warehouse or dn_ret.set_warehouse or ""
+		bin_qty = frappe.utils.flt(
+			frappe.db.get_value(
+				"Bin", {"item_code": row.item_code, "warehouse": wh}, "actual_qty"
+			)
+			if wh
+			else 0
+		)
+		if bin_qty + ret_stock < -1e-9:
+			frappe.throw(
+				_("رصيد {0} الحالي ({1}) لا يستوعب هذا المرتجع — سيبقى سالبًا. راجع الجرد أو التسوية المخزنية أولًا.").format(
+					row.item_code, bin_qty
+				)
+			)
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_create_return(order_name: str, items=None):
+	"""مرتجع كلي/جزئي لطلب مسلَّم (S2a — Contract v1.1 §4).
+
+	الكلي = كل البنود بكامل المتبقي. الجزئي = بنود + كميات موجبة
+	(`so_detail` + `qty` بوحدة البيع) ≤ المتبقي. يُنشأ مرتجع التسليم
+	(يُرجع المخزون) ومرتجع الفاتورة (Credit Note تخفض المديونية)
+	ويُعتمدان **داخل معاملة واحدة** — أي فشل = `rollback` كامل
+	(A2): لا مخزون بلا مالية ولا العكس. الإشعار آخر كتابة قبل
+	الـcommit ومعزول بـsavepoint داخله (A4).
+	"""
+	import json as _json
+
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+	order_name = (order_name or "").strip()
+	if not order_name or not frappe.db.exists("Sales Order", order_name):
+		return {"ok": False, "error": _("الطلب غير موجود")}
+	so = frappe.get_doc("Sales Order", order_name)
+	if so.docstatus != 1:
+		return {"ok": False, "error": _("المرتجع متاح للطلبات المسلَّمة فقط")}
+	dn_name, si_name, err = _b9_single_delivery_pair(order_name)
+	if err:
+		return {"ok": False, "error": err}
+	if isinstance(items, str):
+		try:
+			items = _json.loads(items)
+		except Exception:
+			return {"ok": False, "error": _("بيانات الأصناف غير صالحة")}
+	requested = {}
+	for row in items or []:
+		try:
+			key = ((row or {}).get("so_detail") or "").strip()
+			qty = frappe.utils.flt((row or {}).get("qty"))
+		except Exception:
+			continue
+		if key and qty > 0:
+			requested[key] = requested.get(key, 0) + qty
+	if not requested:
+		return {"ok": False, "error": _("حدد كمية موجبة لبند واحد على الأقل")}
+	try:
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+
+		# نافذة انتحال للبناء فقط (تعيين مباشر — ممنوع frappe.set_user
+		# صراحةً في هذا الملف): الـmapper يفحص create داخليًا ولا يحترم
+		# أي علم (Document.has_permission يقرأ علم المستند وحده)،
+		# وأدوار الستاف تملك إنشاء DN دون SI. التعيين يطال الذاكرة فقط
+		# (الـmapper لا يكتب DB)، ويُستعاد في finally — ثم الإدراج
+		# والاعتماد والملكية والتدقيق والإشعار باسم الموظف الفعلي.
+		_staff_user = frappe.session.user
+		frappe.session.user = "Administrator"
+		try:
+			dn_ret = make_return_doc("Delivery Note", dn_name)
+			si_ret = make_return_doc("Sales Invoice", si_name)
+		finally:
+			frappe.session.user = _staff_user
+		_b9_apply_partial(dn_ret, requested)
+		_b9_apply_partial(si_ret, requested)
+		_b9_check_return_stock(dn_ret)
+		dn_ret.insert(ignore_permissions=True)
+		dn_ret.submit()
+		si_ret.insert(ignore_permissions=True)
+		si_ret.submit()
+	except frappe.ValidationError as e:
+		frappe.db.rollback()
+		frappe.log_error(title="Biozone staff_create_return rejected")
+		msg = e.args[0] if e.args and isinstance(e.args[0], str) else ""
+		if "already been returned" in msg or "Cannot return more" in msg:
+			msg = _("تجاوزت الكمية المتبقية القابلة للمرتجع")
+		elif "to complete this transaction" in msg or "NegativeStock" in type(e).__name__:
+			msg = _("المخزون الحالي لا يستوعب هذا المرتجع — راجع الجرد أو التسوية المخزنية أولًا")
+		return {"ok": False, "error": msg or _("تعذر إنشاء المرتجع")}
+	except Exception:
+		frappe.db.rollback()
+		frappe.log_error(title="Biozone staff_create_return failed", message=frappe.get_traceback())
+		return {"ok": False, "error": _("تعذر إنشاء المرتجع")}
+	staff = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
+	_b9_log(
+		so,
+		_("أنشأ {0} مرتجعًا (تسليم {1} + إشعار دائن {2})").format(staff, dn_ret.name, si_ret.name),
+	)
+	try:
+		from biozone_web.services.notifications import notify
+
+		notify(
+			"order_returned",
+			reference_doctype="Sales Order",
+			reference_name=so.name,
+			context={"order": so.name},
+		)
+	except Exception:
+		frappe.log_error(title="Biozone notify order_returned failed")
+	frappe.db.commit()
+	# مكتمل؟ — من مستندات المرتجع نفسها (R3)، لا من حقول returned_qty
+	# الأصيلة التي لا يحدّثها المحرك مع فواتير update_stock=0 (مثبت حيًا).
+	fully = False
+	try:
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc as _mrd
+
+		_rem = _mrd("Delivery Note", dn_name)
+		fully = not any(abs(frappe.utils.flt(r.qty)) > 1e-9 for r in (_rem.items or []))
+	except Exception:
+		frappe.log_error(title="Biozone return fully-check failed")
+	return {
+		"ok": True,
+		"delivery_return": dn_ret.name,
+		"credit_note": si_ret.name,
+		"fully": bool(fully),
+	}
 
 
 @frappe.whitelist(methods=["POST"])

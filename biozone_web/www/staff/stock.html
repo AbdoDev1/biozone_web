@@ -59,37 +59,11 @@
 <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-navy-text">حركة المخزون</h1>
 </div>
 
-<!-- KPI Cards -->
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
-<div class="w-12 h-12 rounded-full bg-alert-bg/60 text-alert-red flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-2xl">warning</span>
-</div>
-<div class="text-left sm:text-right flex flex-col">
-<span class="text-3xl sm:text-4xl font-bold text-alert-red tracking-tight">{{ low_stock_count }}</span>
-<span class="text-sm text-navy-text/60 font-medium mt-1">قاربت على النفاد</span>
-</div>
-</div>
-<div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm flex sm:flex-col items-center sm:items-start justify-between sm:justify-start gap-4">
-<div class="w-12 h-12 rounded-full bg-surface-subtle text-primary flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-2xl">inventory_2</span>
-</div>
-<div class="text-left sm:text-right flex flex-col">
-<span class="text-3xl sm:text-4xl font-bold text-navy-text tracking-tight">{{ "{:,}".format(total_items) }}</span>
-<span class="text-sm text-navy-text/60 font-medium mt-1">إجمالي البنود</span>
-</div>
-</div>
-</div>
-
 <!-- Simple underline tabs -->
 <div class="border-b border-surface-subtle flex gap-6">
-<button class="pb-3 px-1 border-b-2 border-primary text-primary font-bold flex items-center gap-1.5" id="tab-btn-stock" onclick="switchTab('stock')" type="button">
+<button class="pb-3 px-1 border-b-2 border-primary text-primary font-bold flex items-center gap-1.5" id="tab-btn-stock" type="button">
 <span class="material-symbols-outlined text-[20px]">home_storage</span>
 المخزون الأرصدة الحالية
-</button>
-<button class="pb-3 px-1 border-b-2 border-transparent text-navy-text/50 hover:text-navy-text font-bold flex items-center gap-1.5" id="tab-btn-log" onclick="switchTab('log')" type="button">
-<span class="material-symbols-outlined text-[20px]">history</span>
-سجل الحركات
 </button>
 </div>
 
@@ -195,13 +169,6 @@
 {% endif %}
 </div>
 </div>
-</div>
-
-<!-- TAB 2: Movement log — not built yet, see note in main.py comment below -->
-<div class="hidden flex-col gap-4 items-center justify-center bg-white rounded-2xl shadow-sm py-20 text-center" id="tab-content-log">
-<span class="material-symbols-outlined text-4xl text-navy-text/30">construction</span>
-<p class="text-navy-text/50 text-sm">تبويب "سجل الحركات" غير مبنيّ بعد — سيُضاف في الخطوة القادمة</p>
-</div>
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 
@@ -262,29 +229,14 @@ const ITEMS = {{ items_json }};
 let mpSelectedType = 'in';
 
 function switchTab(tab) {
+  if (tab !== 'stock') return;
   const stockBtn = document.getElementById('tab-btn-stock');
-  const logBtn = document.getElementById('tab-btn-log');
   const stockContent = document.getElementById('tab-content-stock');
-  const logContent = document.getElementById('tab-content-log');
-  if (tab === 'stock') {
-    stockBtn.classList.add('border-primary', 'text-primary');
-    stockBtn.classList.remove('border-transparent', 'text-navy-text/50');
-    logBtn.classList.remove('border-primary', 'text-primary');
-    logBtn.classList.add('border-transparent', 'text-navy-text/50');
-    stockContent.classList.remove('hidden');
-    stockContent.classList.add('flex');
-    logContent.classList.add('hidden');
-    logContent.classList.remove('flex');
-  } else {
-    logBtn.classList.add('border-primary', 'text-primary');
-    logBtn.classList.remove('border-transparent', 'text-navy-text/50');
-    stockBtn.classList.remove('border-primary', 'text-primary');
-    stockBtn.classList.add('border-transparent', 'text-navy-text/50');
-    logContent.classList.remove('hidden');
-    logContent.classList.add('flex');
-    stockContent.classList.add('hidden');
-    stockContent.classList.remove('flex');
-  }
+  if (!stockBtn || !stockContent) return;
+  stockBtn.classList.add('border-primary', 'text-primary');
+  stockBtn.classList.remove('border-transparent', 'text-navy-text/50');
+  stockContent.classList.remove('hidden');
+  stockContent.classList.add('flex');
 }
 
 function setMovementType(type) {

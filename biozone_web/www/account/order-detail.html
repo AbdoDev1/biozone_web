@@ -66,6 +66,7 @@ tailwind.config = {
     <!-- بنود الطلب -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="font-bold text-on-surface mb-3">الأصناف ({{ item_count }})</div>
+      {% if items %}
       <div class="flex flex-col gap-2.5">
         {% for item in items %}
         <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3">
@@ -77,6 +78,9 @@ tailwind.config = {
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <p class="text-sm text-on-surface-variant">لا توجد بنود في هذا الطلب.</p>
+      {% endif %}
     </div>
 
     <!-- الإجمالي -->
@@ -86,6 +90,24 @@ tailwind.config = {
         <div class="text-base font-extrabold text-on-surface whitespace-nowrap">{{ grand_total_display }} ج.م</div>
       </div>
     </div>
+
+    {% if returns %}
+    <!-- المرتجعات (S3b) — إشعارات دائنة تخفض المديونية -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
+      <div class="font-bold text-on-surface mb-3">المرتجعات ({{ returns|length }})</div>
+      <div class="flex flex-col gap-2.5">
+        {% for ret in returns %}
+        <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3">
+          <div>
+            <div class="font-bold text-sm text-on-surface">إشعار دائن {{ ret.name }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display }}</div>
+          </div>
+          <div class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display }} ج.م</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <a href="/account/orders" class="text-xs font-bold text-primary hover:underline self-start">العودة إلى كل الطلبات</a>
 
