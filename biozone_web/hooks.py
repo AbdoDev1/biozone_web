@@ -259,7 +259,10 @@ notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
 # حارس مسارات Desk على مضيفي المتجر والستاف (قرار فصل النطاقات — قاعدة
 # نهائية: app.biozone.pro وحده يعرض Desk). المسارات محددة بدقة (^/desk ،^/app) حتى
 # لا يمس أي /api أو أصول أو صفحات متجر — وتفاصيل الحارس في utils.
-before_request = ["biozone_web.utils.guard_domain_routes"]
+before_request = [
+	"biozone_web.utils.set_host_aware_home_page",
+	"biozone_web.utils.guard_domain_routes",
+]
 # after_request = ["biozone_web.utils.after_request"]
 
 # Job Events

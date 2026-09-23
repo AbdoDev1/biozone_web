@@ -180,8 +180,8 @@ def get_home_route_for_system_user(user):
 
 
 def get_store_url(path="/biozone-home"):
-	"""رابط متجر الاختبار المستقل (store.biozone.pro حاليًا — يحل محل
-	 biozone.pro مؤقتًا لحين تشغيل نفق الإنتاج) عشان زر "الرجوع للمتجر"
+	"""رابط المتجر الأساسي (biozone.pro — يُلتقط تلقائيًا كأول دومين عام
+	 في site_config بعد استبعاد staff/app) عشان زر "الرجوع للمتجر"
 	 في /system-home يفتحه في **تبويب جديد** بجلسة منفصلة — التبويب الجديد
 	 على دومين مختلف مش بيحمل كوكيز/توكن جلسة الموظف أصلًا (كوكيز host-only
 	 بلا Domain)، فلا مشاركة جلسة مع staff/app ولا تحويل تلقائي من أي نطاق:
@@ -259,6 +259,63 @@ def get_website_user_home_page(user=None):
 		return get_home_route_for_system_user(user)
 
 	return "/biozone-home"
+
+
+def set_host_aware_home_page():
+	"""تثبيت home_page الواعي بالمضيف قبل التوجيه (before_request).
+
+	السبب: إطار Frappe يخزّن home_page في الكاش لكل مستخدم بلا اعتبار
+	للمضيف — فزيارة ضيف لمضيف app (نتيجتها /desk) كانت تسمم ضيوف مضيف
+	المتجر (نتيجته /biozone-home) والعكس. هنا نضبط
+	frappe.local.flags.home_page الذي يفحصه الإطار *قبل* الكاش
+	(frappe/website/utils.py) — والـ flags نطاق-طلب (thread-local)
+	فلا تسريب بين الطلبات ولا state مشترك. (تحققنا: لا متغيرات
+	module-level للمضيف في التطبيق — المصدر الوحيد كان كاش الإطار.)
+
+	- الجلسة محلولة قبل before_request (app.py: HTTPRequest ثم الخطافات)
+	  فيُعتمد frappe.session.user بأمان.
+	- الضيف: خريطة ثابتة صريحة للمضيفات المتبقية فقط — بلا DB وبلا أي
+	  state خارج frappe.local (مضيف مجهول/تطوير → نترك الإطار الافتراضي).
+	- www.biozone.pro → تحويل 301 للجذر canonical مع الحفاظ على المسار
+	  والاستعلام — GET/HEAD فقط حتى لا تُكسر POSTs نادرة.
+	- المسجلون: المنطق الواعي الكامل عبر get_website_user_home_page
+	  (يحتاج الأدوار = قراءة DB — مقبول لمسار "/" فقط؛ البديل هو كاش
+	  الإطار المسموم عبر المضيفات لنفس المستخدم).
+	- روابط نسبية same-host (و301 الجذر لمضيفه المعلن) — لا عبور نطاقات.
+	"""
+	request = getattr(frappe.local, "request", None)
+	if not request:
+		return
+	headers = getattr(request, "headers", None) or {}
+	forwarded = headers.get("X-Forwarded-Host") if hasattr(headers, "get") else None
+	host = (forwarded or getattr(request, "host", "") or "").split(":")[0].lower()
+	path = getattr(request, "path", "") or ""
+	if host == "www.biozone.pro":
+		if (getattr(request, "method", "GET") or "GET").upper() in ("GET", "HEAD"):
+			qs = getattr(request, "query_string", "") or ""
+			if isinstance(qs, bytes):
+				qs = qs.decode("utf-8", "ignore")
+			dest = f"https://biozone.pro{path or '/'}"
+			if qs:
+				dest += f"?{qs}"
+			frappe.local.flags.redirect_location = dest
+			raise frappe.Redirect
+		return
+	if path.strip("/") != "":
+		return
+	user = getattr(getattr(frappe, "session", None), "user", None) or "Guest"
+	if user == "Guest":
+		if host == "biozone.pro":
+			home = "/biozone-home"
+		elif host == "staff.biozone.pro":
+			home = "/staff/login"
+		elif host == "app.biozone.pro":
+			home = "/desk"
+		else:
+			return
+		frappe.local.flags.home_page = home
+		return
+	frappe.local.flags.home_page = get_website_user_home_page()
 
 
 def get_default_warehouse():
