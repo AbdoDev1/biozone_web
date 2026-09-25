@@ -145,7 +145,7 @@
         <input type="checkbox" id="login-remember" class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary">
         <span class="font-label-md text-label-md text-on-surface-variant">تذكرني</span>
     </label>
-    <button class="font-label-md text-label-md text-primary hover:underline" onclick="handleForgotPassword()" type="button">نسيت كلمة المرور؟</button>
+    <button id="forgot-btn" class="font-label-md text-label-md text-primary hover:underline disabled:opacity-60" onclick="handleForgotPassword()" type="button">نسيت كلمة المرور؟</button>
 </div>
 <p class="hidden text-sm text-on-surface-variant bg-surface-variant/40 rounded-lg px-md py-sm" id="forgot-message"></p>
 <button id="login-submit-btn" class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98] disabled:opacity-60" type="submit">
@@ -274,17 +274,46 @@
             recalcFormHeight('form-login');
         }
 
+        // تهدئة النقر المتكرر على "نسيت كلمة المرور" (ميزانية 3/بريد/ساعة):
+        // تعطيل أثناء الإرسال، ثم تهدئة 60 ثانية بعد النجاح مع عدّاد ظاهر،
+        // وإعادة فورية عند الفشل. التلميح بلا مدة صلاحية (إعداد سيرفر).
+        const FORGOT_COOLDOWN_SECONDS = 60;
+
+        function startForgotCooldown(btn) {
+            const original = btn.textContent;
+            let left = FORGOT_COOLDOWN_SECONDS;
+            btn.disabled = true;
+            btn.textContent = 'انتظر ' + left + ' ثانية قبل إعادة المحاولة';
+            const timer = setInterval(() => {
+                left -= 1;
+                if (left <= 0) {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    btn.textContent = original;
+                } else {
+                    btn.textContent = 'انتظر ' + left + ' ثانية قبل إعادة المحاولة';
+                }
+            }, 1000);
+        }
+
         async function handleForgotPassword() {
+            const btn = document.getElementById('forgot-btn');
             const email = document.getElementById('login-email').value.trim();
             if (!email) {
                 showError('login-error', 'يرجى إدخال بريدك الإلكتروني في الحقل أعلاه أولًا، ثم الضغط على «نسيت كلمة المرور؟»');
                 return;
             }
+            if (btn.disabled) {
+                return;
+            }
+            btn.disabled = true;
             try {
                 const result = await callApi('biozone_forgot_password', { email });
-                showMessage('forgot-message', result.message);
+                showMessage('forgot-message', result.message + ' إذا لم تجد الرسالة، تفقد ملف السبام.');
+                startForgotCooldown(btn);
             } catch (err) {
                 showError('login-error', 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
+                btn.disabled = false;
             }
         }
 
