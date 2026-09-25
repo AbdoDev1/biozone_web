@@ -111,39 +111,13 @@ def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 	if frappe.db.exists("User", email):
 		frappe.throw(_("هذا البريد الإلكتروني مسجل بالفعل"))
 
-	user = frappe.get_doc(
-		{
-			"doctype": "User",
-			"email": email,
-			"first_name": full_name,
-			"phone": phone,
-			"send_welcome_email": 0,
-			"enabled": 1,
-			"user_type": "Website User",
-			"new_password": pwd,
-		}
-	)
+	# Slice 1a: the atomic unit (User + role + Customer) and its deadlock
+	# retry live in biozone_web.services.signup — no new logic here.
+	from biozone_web.services.signup import create_signup_with_retry
 
-	user.insert(ignore_permissions=True)
-
-	# User.get_roles() مش موجودة على مستند Document (الخطأ اللي
-	# ظهر فعليًا). الطريقة الصح: نقرا جدول roles الفرعي (Has Role)
-	# على المستند مباشرة، مش عن طريق دالة مش موجودة.
-	existing_roles = {r.role for r in user.get("roles", [])}
-
-	if "Biozone Storefront Customer" not in existing_roles:
-		user.add_roles("Biozone Storefront Customer")
-
-	# إنشاء Customer فور التسجيل (بنفس قيم المسار الكسول عبر
-	# create_customer_for_user: نفس ربط Portal User الذي يجده
-	# find_customer_for_current_user، ونفس الفئة الافتراضية، مع
-	# staff_category_reviewed = 0 ليظهر فورًا في /staff/customers).
-	# قبل commit عمدًا: سياسة ذرّية مطابقة لمسار التسجيل الحالي
-	# (commit واحد أدناه) — أي فشل هنا يُلغي التسجيل كله بلا مستخدم
-	# يتيم بلا عميل. الدالة آمنة للتكرار (تُرجع الربط الموجود).
-	from biozone_web.utils import create_customer_for_user
-
-	create_customer_for_user(email, full_name=full_name)
+	failure = create_signup_with_retry(email, full_name, phone, pwd)
+	if failure:
+		return failure
 
 	frappe.db.commit()
 
