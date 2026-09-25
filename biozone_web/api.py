@@ -4,6 +4,11 @@ import frappe
 from frappe import _
 
 from biozone_web.services.rate_limit import rate_limited
+from biozone_web.services.login_lock import (
+	acquire_login_lock,
+	login_busy_response,
+	release_login_lock,
+)
 
 
 STORE_LOGIN_FAILED_MESSAGE = "هذا الحساب غير مصرح له بالدخول إلى المتجر"
@@ -29,8 +34,17 @@ def biozone_login(usr=None, pwd=None, remember_me: int = 0):
 	# الرفض برسالة المتجر الواضحة نفسها، بلا redirect لأي نطاق آخر.
 	if not isinstance(usr, str) or not usr.strip() or not isinstance(pwd, str) or not pwd:
 		return _fail_store_login()
-	login_manager = frappe.local.login_manager
-	login_manager.authenticate(user=usr, pwd=pwd)
+	# B4: serialize concurrent logins for the same account (deadlock on
+	# tabUser inside the framework session start). Waiter timeouts return
+	# the busy contract below -- authenticate itself is untouched.
+	lock_state, lock_token = acquire_login_lock(usr)
+	if lock_state == "busy":
+		return login_busy_response()
+	try:
+		login_manager = frappe.local.login_manager
+		login_manager.authenticate(user=usr, pwd=pwd)
+	finally:
+		release_login_lock(usr, lock_token)
 	if frappe.db.get_value("User", login_manager.user, "user_type") != "Website User":
 		return _fail_store_login()
 	login_manager.post_login()
@@ -86,11 +100,18 @@ def staff_login(usr=None, pwd=None):
 	"""
 	if not isinstance(usr, str) or not usr.strip() or not isinstance(pwd, str) or not pwd:
 		return _fail_staff_login()
+	# B4: same per-account mutex as biozone_login (shared namespace -- the
+	# same typed identifier maps to one key on both paths).
+	lock_state, lock_token = acquire_login_lock(usr)
+	if lock_state == "busy":
+		return login_busy_response()
 	login_manager = frappe.local.login_manager
 	try:
 		login_manager.authenticate(user=usr, pwd=pwd)
 	except (frappe.AuthenticationError, frappe.SecurityException):
 		return _fail_staff_login()
+	finally:
+		release_login_lock(usr, lock_token)
 	login_manager.post_login()
 
 	user_type = frappe.db.get_value("User", login_manager.user, "user_type")
