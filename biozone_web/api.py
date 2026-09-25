@@ -3,6 +3,8 @@ import uuid
 import frappe
 from frappe import _
 
+from biozone_web.services.rate_limit import rate_limited
+
 
 STORE_LOGIN_FAILED_MESSAGE = "هذا الحساب غير مصرح له بالدخول إلى المتجر"
 
@@ -18,7 +20,8 @@ def _fail_store_login():
 	return STORE_LOGIN_FAILED_MESSAGE
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limited("biozone_login")
 def biozone_login(usr=None, pwd=None, remember_me: int = 0):
 	# بوابة نوع المتجر (قرار فصل النطاقات): حسابات العملاء (Website User)
 	# فقط. أي System User (موظف/أدمن) يُرفض هنا — بعد نجاح المصادقة لكن
@@ -101,7 +104,8 @@ def staff_login(usr=None, pwd=None):
 	}
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limited("biozone_sign_up")
 def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 	email = email.strip().lower()
 
@@ -132,16 +136,38 @@ def biozone_sign_up(email: str, full_name: str, phone: str, pwd: str):
 
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limited("biozone_forgot_password")
 def biozone_forgot_password(email: str):
-	from frappe.core.doctype.user.user import reset_password
-
+	# NOTE (A2): frappe's reset_password carries @rate_limit with no key=
+	# (user.py:1148), i.e. keyed by request_ip -- a collective key behind
+	# our Tunnel (T10), exhausted globally after password_reset_limit
+	# (3/hr default). Our @rate_limited above replaces it with per-IP +
+	# per-email counters and a 429 contract, so the Desk limiter must NOT
+	# run on this path. The orchestration below mirrors reset_password's
+	# semantics exactly (silent skip for missing/disabled/Administrator --
+	# CWE-204 -- plus identical generic message) while calling the User
+	# doc's own validate/_reset_password methods, so framework logic is
+	# reused, not forked. A regression test asserts no Desk-style rl: key
+	# is ever created here (fails loudly if upstream changes).
 	email = (email or "").strip().lower()
 
 	if not email:
 		frappe.throw(_("من فضلك اكتب البريد الإلكتروني"))
 
-	reset_password(user=email)
+	try:
+		user_doc = frappe.get_doc("User", email)
+		if user_doc.name != "Administrator" and user_doc.enabled:
+			user_doc.validate_reset_password()
+			user_doc._reset_password(send_email=True)
+	except frappe.DoesNotExistError:
+		frappe.clear_messages()
+	except frappe.OutgoingEmailError:
+		frappe.clear_messages()
+		frappe.log_error(title="Password reset email could not be sent", message=frappe.get_traceback())
+	except Exception:
+		frappe.clear_messages()
+		frappe.log_error(title="Password reset failed unexpectedly", message=frappe.get_traceback())
 	frappe.clear_messages()
 
 	return {
