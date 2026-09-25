@@ -148,7 +148,7 @@
     <button class="font-label-md text-label-md text-primary hover:underline" onclick="handleForgotPassword()" type="button">نسيت كلمة المرور؟</button>
 </div>
 <p class="hidden text-sm text-on-surface-variant bg-surface-variant/40 rounded-lg px-md py-sm" id="forgot-message"></p>
-<button class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98]" type="submit">
+<button id="login-submit-btn" class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98] disabled:opacity-60" type="submit">
                     تسجيل الدخول
                 </button>
 <p class="text-center font-body-md text-body-md text-on-surface-variant mt-sm">
@@ -189,7 +189,7 @@
 </button>
 </div>
 </div>
-<button class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98]" type="submit">
+<button id="signup-submit-btn" class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98] disabled:opacity-60" type="submit">
                     إنشاء حساب
                 </button>
 <p class="text-center font-body-md text-body-md text-on-surface-variant mt-sm">
@@ -307,6 +307,8 @@
         document.getElementById('form-login').addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('login-error').classList.add('hidden');
+            const loginBtn = document.getElementById('login-submit-btn');
+            loginBtn.disabled = true;
             try {
                 const result = await callApi('biozone_login', {
                     usr: document.getElementById('login-email').value,
@@ -315,6 +317,7 @@
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
+                loginBtn.disabled = false;
                 showError('login-error', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
             }
         });
@@ -322,6 +325,8 @@
         document.getElementById('form-signup').addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('signup-error').classList.add('hidden');
+            const signupBtn = document.getElementById('signup-submit-btn');
+            signupBtn.disabled = true;
             try {
                 const result = await callApi('biozone_sign_up', {
                     email: document.getElementById('signup-email').value,
@@ -331,6 +336,7 @@
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
+                signupBtn.disabled = false;
                 showError('signup-error', 'تعذر إنشاء الحساب، حاول مرة أخرى');
             }
         });
