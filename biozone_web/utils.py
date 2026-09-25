@@ -275,7 +275,8 @@ def set_host_aware_home_page():
 	- الجلسة محلولة قبل before_request (app.py: HTTPRequest ثم الخطافات)
 	  فيُعتمد frappe.session.user بأمان.
 	- الضيف: خريطة ثابتة صريحة للمضيفات المتبقية فقط — بلا DB وبلا أي
-	  state خارج frappe.local (مضيف مجهول/تطوير → نترك الإطار الافتراضي).
+	  state خارج frappe.local (مضيف مجهول/تطوير → /biozone-home الافتراضي
+	  الآمن، فيتجاوز قراءة خانة Guest المشتركة التي قد تكون قديمة).
 	- www.biozone.pro يُعامل معاملة الجذر (يخدم المتجر عند الوصول
 	  المباشر للأصل) — التحويل canonical الـ301 يتم على حافة Cloudflare
 	  (قاعدة www-to-root)، لا raise تحويلية هنا أبدًا: معالج الاستثناءات
@@ -288,9 +289,9 @@ def set_host_aware_home_page():
 	request = getattr(frappe.local, "request", None)
 	if not request:
 		return
-	headers = getattr(request, "headers", None) or {}
-	forwarded = headers.get("X-Forwarded-Host") if hasattr(headers, "get") else None
-	host = (forwarded or getattr(request, "host", "") or "").split(":")[0].lower()
+	# P1-variant: request.host وحده هوية المضيف (nginx يعيد كتابة Host؛
+	# X-Forwarded-Host قابل للتزوير من العميل عبر السلسلة — لا يُقرأ أبدًا).
+	host = (getattr(request, "host", "") or "").split(":")[0].lower()
 	path = getattr(request, "path", "") or ""
 	if path.strip("/") != "":
 		return
@@ -303,7 +304,10 @@ def set_host_aware_home_page():
 		elif host == "app.biozone.pro":
 			home = "/desk"
 		else:
-			return
+			# مضيف مجهول (تطوير/IP/alias): الافتراضي الآمن للمتجر. يكتفي
+			# بتجاوز قراءة خانة Guest المشتركة — بلا كتابة كاش، بلا رفض،
+			# بلا تحويل.
+			home = "/biozone-home"
 		frappe.local.flags.home_page = home
 		return
 	frappe.local.flags.home_page = get_website_user_home_page()
