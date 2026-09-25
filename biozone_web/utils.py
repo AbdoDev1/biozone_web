@@ -778,32 +778,43 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 
 	from erpnext.accounts.doctype.pricing_rule.pricing_rule import apply_pricing_rule
 
-	engine_out = apply_pricing_rule(
-		{
-			"doctype": "Sales Order",
-			"transaction_type": "selling",
-			"selling_price_list": PUBLIC_PRICE_LIST,
-			"price_list": PUBLIC_PRICE_LIST,
-			"company": company,
-			"currency": currency,
-			"transaction_date": frappe.utils.today(),
-			"ignore_pricing_rule": 0,
-			"customer": customer,
-			"customer_group": customer_group,
-			"items": [
-				{
-					"doctype": "Sales Order Item",
-					"item_code": code,
-					"item_group": (meta_map.get(code) or {}).get("item_group"),
-					"qty": 1,
-					"stock_qty": 1,
-					"uom": (meta_map.get(code) or {}).get("stock_uom"),
-					"price_list_rate": base_map[code],
-				}
-				for code in pricable
-			],
-		}
-	)
+	# pricing-guest-compat: narrow Administrator impersonation window around
+	# the engine call only. ERPNext >= 16.36 gates apply_pricing_rule behind
+	# Sales Order permission, but guests browse public prices (16.33 had no
+	# gate). Direct session assignment — never frappe.set_user here, it
+	# rewrites sid too. Restored in finally whatever happens. No writes,
+	# no commit, no order creation inside: the engine path is read-only.
+	previous_user = frappe.session.user
+	frappe.session.user = "Administrator"
+	try:
+		engine_out = apply_pricing_rule(
+			{
+				"doctype": "Sales Order",
+				"transaction_type": "selling",
+				"selling_price_list": PUBLIC_PRICE_LIST,
+				"price_list": PUBLIC_PRICE_LIST,
+				"company": company,
+				"currency": currency,
+				"transaction_date": frappe.utils.today(),
+				"ignore_pricing_rule": 0,
+				"customer": customer,
+				"customer_group": customer_group,
+				"items": [
+					{
+						"doctype": "Sales Order Item",
+						"item_code": code,
+						"item_group": (meta_map.get(code) or {}).get("item_group"),
+						"qty": 1,
+						"stock_qty": 1,
+						"uom": (meta_map.get(code) or {}).get("stock_uom"),
+						"price_list_rate": base_map[code],
+					}
+					for code in pricable
+				],
+			}
+		)
+	finally:
+		frappe.session.user = previous_user
 
 	for code, row in zip(pricable, engine_out):
 		base = base_map[code]
