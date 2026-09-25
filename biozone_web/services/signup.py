@@ -31,17 +31,17 @@ def create_signup_records(email, full_name, phone, pwd):
 			"enabled": 1,
 			"user_type": "Website User",
 			"new_password": pwd,
+			"roles": [
+				{
+					"doctype": "Has Role",
+					"parentfield": "roles",
+					"role": "Biozone Storefront Customer",
+				}
+			],
 		}
 	)
 
 	user.insert(ignore_permissions=True)
-
-	# NOTE (api.py): get_roles() does not exist on Document. Read the
-	# child table directly instead of a missing helper.
-	existing_roles = {r.role for r in user.get("roles", [])}
-
-	if "Biozone Storefront Customer" not in existing_roles:
-		user.add_roles("Biozone Storefront Customer")
 
 	# Same lazy-path values and guard as the atomic signup path: the same
 	# Portal User link find_customer_for_current_user expects, the default
