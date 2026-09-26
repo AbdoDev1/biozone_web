@@ -237,6 +237,15 @@ def biozone_get_cart_prices(item_codes):
 		customer_group=ctx["customer_group"],
 	)
 
+	# المصغرات لسطور السلة دفعة واحدة (القوائم لا ترى الأصل أبدًا).
+	from biozone_web.services.item_images import resolve_item_thumbnails
+
+	_thumb_map = resolve_item_thumbnails(codes)
+	for _code in codes:
+		_entry = prices.get(_code)
+		if isinstance(_entry, dict):
+			_entry["thumbnail"] = (_thumb_map.get(_code) or {}).get("thumbnail") or ""
+
 	# Phase-2 display units: same small-unit engine price, converted for
 	# the customer's group unit. Non-displayable items keep price=None so
 	# the cart drops them like priceless items (setup error, never guess).
@@ -669,6 +678,61 @@ def staff_save_customer_address(
 		return _save_address(customer, governorate, city, street, landmark, phone)
 	except frappe.ValidationError as e:
 		return {"ok": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def staff_upload_item_image(item_code=None):
+	"""رفع صورة الصنف الوحيدة (multipart: حقل `file`) — الأدوار المصرحة فقط.
+
+	أخطاء التحقق المنسقة تُرجع {ok: False, error} على 200؛ رفض الحارس
+	يبقى استثناءً إطاريًا (403/تحويل).
+	"""
+	from biozone_web.services.item_images import (
+		assert_can_manage_item_images,
+	)
+	from biozone_web.services.item_images import (
+		staff_upload_item_image as _upload_image,
+	)
+
+	assert_can_manage_item_images()
+
+	files = getattr(frappe.request, "files", None) or {}
+	up = files.get("file") if hasattr(files, "get") else None
+	content = up.read() if up is not None and hasattr(up, "read") else None
+	if not content:
+		return {"ok": False, "error": _("ملف الصورة مفقود")}
+	try:
+		return _upload_image(item_code, content)
+	except frappe.ValidationError as e:
+		return {"ok": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def staff_delete_item_image(item_code=None):
+	"""مسح صورة الصنف (خامل آمن: بلا صورة = نجاح بلا حذف)."""
+	from biozone_web.services.item_images import (
+		assert_can_manage_item_images,
+	)
+	from biozone_web.services.item_images import (
+		staff_delete_item_image as _delete_image,
+	)
+
+	assert_can_manage_item_images()
+	return _delete_image(item_code)
+
+
+@frappe.whitelist()
+def staff_check_missing_images(limit=100):
+	"""فحص المراجع المكسورة (قراءة فقط — أي ستاف)."""
+	from biozone_web.services.item_images import staff_find_missing_images
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+	try:
+		limit = int(limit or 100)
+	except (TypeError, ValueError):
+		limit = 100
+	return {"ok": True, "missing": staff_find_missing_images(limit)}
 
 
 def _set_customer_account_types_batch(updates):

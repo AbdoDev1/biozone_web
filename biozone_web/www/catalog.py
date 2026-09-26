@@ -99,6 +99,13 @@ def get_context(context):
         item["display_uom"] = d.get("uom") or ""
         visible.append(item)
     items = visible
+    # المصغرات دفعة واحدة (استعلامان مهما كان عدد البطاقات — بلا N+1).
+    # القوالب تستخدم المصغرة حصرًا؛ الأصل الكامل لا يظهر في القوائم أبدًا.
+    from biozone_web.services.item_images import resolve_item_thumbnails
+
+    thumb_map = resolve_item_thumbnails([i["item_code"] for i in items])
+    for item in items:
+        item["thumbnail"] = (thumb_map.get(item["item_code"]) or {}).get("thumbnail") or ""
     context.items = items
     # Category chip list: every distinct item_group that has active items.
     categories = [

@@ -175,7 +175,14 @@
 {% for it in items %}
 <tr class="hover:bg-slate-50/60 transition-colors">
 <td class="py-4 px-6 font-bold text-darkNavy col-name bg-white">
+<div class="flex items-center gap-2.5">
+{% if it.thumbnail %}
+<img src="{{ it.thumbnail }}" alt="" class="h-10 w-10 rounded-lg object-cover ring-1 ring-inset ring-borderSubtle shrink-0" loading="lazy" decoding="async" data-row-thumb="{{ it.item_code|e }}">
+{% else %}
+<span class="h-10 w-10 rounded-lg bg-slate-100 text-slate-400 inline-flex items-center justify-center shrink-0" data-row-thumb="{{ it.item_code|e }}"><span class="material-symbols-outlined text-xl">image</span></span>
+{% endif %}
 <div class="cell-truncate truncate" title="{{ it.item_name|e }}">{{ it.item_name }}</div>
+</div>
 </td>
 <td class="py-4 px-6 font-mono text-xs font-semibold text-slate-600">
 <div class="cell-truncate truncate">{{ it.item_code }}</div>
@@ -211,7 +218,7 @@
 {% endif %}
 </td>
 <td class="py-4 px-6 text-center">
-<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes, "display_override": it.display_override, "conversion": it.conversion}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
+<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes, "display_override": it.display_override, "conversion": it.conversion, "image": it.image, "thumbnail": it.thumbnail}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs" title="تعديل">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
@@ -418,7 +425,23 @@
 </button>
 </div>
 <!-- Drawer Body: Form Fields strictly in ordered sequence -->
-<div class="p-6 overflow-y-auto space-y-4 flex-1 text-right"><!-- 1. اسم الصنف -->
+<div class="p-6 overflow-y-auto space-y-4 flex-1 text-right"><!-- صورة الصنف -->
+<div class="space-y-2" id="item-image-block">
+<div class="flex items-center gap-3">
+<img id="item-image-preview" class="h-20 w-20 rounded-xl object-cover ring-1 ring-inset ring-borderSubtle bg-slate-100" alt="" src="">
+<span id="item-image-empty" class="h-20 w-20 rounded-xl bg-slate-100 text-slate-400 hidden items-center justify-center"><span class="material-symbols-outlined text-3xl">image</span></span>
+<div class="flex flex-col gap-2">
+<div class="flex gap-2">
+<button id="item-image-upload-btn" type="button" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-60">رفع صورة</button>
+<button id="item-image-delete-btn" type="button" class="px-4 py-2 rounded-xl bg-white border border-borderSubtle text-slate-600 hover:text-alert-red hover:border-alert-red text-xs font-bold transition-colors disabled:opacity-60">حذف</button>
+</div>
+<p class="text-[11px] text-slate-400">JPG أو PNG أو WEBP حتى 5 ميجا — تُعرض مصغرة 300px في المتجر.</p>
+</div>
+</div>
+<input id="item-image-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
+<p id="item-image-msg" class="hidden text-xs font-bold"></p>
+</div>
+<!-- 1. اسم الصنف -->
 <div class="space-y-1.5">
 <label class="block text-xs font-bold text-darkNavy" for="item-name">اسم الصنف</label>
 <input class="w-full bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" id="item-name" type="text" value="قفازات جراحية معقمة (قياس 7.5)"/>
@@ -643,6 +666,8 @@ function openItemPanel(data) {
   if (data) {
     // تعديل صنف موجود
     currentItemCode = data.item_code;
+    setItemImagePreview(data.thumbnail || data.image || '');
+    document.getElementById('item-image-block').classList.remove('hidden');
     title.textContent = 'تعديل الصنف';
     document.getElementById('item-name').value = data.item_name || '';
     document.getElementById('item-sku').value = data.item_code || '';
@@ -704,6 +729,8 @@ function openItemPanel(data) {
   } else {
     // إضافة صنف جديد
     currentItemCode = null;
+    setItemImagePreview('');
+    document.getElementById('item-image-block').classList.add('hidden');
     title.textContent = 'إضافة صنف';
     document.getElementById('item-name').value = '';
     document.getElementById('item-sku').value = '';
@@ -731,6 +758,132 @@ function openItemPanel(data) {
   drawer.classList.remove('hidden');
   backdrop.classList.remove('hidden');
 }
+
+function setItemImagePreview(url) {
+  const img = document.getElementById('item-image-preview');
+  const empty = document.getElementById('item-image-empty');
+  if (url) {
+    img.src = url;
+    img.classList.remove('hidden');
+    empty.classList.add('hidden');
+    empty.classList.remove('flex');
+  } else {
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+    empty.classList.remove('hidden');
+    empty.classList.add('flex');
+  }
+}
+
+function showItemImageMsg(text, ok) {
+  const msg = document.getElementById('item-image-msg');
+  msg.textContent = text;
+  msg.classList.remove('hidden', 'text-alert-red', 'text-primary');
+  msg.classList.add(ok ? 'text-primary' : 'text-alert-red');
+}
+
+function syncRowThumb(code, thumbUrl) {
+  const el = document.querySelector('[data-row-thumb="' + code + '"]');
+  if (!el) return;
+  if (el.tagName === 'IMG') {
+    if (thumbUrl) {
+      el.src = thumbUrl;
+    } else {
+      const span = document.createElement('span');
+      span.className = 'h-10 w-10 rounded-lg bg-slate-100 text-slate-400 inline-flex items-center justify-center shrink-0';
+      span.setAttribute('data-row-thumb', code);
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined text-xl';
+      icon.textContent = 'image';
+      span.appendChild(icon);
+      el.replaceWith(span);
+    }
+  } else if (thumbUrl) {
+    const img = document.createElement('img');
+    img.className = 'h-10 w-10 rounded-lg object-cover ring-1 ring-inset ring-borderSubtle shrink-0';
+    img.setAttribute('loading', 'lazy');
+    img.setAttribute('decoding', 'async');
+    img.setAttribute('alt', '');
+    img.setAttribute('data-row-thumb', code);
+    img.src = thumbUrl;
+    el.replaceWith(img);
+  }
+}
+
+async function uploadItemImageFile(file) {
+  const upBtn = document.getElementById('item-image-upload-btn');
+  const delBtn = document.getElementById('item-image-delete-btn');
+  if (!currentItemCode || upBtn.disabled) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showItemImageMsg('حجم الصورة يتجاوز الحد المسموح (5 ميجا)', false);
+    return;
+  }
+  upBtn.disabled = true;
+  delBtn.disabled = true;
+  document.getElementById('item-image-msg').classList.add('hidden');
+  try {
+    const form = new FormData();
+    form.append('item_code', currentItemCode);
+    form.append('file', file);
+    const res = await fetch('/api/method/biozone_web.api.staff_upload_item_image', {
+      method: 'POST',
+      headers: { 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+      body: form,
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    if (!res.ok) throw new Error('تعذر الرفع، حاول مجددًا');
+    const m = (data && data.message) || {};
+    if (!m.ok) throw new Error((typeof m.error === 'string' && m.error) || 'تعذر الرفع، حاول مجددًا');
+    setItemImagePreview(m.thumbnail || m.image || '');
+    syncRowThumb(currentItemCode, m.thumbnail || '');
+    showItemImageMsg('تم رفع الصورة بنجاح', true);
+  } catch (err) {
+    showItemImageMsg((err && err.message) || 'تعذر الرفع، حاول مجددًا', false);
+  } finally {
+    upBtn.disabled = false;
+    delBtn.disabled = false;
+    document.getElementById('item-image-file').value = '';
+  }
+}
+
+async function deleteItemImage() {
+  const upBtn = document.getElementById('item-image-upload-btn');
+  const delBtn = document.getElementById('item-image-delete-btn');
+  if (!currentItemCode || delBtn.disabled) return;
+  upBtn.disabled = true;
+  delBtn.disabled = true;
+  document.getElementById('item-image-msg').classList.add('hidden');
+  try {
+    const res = await fetch('/api/method/biozone_web.api.staff_delete_item_image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+      body: JSON.stringify({ item_code: currentItemCode }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    if (!res.ok) throw new Error('تعذر الحذف، حاول مجددًا');
+    const m = (data && data.message) || {};
+    if (!m.ok) throw new Error((typeof m.error === 'string' && m.error) || 'تعذر الحذف، حاول مجددًا');
+    setItemImagePreview('');
+    syncRowThumb(currentItemCode, '');
+    showItemImageMsg('تم حذف الصورة', true);
+  } catch (err) {
+    showItemImageMsg((err && err.message) || 'تعذر الحذف، حاول مجددًا', false);
+  } finally {
+    upBtn.disabled = false;
+    delBtn.disabled = false;
+  }
+}
+
+document.getElementById('item-image-upload-btn').addEventListener('click', function () {
+  document.getElementById('item-image-file').click();
+});
+document.getElementById('item-image-file').addEventListener('change', function (e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) uploadItemImageFile(f);
+});
+document.getElementById('item-image-delete-btn').addEventListener('click', deleteItemImage);
 
 function updatePriceNote() {
   const note = document.getElementById('item-price-note');

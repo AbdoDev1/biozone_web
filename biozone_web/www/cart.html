@@ -104,7 +104,7 @@ tailwind.config = {
 <template id="cart-item-template">
   <article class="flex gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 shadow-sm sm:gap-5 sm:p-5">
     <div class="shrink-0 overflow-hidden rounded-xl bg-surface-container-low ring-1 ring-inset ring-outline-variant/40 h-24 w-24 sm:h-28 sm:w-28 flex items-center justify-center">
-      <img class="h-full w-full object-cover cart-item-image" src="" alt="">
+      <img class="h-full w-full object-cover cart-item-image" src="" alt="" loading="lazy" decoding="async">
     </div>
     <div class="flex min-w-0 flex-1 flex-col">
       <div class="flex items-start justify-between gap-3">
@@ -198,6 +198,7 @@ tailwind.config = {
 
       const node = template.content.cloneNode(true);
       const img = node.querySelector('.cart-item-image');
+      img.onerror = function () { this.onerror = null; this.src = '/assets/biozone_web/images/product-placeholder.svg'; };
       img.src = item.image || '/assets/biozone_web/images/product-placeholder.svg';
       img.alt = item.item_name;
       node.querySelector('.cart-item-category').textContent = item.item_group || '';
@@ -267,6 +268,8 @@ tailwind.config = {
           // Phase-2: unit always refreshed from server (old lines may
           // predate units or carry a stale group unit — never trusted).
           if (p.display_uom) it.uom = p.display_uom;
+          // الصورة من الخادم دائمًا (المصغرة حصرًا — الأصل لا يظهر هنا).
+          if (p.thumbnail) it.image = p.thumbnail;
           kept.push(it);
         } else {
           outcome.removedCount += 1;

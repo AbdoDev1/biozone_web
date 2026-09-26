@@ -137,6 +137,7 @@
     const itemGroup = el.dataset.itemGroup;
     const price = parseFloat(el.dataset.itemPrice) || 0;
     const uom = el.dataset.itemUom || '';
+    const image = el.dataset.itemImage || '';
 
     let items = getCartItemsList();
     const idx = items.findIndex((it) => it.item_code === itemCode);
@@ -148,7 +149,7 @@
           item_name: itemName,
           item_group: itemGroup,
           price: price,
-          image: '',
+          image: image,
           quantity: 1,
           uom: uom,
         });

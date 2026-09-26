@@ -1,5 +1,6 @@
 import frappe
 
+from biozone_web.services.item_images import resolve_item_thumbnails
 from biozone_web.utils import get_header_context, require_staff_access
 
 PAGE_SIZE = 20
@@ -153,6 +154,9 @@ def get_context(context):
 
 	discounts_map = _get_active_discounts(item_codes)
 
+	# المصغرات دفعة واحدة (استعلامان مهما كان عدد الصفوف — بلا N+1).
+	thumb_map = resolve_item_thumbnails(item_codes) if item_codes else {}
+
 	# الباركودات الحالية لكل صنف (للعرض/التعديل في الدرج — بند 4).
 	barcodes_map = {code: [] for code in item_codes}
 	if item_codes:
@@ -172,6 +176,9 @@ def get_context(context):
 		it["barcodes"] = barcodes_map.get(it["item_code"], [])
 		it["display_override"] = (it.get("display_override") or "inherit").strip() or "inherit"
 		it["conversion"] = conv_map.get(it["item_code"])
+		th = thumb_map.get(it["item_code"]) or {}
+		it["thumbnail"] = th.get("thumbnail") or ""
+		it["image"] = th.get("image") or ""
 
 	context.items = items
 	context.item_groups = frappe.get_all("Item Group", fields=["name"], order_by="name asc")
