@@ -4,6 +4,7 @@ from frappe import _
 from biozone_web.services.addresses import get_customer_shipping_address
 from biozone_web.utils import (
 	customer_has_category_assigned_field,
+	get_csrf_token_safe,
 	get_header_context,
 	render_state_page,
 	require_staff_access,
@@ -17,6 +18,9 @@ def get_context(context):
 	context.update(get_header_context())
 	context.today_display = frappe.utils.format_date(frappe.utils.today(), "d MMMM yyyy")
 	context.error_state = False
+	# رمز CSRF لنموذج حفظ العنوان (نمط customers.py:23) — غيابه يكسر
+	# الصفحة كلها عند tojson (عطل الإنتاج السابق).
+	context.csrf_token = get_csrf_token_safe()
 
 	# الاسم يأتي من قاعدة الـroute (website_route_rules) عبر form_dict —
 	# بلا أي افتراض لشكله، والتحقق الوحيد هو وجود السجل فعليًا.
