@@ -1,5 +1,6 @@
 import frappe
 
+from biozone_web.services.addresses import build_brief_display, get_my_shipping_address
 from biozone_web.utils import (
 	customer_has_category_assigned_field,
 	find_customer_for_current_user,
@@ -55,7 +56,13 @@ def get_context(context):
 	context.phone_display = (
 		frappe.db.get_value("User", frappe.session.user, "phone") or PHONE_EMPTY_DISPLAY
 	)
-	context.address_note = ADDRESS_NEUTRAL_LABEL
+	# عنوان الشحن الوحيد (قراءة فقط — الكتابة للستاف حصرًا): مختصر
+	# بلا محافظة/مدينة/دولة، والهاتف سطر منفصل. بلا عنوان يبقى المحايد.
+	shipping = get_my_shipping_address()
+	context.has_address = bool(shipping)
+	context.address_brief = build_brief_display(shipping)
+	context.address_phone = ((shipping or {}).get("phone") or "").strip()
+	context.address_empty_label = ADDRESS_NEUTRAL_LABEL
 	# قيد B10: لا يُعرض اسم الفئة الفعلي إطلاقًا — لا قبل التعيين الإداري
 	# ولا بعده. يظهر للعميل غير المعيَّن جملة محايدة واحدة بلا اسم فئة.
 	context.category_assigned = bool(assigned)

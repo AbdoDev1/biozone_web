@@ -379,6 +379,23 @@ def biozone_confirm_order(items):
 		# لتمريرها صراحة للطلب أدناه.
 		customer, customer_group = require_active_price_customer()
 
+		# عنوان الشحن (قرار Q3): يُضبط تلقائيًا من عنوان العميل المحفوظ —
+		# بلا أي إدخال من الطلب، وللعميل المؤكد من البوابة حصرًا. غيابه
+		# لا يمنع الطلب (يُترك فارغًا كما قبل)، وأي عطل في جلبه لا يُفشل
+		# التأكيد — العنوان إثراء لا شرط.
+		shipping_address_name = None
+		try:
+			from biozone_web.services.addresses import get_customer_shipping_address
+
+			_saved = get_customer_shipping_address(customer)
+			if _saved:
+				shipping_address_name = _saved["name"]
+		except Exception:
+			frappe.logger().warning(
+				"biozone_confirm_order: shipping address lookup failed, continuing without it"
+			)
+			shipping_address_name = None
+
 		# Phase-2 unit gate (definitive; the store sends freely, staff
 		# confirmation decides): every line must match the group's display
 		# unit resolved server-side, meet its minimum, and carry the item's
@@ -435,6 +452,9 @@ def biozone_confirm_order(items):
 						"customer_group": customer_group,
 						"company": get_default_company(),
 						"selling_price_list": "Standard Selling",
+						# يملؤه ERPNext تلقائيًا (العرض + النسخ للتسليم/الفاتورة)
+						# عند التحقق — None تعني غياب العنوان كما قبل.
+						"shipping_address_name": shipping_address_name,
 						"delivery_date": frappe.utils.add_days(
 							frappe.utils.nowdate(),
 							3,
@@ -627,6 +647,28 @@ def staff_set_customer_account_type(customer=None, customer_group=None, updates=
 		return _set_customer_account_types_batch(updates)
 
 	return _set_customer_account_type(customer, customer_group)
+
+
+@frappe.whitelist()
+def staff_save_customer_address(
+	customer=None, governorate=None, city=None, street=None, landmark=None, phone=None
+):
+	"""حفظ عنوان الشحن الوحيد للعميل (ستاف فقط) — غلاف رفيع فوق الخدمة.
+
+	أخطاء التحقق المنسقة تُرجع {ok: False, error} على 200 فتعرضها
+	الواجهة نصًا (نفس سياسة «النص المنسق فقط» في السلة)؛ أي شيء آخر —
+	ومنها فشل الحارس — يبقى استثناءً إطاريًا.
+	"""
+	from biozone_web.utils import require_staff_access
+
+	require_staff_access()
+
+	from biozone_web.services.addresses import staff_save_customer_address as _save_address
+
+	try:
+		return _save_address(customer, governorate, city, street, landmark, phone)
+	except frappe.ValidationError as e:
+		return {"ok": False, "error": str(e)}
 
 
 def _set_customer_account_types_batch(updates):

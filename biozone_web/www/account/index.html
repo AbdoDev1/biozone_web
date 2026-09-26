@@ -115,8 +115,18 @@ tailwind.config = {
       <div class="font-bold text-on-surface">{{ customer_name }}</div>
       <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ email }}</div>
       <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ phone_display }}</div>
-      <div class="text-xs text-on-surface-variant mt-1">{{ address_note }}</div>
     </div>
+
+    {% if has_address %}
+    <!-- عنوان الشحن — قراءة فقط (الإدخال للستاف حصرًا) -->
+    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
+      <div class="text-xs text-on-surface-variant mb-1">عنوان الشحن</div>
+      <div class="font-bold text-on-surface">{{ address_brief }}</div>
+      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ address_phone }}</div>
+    </div>
+    {% else %}
+    <p class="text-sm text-on-surface-variant">{{ address_empty_label }}</p>
+    {% endif %}
 
     {% if not category_assigned %}
     <p class="text-sm text-on-surface-variant">{{ unassigned_label }}</p>

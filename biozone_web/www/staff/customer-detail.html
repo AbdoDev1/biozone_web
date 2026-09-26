@@ -89,6 +89,96 @@
 <p class="text-xs text-navy-text/50 mt-1">{{ email + ' — ' if email else '' }}منذ {{ created_display }}</p>
 </section>
 
+<!-- عنوان الشحن -->
+<section aria-label="عنوان الشحن" class="bg-white rounded-2xl shadow-sm p-5 border border-surface-container">
+<div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+<h3 class="text-base font-extrabold text-navy-text">عنوان الشحن</h3>
+{% if has_address %}
+<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">مسجل</span>
+{% else %}
+<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text">غير مسجل</span>
+{% endif %}
+</div>
+{% if has_address %}
+<div class="text-sm text-navy-text/80 space-y-1 mb-4">
+<p><span class="text-navy-text/50">المحافظة:</span> {{ address_governorate }}</p>
+<p><span class="text-navy-text/50">المدينة:</span> {{ address_city }}</p>
+<p><span class="text-navy-text/50">الشارع:</span> {{ address_street }}</p>
+{% if address_landmark %}<p><span class="text-navy-text/50">علامة مميزة:</span> {{ address_landmark }}</p>{% endif %}
+<p><span class="text-navy-text/50">الهاتف:</span> <span class="font-mono" style="direction: ltr; unicode-bidi: embed;">{{ address_phone }}</span></p>
+</div>
+{% else %}
+<p class="text-sm text-navy-text/50 mb-4">لا يوجد عنوان مسجل لهذا العميل حتى الآن.</p>
+{% endif %}
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-bold text-navy-text/60 mb-1" for="addr-governorate">المحافظة *</label>
+<input class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary/40" id="addr-governorate" type="text" value="{{ address_governorate }}">
+</div>
+<div>
+<label class="block text-xs font-bold text-navy-text/60 mb-1" for="addr-city">المدينة *</label>
+<input class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary/40" id="addr-city" type="text" value="{{ address_city }}">
+</div>
+<div class="sm:col-span-2">
+<label class="block text-xs font-bold text-navy-text/60 mb-1" for="addr-street">الشارع *</label>
+<input class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary/40" id="addr-street" type="text" value="{{ address_street }}">
+</div>
+<div class="sm:col-span-2">
+<label class="block text-xs font-bold text-navy-text/60 mb-1" for="addr-landmark">علامة مميزة (اختياري)</label>
+<input class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary/40" id="addr-landmark" type="text" value="{{ address_landmark }}">
+</div>
+<div>
+<label class="block text-xs font-bold text-navy-text/60 mb-1" for="addr-phone">الهاتف *</label>
+<input class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary/40" id="addr-phone" type="text" value="{{ address_phone }}" style="direction: ltr; text-align: right;">
+</div>
+</div>
+<p id="addr-msg" class="hidden mt-3 text-sm font-bold"></p>
+<button id="addr-save-btn" class="mt-4 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-accent text-white font-bold text-sm transition-colors disabled:opacity-60" type="button">حفظ العنوان</button>
+</section>
+<script>
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+const ADDR_CUSTOMER = {{ customer_code|tojson }};
+function showAddrMsg(text, ok) {
+  const msg = document.getElementById('addr-msg');
+  msg.textContent = text;
+  msg.classList.remove('hidden', 'text-alert-red', 'text-primary');
+  msg.classList.add(ok ? 'text-primary' : 'text-alert-red');
+}
+async function saveAddress() {
+  const btn = document.getElementById('addr-save-btn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  document.getElementById('addr-msg').classList.add('hidden');
+  const payload = {
+    customer: ADDR_CUSTOMER,
+    governorate: document.getElementById('addr-governorate').value,
+    city: document.getElementById('addr-city').value,
+    street: document.getElementById('addr-street').value,
+    landmark: document.getElementById('addr-landmark').value,
+    phone: document.getElementById('addr-phone').value
+  };
+  try {
+    const res = await fetch('/api/method/biozone_web.api.staff_save_customer_address', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
+      body: JSON.stringify(payload)
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    if (!res.ok) throw new Error('تعذر الحفظ، حاول مجددًا');
+    const m = (data && data.message) || {};
+    if (!m.ok) throw new Error((typeof m.error === 'string' && m.error) || 'تعذر الحفظ، حاول مجددًا');
+    showAddrMsg('تم حفظ العنوان بنجاح', true);
+    setTimeout(function () { window.location.reload(); }, 900);
+  } catch (err) {
+    showAddrMsg((err && err.message) || 'تعذر الحفظ، حاول مجددًا', false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('addr-save-btn').addEventListener('click', saveAddress);
+</script>
+
 <!-- الفواتير -->
 <section aria-label="فواتير العميل" class="bg-white rounded-2xl shadow-sm border border-surface-container overflow-hidden flex flex-col">
 <div class="flex items-center justify-between px-5 py-4 border-b border-surface-container">

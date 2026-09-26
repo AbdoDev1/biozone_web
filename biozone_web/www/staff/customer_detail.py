@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from biozone_web.services.addresses import get_customer_shipping_address
 from biozone_web.utils import (
 	customer_has_category_assigned_field,
 	get_header_context,
@@ -45,6 +46,16 @@ def get_context(context):
 	) or ""
 	context.created_display = frappe.utils.format_datetime(doc.creation, "dd MMM yyyy")
 	context.invoices = _all_invoices(doc.name)
+
+	# عنوان الشحن الوحيد (قراءة للعرض الكامل + تعبئة النموذج) — بلا عنوان
+	# تُعرض الحالة المحايدة ويبقى النموذج فارغًا للإدخال الأول.
+	address = get_customer_shipping_address(doc.name)
+	context.has_address = bool(address)
+	context.address_governorate = ((address or {}).get("state") or "").strip()
+	context.address_city = ((address or {}).get("city") or "").strip()
+	context.address_street = ((address or {}).get("address_line1") or "").strip()
+	context.address_landmark = ((address or {}).get("address_line2") or "").strip()
+	context.address_phone = ((address or {}).get("phone") or "").strip()
 
 	return context
 
