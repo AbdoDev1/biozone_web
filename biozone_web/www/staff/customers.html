@@ -169,11 +169,11 @@
 <tr class="hover:bg-surface/60 transition-colors group relative" data-row="{{ c.name }}" id="customer-row-{{ loop.index }}">
 <td class="py-4 px-5 sticky-col-right sticky-shadow align-middle relative">
 <div class="flex items-start justify-between gap-2">
-<button type="button" onclick="openCustomerDrawer({{ c.name|tojson }})" class="text-right group-hover:text-primary transition-colors focus:outline-none focus:underline">
+<button type="button" onclick='openCustomerDrawer({{ c.name|tojson }})' class="text-right group-hover:text-primary transition-colors focus:outline-none focus:underline">
 <p class="font-bold text-navy-text text-sm leading-snug group-hover:text-primary"><a href="/staff/customers/{{ c.name | urlencode }}" onclick="event.stopPropagation()">{{ c.customer_name }}</a></p>
 <p class="text-xs font-mono text-navy-text/40 mt-1">{{ c.name }}</p>
 </button>
-<button type="button" onclick="openCustomerDrawer({{ c.name|tojson }})" class="text-navy-text/40 hover:text-primary p-1 rounded-lg hover:bg-surface-subtle transition-colors shrink-0" aria-label="عرض تفاصيل العميل">
+<button type="button" onclick='openCustomerDrawer({{ c.name|tojson }})' class="text-navy-text/40 hover:text-primary p-1 rounded-lg hover:bg-surface-subtle transition-colors shrink-0" aria-label="عرض تفاصيل العميل">
 <span class="material-symbols-outlined text-lg">info</span>
 </button>
 </div>
@@ -231,9 +231,8 @@
 </td>
 <td class="py-4 px-5 align-middle whitespace-nowrap">
 <div class="flex flex-col items-start gap-1.5">
-<button class="text-xs font-bold text-primary hover:underline" onclick="openCustomerDrawer({{ c.name|tojson }})" type="button">التفاصيل</button>
 {% if show == 'unreviewed' and c.customer_group == public_group %}
-<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name }}" onclick="approveAsPublic({{ c.name|tojson }})" type="button">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name }}" onclick='approveAsPublic({{ c.name|tojson }})' type="button">
 <span class="material-symbols-outlined text-sm">verified</span>
 اعتماد كجمهور
 </button>
