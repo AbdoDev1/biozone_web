@@ -704,7 +704,7 @@ def require_active_price_customer():
 
 	if group == get_public_customer_group():
 		frappe.throw(
-			_("يتعذّر تأكيد الطلب قبل تفعيل فئة حسابك. يُرجى التواصل مع إدارة المتجر لتفعيل الحساب."),
+			_("يتعذّر تأكيد الطلب قبل تنشيط حسابك. يُرجى التواصل مع إدارة المتجر لتفعيل حسابك."),
 			frappe.PermissionError,
 		)
 

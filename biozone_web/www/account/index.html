@@ -118,15 +118,9 @@ tailwind.config = {
       <div class="text-xs text-on-surface-variant mt-1">{{ address_note }}</div>
     </div>
 
-    <!-- حالة الفئة -->
-    <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
-      <div class="text-xs text-on-surface-variant mb-1">فئة التسعير</div>
-      {% if category_assigned %}
-      <div class="font-bold text-on-surface">{{ customer_group }}</div>
-      {% else %}
-      <div class="font-bold text-on-surface-variant">{{ unassigned_label }}</div>
-      {% endif %}
-    </div>
+    {% if not category_assigned %}
+    <p class="text-sm text-on-surface-variant">{{ unassigned_label }}</p>
+    {% endif %}
 
     <!-- آخر الطلبات -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">

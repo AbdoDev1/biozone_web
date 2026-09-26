@@ -11,7 +11,7 @@ from biozone_web.utils import (
 from biozone_web.www.my_orders import build_customer_invoices_list, build_customer_orders_list
 
 RECENT_ORDERS_LIMIT = 3
-UNASSIGNED_CATEGORY_LABEL = "لم تُحدَّد لك فئة تسعير بعد"
+UNASSIGNED_CATEGORY_LABEL = "سيتاح بعد تنشيط حسابك"
 # الهاتف اختياري فعليًا (السيرفر لا يشترطه) — الفراغ يُعرض شرطة (قرار B10).
 PHONE_EMPTY_DISPLAY = "-"
 # لا ميزة عناوين قائمة في المشروع — حالة محايدة ثابتة فقط (قرار B10).
@@ -35,7 +35,6 @@ def get_context(context):
 
 	if customer:
 		customer_name = frappe.db.get_value("Customer", customer, "customer_name") or customer
-		group = frappe.db.get_value("Customer", customer, "customer_group")
 		if customer_has_category_assigned_field():
 			assigned = frappe.utils.cint(
 				frappe.db.get_value("Customer", customer, "category_assigned_by_staff")
@@ -48,7 +47,6 @@ def get_context(context):
 		customer_name = (
 			frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 		)
-		group = None
 		assigned = 0
 		email = frappe.session.user
 
@@ -58,14 +56,10 @@ def get_context(context):
 		frappe.db.get_value("User", frappe.session.user, "phone") or PHONE_EMPTY_DISPLAY
 	)
 	context.address_note = ADDRESS_NEUTRAL_LABEL
-	if assigned:
-		context.category_assigned = True
-		context.customer_group = group
-	else:
-		# قيد B10: لا يُعرض اسم الفئة الفعلي إطلاقًا قبل التعيين الإداري،
-		# حتى لو كانت "الجمهور" مخزَّنة فعليًا — نص محايد فقط.
-		context.category_assigned = False
-		context.unassigned_label = UNASSIGNED_CATEGORY_LABEL
+	# قيد B10: لا يُعرض اسم الفئة الفعلي إطلاقًا — لا قبل التعيين الإداري
+	# ولا بعده. يظهر للعميل غير المعيَّن جملة محايدة واحدة بلا اسم فئة.
+	context.category_assigned = bool(assigned)
+	context.unassigned_label = UNASSIGNED_CATEGORY_LABEL
 
 	orders, orders_count = build_customer_orders_list()
 	context.orders_count = orders_count
