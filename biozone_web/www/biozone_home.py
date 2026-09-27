@@ -44,6 +44,12 @@ def get_context(context):
     effective = get_effective_item_prices(item_codes)
     for item in items:
         item["price"] = effective.get(item["item_code"], {}).get("price")
+    # المصغرات دفعة واحدة (نفس نمط /catalog — بلا N+1).
+    from biozone_web.services.item_images import resolve_item_thumbnails
+
+    thumb_map = resolve_item_thumbnails(item_codes)
+    for item in items:
+        item["thumbnail"] = (thumb_map.get(item["item_code"]) or {}).get("thumbnail") or ""
     context.featured_items = items
 
     return context

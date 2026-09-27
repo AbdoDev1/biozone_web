@@ -67,7 +67,7 @@ tailwind.config = {
     <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col">
       <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
         {% if item.thumbnail %}
-        <img src="{{ item.thumbnail }}" alt="{{ item.item_name }}" class="absolute inset-0 h-full w-full object-cover" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+        <img src="{{ item.thumbnail }}" alt="{{ item.item_name }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
         {% else %}
         <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
         {% endif %}
