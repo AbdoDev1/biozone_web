@@ -1,0 +1,208 @@
+<!DOCTYPE html><html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Biozone - {{ item.item_name if item else "الصنف غير متاح" }}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#00685f",
+        "on-primary": "#ffffff",
+        "primary-container": "#008378",
+        "on-primary-container": "#f4fffc",
+        "surface": "#f8f9ff",
+        "on-surface": "#0b1c30",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-high": "#dce9ff",
+        "surface-variant": "#d3e4fe",
+        "on-surface-variant": "#3d4947",
+        "secondary": "#5c5f61",
+        "outline": "#6d7a77",
+        "outline-variant": "#bcc9c6",
+        "error": "#ba1a1a",
+        "on-error": "#ffffff"
+      },
+      spacing: { lg: "24px", base: "4px", sm: "8px", md: "16px", "container-max": "1280px", gutter: "20px", xs: "4px", xl: "40px" },
+      fontFamily: { title: ["Tajawal", "sans-serif"], body: ["Tajawal", "sans-serif"] }
+    }
+  }
+}
+</script>
+<style>
+  body { font-family: 'Tajawal', sans-serif; }
+</style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col min-h-screen">
+
+{% include "biozone_web/templates/includes/site_header.html" %}
+
+<main class="flex-grow max-w-container-max mx-auto px-md py-lg w-full">
+  <!-- Breadcrumbs: home / store / group / item (all real links) -->
+  <nav class="flex flex-wrap items-center gap-1 text-sm text-on-surface-variant mb-lg" aria-label="مسار التنقل">
+    <a href="/biozone-home" class="hover:text-primary">الرئيسية</a>
+    <span>/</span>
+    <a href="/catalog" class="hover:text-primary">المتجر</a>
+    {% if item %}
+    <span>/</span>
+    <a href="/catalog?category={{ item.item_group }}" class="hover:text-primary">{{ item.item_group }}</a>
+    <span>/</span>
+    <span class="text-on-surface font-bold">{{ item.item_name }}</span>
+    {% endif %}
+  </nav>
+
+  {% if item %}
+  <!-- Item detail card: image + commercial data, same tokens as catalog cards -->
+  <section class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-lg p-lg">
+    <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden rounded-xl aspect-[4/3]">
+      {% if item.thumbnail %}
+      <img src="{{ item.thumbnail }}" alt="{{ item.item_name }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+      {% else %}
+      <span class="text-6xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
+      {% endif %}
+      <span class="absolute top-2 right-2 text-[11px] font-bold text-primary bg-surface/90 rounded-full px-2 py-0.5">{{ item.item_group }}</span>
+    </div>
+    <div class="flex flex-col gap-md">
+      <div>
+        <span class="text-sm text-primary font-bold">{{ item.item_group }}</span>
+        <h1 class="text-2xl md:text-4xl font-bold text-on-surface leading-tight mt-1">{{ item.item_name }}</h1>
+        <div class="text-xs text-on-surface-variant mt-1">كود الصنف: {{ item.item_code }}{% if item.brand %} | العلامة: {{ item.brand }}{% endif %}</div>
+      </div>
+      <div class="flex items-center gap-2">
+        {% if item.price %}
+        <span class="font-bold text-primary text-3xl">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-sm font-medium text-slate-500">/ {{ item.display_uom }}</span>{% endif %}</span>
+        {% else %}
+        <span class="text-base text-outline">السعر غير متاح</span>
+        {% endif %}
+      </div>
+      {% if item.description %}
+      <p class="text-sm text-on-surface-variant leading-relaxed">{{ item.description }}</p>
+      {% endif %}
+      <div
+        class="mt-2 catalog-cart-control max-w-md"
+        data-item-code="{{ item.item_code|e }}"
+        data-item-name="{{ item.item_name|e }}"
+        data-item-group="{{ item.item_group|e }}"
+        data-item-price="{{ item.price or 0 }}"
+        data-item-uom="{{ item.display_uom or '' }}"
+        data-item-image="{{ item.thumbnail or '' }}"
+      >
+        <button
+          class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
+          {% if not item.price %}disabled{% endif %}
+          type="button"
+        >
+          <span class="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+          أضف للسلة
+        </button>
+        <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
+          <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
+            <span class="material-symbols-outlined text-xl">add</span>
+          </button>
+          <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
+          <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
+            <span class="material-symbols-outlined text-xl">remove</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Compact trust row: same short Arabic labels as the homepage strip -->
+  <section class="grid grid-cols-3 gap-sm py-lg text-center">
+    <div class="flex flex-col items-center gap-1 p-2">
+      <span class="material-symbols-outlined text-primary text-3xl">local_shipping</span>
+      <span class="text-xs font-bold text-on-surface">توصيل سريع</span>
+    </div>
+    <div class="flex flex-col items-center gap-1 p-2">
+      <span class="material-symbols-outlined text-primary text-3xl">verified</span>
+      <span class="text-xs font-bold text-on-surface">منتجات أصلية</span>
+    </div>
+    <div class="flex flex-col items-center gap-1 p-2">
+      <span class="material-symbols-outlined text-primary text-3xl">support_agent</span>
+      <span class="text-xs font-bold text-on-surface">دعم سريع</span>
+    </div>
+  </section>
+
+  <!-- Similar products: same item_group fallback until staff-picked field lands -->
+  {% if similar_items %}
+  <section class="py-xl">
+    <div class="flex justify-between items-center mb-lg">
+      <h2 class="text-2xl font-bold text-on-surface">منتجات مشابهة</h2>
+      <a href="/catalog?category={{ item.item_group }}" class="text-primary font-bold hover:underline">المزيد من {{ item.item_group }}</a>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
+      {% for sim in similar_items %}
+      <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col">
+        <a href="/item?code={{ sim.item_code|urlencode }}" class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
+          {% if sim.thumbnail %}
+          <img src="{{ sim.thumbnail }}" alt="{{ sim.item_name }}" class="absolute inset-0 h-full w-full object-contain" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+          {% else %}
+          <span class="text-4xl font-bold text-outline-variant">{{ sim.item_name[0] }}</span>
+          {% endif %}
+        </a>
+        <div class="flex flex-col flex-grow p-3">
+          <span class="text-xs text-primary mb-0.5 block">{{ sim.item_group }}</span>
+          <a href="/item?code={{ sim.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ sim.item_name }}</a>
+          <div class="mt-auto pt-2 flex items-center justify-between">
+            {% if sim.price %}
+            <span class="font-bold text-primary text-lg">{{ "%.2f"|format(sim.price) }} ج.م{% if sim.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ sim.display_uom }}</span>{% endif %}</span>
+            {% else %}
+            <span class="text-sm text-outline">السعر غير متاح</span>
+            {% endif %}
+          </div>
+          <div
+            class="mt-2 catalog-cart-control"
+            data-item-code="{{ sim.item_code|e }}"
+            data-item-name="{{ sim.item_name|e }}"
+            data-item-group="{{ sim.item_group|e }}"
+            data-item-price="{{ sim.price or 0 }}"
+            data-item-uom="{{ sim.display_uom or '' }}"
+            data-item-image="{{ sim.thumbnail or '' }}"
+          >
+            <button
+              class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
+              {% if not sim.price %}disabled{% endif %}
+              type="button"
+            >
+              <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+              أضف للسلة
+            </button>
+            <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
+              <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
+                <span class="material-symbols-outlined text-xl">add</span>
+              </button>
+              <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
+              <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
+                <span class="material-symbols-outlined text-xl">remove</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% else %}
+  <!-- Unknown / disabled code: clean store-language empty state, no traceback -->
+  <section class="text-center py-xl">
+    <span class="material-symbols-outlined text-outline-variant text-6xl">inventory_2</span>
+    <h1 class="text-2xl font-bold text-on-surface mt-4">الصنف غير متاح</h1>
+    <p class="text-on-surface-variant mt-2">ربما تم إيقافه أو الرابط غير صحيح.</p>
+    <a href="/catalog" class="inline-flex items-center justify-center bg-primary text-on-primary font-bold rounded-full px-8 py-3 hover:bg-primary-container transition-colors mt-lg">تصفّح المتجر</a>
+  </section>
+  {% endif %}
+</main>
+
+{% include "biozone_web/templates/includes/site_footer.html" %}
+{% include "biozone_web/templates/includes/cart_helpers.html" %}
+
+</body></html>

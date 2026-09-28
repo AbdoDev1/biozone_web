@@ -1,7 +1,6 @@
 import frappe
 
 from biozone_web.utils import (
-    get_effective_item_prices,
     get_header_context,
     redirect_staff_away_from_store,
 )
@@ -69,43 +68,14 @@ def get_context(context):
         limit_page_length=PAGE_SIZE,
     )
 
-    item_codes = [i["item_code"] for i in items]
     # البند 5: السعر النهائي حسب فئة الطالب (سيرفر-سايد عبر محرك ERPNext)،
     # لا السعر الأساسي الخام — الزائر/غير المفعّل يرى سعر الجمهور، والمفعّل
-    # يرى سعر فئته فقط. الأصناف بلا سعر أساسي تبقى price=None (غير متاحة).
-    effective = get_effective_item_prices(item_codes)
-    # Phase-2 display units: price converted to the customer's group unit;
-    # misconfigured (large without conversion) items are hidden, never
-    # priced by guess. Missing price still hides the item as before.
-    try:
-        from biozone_web.units import money2, resolve_items_display
-        from biozone_web.utils import get_customer_price_group
+    # يرى سعر فئته فقط. الأصناف بلا سعر أساسي تبقى price=None (زر معطّل).
+    # الإثراء الكامل (سعر/وحدة عرض/مصغرة) في services.store_items —
+    # المصدر الوحيد المشترك مع /item. فشل حل الوحدات = إخفاء (fail-closed).
+    from biozone_web.services.store_items import enrich_store_items
 
-        try:
-            _group = get_customer_price_group()
-        except Exception:
-            _group = None
-        _display = resolve_items_display(item_codes, _group)
-    except Exception:
-        _display = {}
-    visible = []
-    for item in items:
-        d = (_display.get(item["item_code"]) or {}) if isinstance(_display, dict) else {}
-        if not d.get("ok", True) or not d.get("displayable", True):
-            continue
-        factor = d.get("factor") or 1.0
-        price = effective.get(item["item_code"], {}).get("price")
-        item["price"] = money2(price * factor) if price is not None else None
-        item["display_uom"] = d.get("uom") or ""
-        visible.append(item)
-    items = visible
-    # المصغرات دفعة واحدة (استعلامان مهما كان عدد البطاقات — بلا N+1).
-    # القوالب تستخدم المصغرة حصرًا؛ الأصل الكامل لا يظهر في القوائم أبدًا.
-    from biozone_web.services.item_images import resolve_item_thumbnails
-
-    thumb_map = resolve_item_thumbnails([i["item_code"] for i in items])
-    for item in items:
-        item["thumbnail"] = (thumb_map.get(item["item_code"]) or {}).get("thumbnail") or ""
+    items = enrich_store_items(items)
     context.items = items
     # Category chip list: every distinct item_group that has active items.
     categories = [
