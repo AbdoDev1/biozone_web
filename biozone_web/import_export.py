@@ -490,11 +490,16 @@ def validate_rows(raw_rows, key_by_index, active_groups):
 		large = (values.get("large_uom") or "").strip()
 		factor_raw = (values.get("factor") or "").strip()
 		small_unit = uom or "Nos"
+		if large and large == small_unit:
+			# الكبرى المطابقة للصغرى (ومنها الصف التافه الذي تولده النواة
+			# تلقائيًا) تُتجاهل بدل رفضها — الصنف الوحيد بلا كبرى حقيقية.
+			values["large_uom"] = ""
+			values["factor"] = ""
+			large = ""
+			factor_raw = ""
 		if large:
 			if not frappe.db.exists("UOM", {"name": large, "enabled": 1}):
 				row["errors"].append(_("الوحدة الكبرى غير معرّفة أو معطّلة: {0}").format(large))
-			if large == small_unit:
-				row["errors"].append(_("الوحدة الكبرى تطابق الوحدة — اترك الكبرى فارغة للصنف الوحيد"))
 			if not factor_raw:
 				row["errors"].append(_("عدد الوحدات في الكبرى مطلوب مع الوحدة الكبرى"))
 			else:

@@ -872,17 +872,17 @@ def staff_save_item(
 	large = (large_uom or "").strip()
 	factor_raw = (factor if factor not in (None, "") else "")
 	factor_raw = str(factor_raw).strip()
+	small_unit = submitted_unit or "Nos"
+	if large and large == small_unit:
+		# الكبرى المطابقة للصغرى (ومنها الصف التافه الذي تولده النواة
+		# تلقائيًا) تُتجاهل بدل رفضها — الصنف الوحيد بلا كبرى حقيقية.
+		large = ""
+		factor_raw = ""
 	if large:
 		if not frappe.db.exists("UOM", {"name": large, "enabled": 1}):
 			return {
 				"ok": False,
 				"error": _("الوحدة الكبرى غير معرّفة أو معطّلة: {0}").format(large),
-			}
-		small_unit = submitted_unit or "Nos"
-		if large == small_unit:
-			return {
-				"ok": False,
-				"error": _("الوحدة الكبرى تطابق الصغرى — اترك الكبرى فارغة للصنف الوحيد"),
 			}
 		ok_factor, factor_value = _strict_num_local(factor_raw)
 		if not ok_factor or factor_value <= 0:

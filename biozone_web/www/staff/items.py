@@ -105,8 +105,11 @@ def get_context(context):
 
 	item_codes = [i["item_code"] for i in items]
 
-	# Phase-2: أول صف تحويل + الراية لكل صنف (للدرج) — دفعة واحدة.
+	# Phase-2: أول تحويل حقيقي + الراية لكل صنف (للدرج) — دفعة واحدة.
+	# الصف التافه التلقائي (المخزون، 1) الذي تولده النواة في كل حفظ
+	# ليس كبرى حقيقية فلا يعبّئ الدرج — الصنف الوحيد يظهر بكبرى فارغة.
 	conv_map = {}
+	stock_of = {i["item_code"]: (i.get("stock_uom") or "") for i in items}
 	if item_codes:
 		for r in frappe.get_all(
 			"UOM Conversion Detail",
@@ -114,12 +117,15 @@ def get_context(context):
 			fields=["parent", "uom", "conversion_factor", "min_qty"],
 			order_by="idx asc",
 		):
-			if r.uom and r.parent not in conv_map:
-				conv_map[r.parent] = {
-					"uom": r.uom,
-					"factor": r.conversion_factor,
-					"min_qty": r.min_qty if r.min_qty not in (None, "") else 1,
-				}
+			if not r.uom or r.parent in conv_map:
+				continue
+			if (r.uom or "").strip() == (stock_of.get(r.parent) or ""):
+				continue
+			conv_map[r.parent] = {
+				"uom": r.uom,
+				"factor": r.conversion_factor,
+				"min_qty": r.min_qty if r.min_qty not in (None, "") else 1,
+			}
 
 	# الكمية الحالية: مجموع actual_qty لكل صنف عبر كل المخازن — قراءة بس،
 	# مفيش أي تعديل عليها من الشاشة دي (Bin هو مصدر الحقيقة الوحيد).
