@@ -89,7 +89,6 @@ tailwind.config = {
         </button>
         <p class="hidden mt-3 text-sm text-error text-center" id="confirm-order-error"></p>
         <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="activation-hint"></p>
-        <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="min-limit-hint"></p>
         <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="cart-reprice-notice"></p>
         <p class="mt-4 flex items-center justify-center gap-1.5 text-xs text-on-surface-variant">
           <span class="material-symbols-outlined text-base">verified_user</span>
@@ -295,19 +294,6 @@ tailwind.config = {
     hintEl.classList.remove('hidden');
   }
 
-  // تلميح الحد الأدنى (عرض مساعد فقط — السلطة للتأكيد سيرفر-سايد).
-  // يُقرأ من meta السيرفرية نفسها (min_limit/min_applies)، ولا يُحسب
-  // من أسعار المتصفح، ولا يمنع الإرسال.
-  function showMinLimitHint(meta) {
-    const hintEl = document.getElementById('min-limit-hint');
-    if (!meta || !meta.min_applies || !(meta.min_limit > 0)) {
-      hintEl.classList.add('hidden');
-      return;
-    }
-    hintEl.textContent = 'الحد الأدنى للطلب لقيمة المنتجات: ' + formatPrice(meta.min_limit) + ' — يُفحص لحظة التأكيد.';
-    hintEl.classList.remove('hidden');
-  }
-
   document.getElementById('confirm-order-btn').addEventListener('click', async () => {
     const items = loadCart();
     const errorEl = document.getElementById('confirm-order-error');
@@ -393,7 +379,6 @@ cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
       noticeEl.classList.remove('hidden');
     }
     showActivationHint(outcome.meta);
-    showMinLimitHint(outcome.meta);
   });
 })();
 </script>
