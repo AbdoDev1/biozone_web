@@ -267,12 +267,25 @@ def biozone_get_cart_prices(item_codes):
 		if entry.get("price") is not None:
 			entry["price"] = money2(frappe.utils.flt(entry["price"]) * factor)
 
+	# تلميح الحد الأدنى للفئة (عرض مساعد فقط — السلطة للتأكيد سيرفر-سايد).
+	# نفس المساعد ونفس الفئة المشتقة سيرفر-سايد (ctx) — لا يُقبل أي
+	# customer_group من العميل. عطل التهيئة هنا = بلا تلميح (None)، بينما
+	# مسار التأكيد هو المرجع ويسجّل العطل داخليًا.
+	try:
+		from biozone_web.utils import MinOrderConfigError, get_group_min_order_amount
+
+		_cart_min_limit = get_group_min_order_amount(ctx["customer_group"])
+	except MinOrderConfigError:
+		_cart_min_limit = None
+
 	return {
 		"ok": True,
 		"prices": prices,
 		"customer_group": ctx["customer_group"],
 		"is_active": ctx["is_active"],
 		"is_guest": ctx["is_guest"],
+		"min_limit": _cart_min_limit,
+		"min_applies": bool(ctx["is_active"] and _cart_min_limit),
 	}
 
 
@@ -441,6 +454,146 @@ def biozone_confirm_order(items):
 			)
 		so_items = final_items
 
+		# حد الطلب الأدنى للفئة (M1–M6 النهائي): فحص سيرفر-سايد خالص على
+		# net_total — أسعار المتصفح لا تُقرأ في أي نقطة. المعطَّل (0/فارغ)
+		# يتجاوز كل ما يلي فسلوك التأكيد مطابق لما قبل الميزة حرفيًا.
+		from biozone_web.utils import (
+			MinOrderConfigError,
+			get_group_min_order_amount,
+			quantize_2dp,
+		)
+
+		def _min_order_unavailable():
+			return {
+				"ok": False,
+				"error": _("تعذر حساب إجمالي الطلب، يرجى المحاولة مرة أخرى"),
+				"error_code": "MIN_ORDER_CALC_FAILED",
+			}
+
+		try:
+			_min_limit_value = get_group_min_order_amount(customer_group)
+		except MinOrderConfigError:
+			frappe.log_error(
+				title="Biozone min-order limit read failed",
+				message=frappe.get_traceback(),
+			)
+			return _min_order_unavailable()
+
+		_q_limit = quantize_2dp(_min_limit_value)
+		_checked_net = None
+		if _q_limit > 0:
+			# بوابة M1: إعدادا مسار الكتابة في التسعير — أي تفعيل أو تعذّر
+			# قراءة = رفض الحساب قبل بدئه (لا اتكال على savepoint وحده —
+			# ضروري لأن ignore_permissions مرفوع في هذا الطلب).
+			try:
+				_auto_insert = frappe.db.get_single_value(
+					"Stock Settings", "auto_insert_price_list_rate_if_missing"
+				)
+				_update_existing = frappe.db.get_single_value(
+					"Stock Settings", "update_existing_price_list_rate"
+				)
+			except Exception:
+				frappe.log_error(
+					title="Biozone min-order pricing-gate read failed",
+					message=frappe.get_traceback(),
+				)
+				return _min_order_unavailable()
+			if _auto_insert or _update_existing:
+				frappe.log_error(
+					title="Biozone min-order precalc refused (price-write path enabled)",
+					message=f"auto_insert={_auto_insert} update_existing={_update_existing}",
+				)
+				return _min_order_unavailable()
+
+			# الحساب المسبق في الذاكرة على نفس مدخلات الإدخال — بلا insert.
+			# savepoint دفاعي ثانٍ فقط + اقتطاع طولي للرسائل (M5: يُحفظ
+			# الطول قبلًا ويُقتطع الزائد فقط — لا مسح شامل).
+			# نافذة انتحال Administrator ضيقة للحساب المسبق وحده (انحراف موثق
+			# عن نص التصميم — السبب: set_missing_values يستدعي فحص صلاحية
+			# داخليًا عبر _get_party_details (party.py:144) لا يغطيه
+			# ignore_permissions، فبدون سياق الجلسة نفسه المستخدم في
+			# so.insert() أدناه يرفض الحساب PermissionError دائمًا — مثبت
+			# حيًا. الاستعادة في finally أدناه قبل أي return.
+			_precalc_user = frappe.session.user
+			frappe.session.user = "Administrator"
+			_precalc_sp = "bz_min_precalc_sp"
+			_msg_log = getattr(frappe.local, "message_log", None)
+			_msg_len = len(_msg_log) if isinstance(_msg_log, list) else 0
+			try:
+				frappe.db.savepoint(_precalc_sp)
+				try:
+					so_pre = frappe.get_doc(
+						{
+							"doctype": "Sales Order",
+							"customer": customer,
+							"customer_group": customer_group,
+							"company": get_default_company(),
+							"selling_price_list": "Standard Selling",
+							"shipping_address_name": shipping_address_name,
+							"delivery_date": frappe.utils.add_days(
+								frappe.utils.nowdate(),
+								3,
+							),
+							"items": [dict(it) for it in so_items],
+						}
+					)
+					so_pre.set_missing_values()
+					so_pre.calculate_taxes_and_totals()
+					_checked_net = quantize_2dp(so_pre.net_total)
+				finally:
+					try:
+						frappe.db.rollback(save_point=_precalc_sp)
+					except Exception:
+						frappe.log_error(
+							title="Biozone min-order precalc rollback failed",
+							message=frappe.get_traceback(),
+						)
+					try:
+						frappe.db.release_savepoint(_precalc_sp)
+					except Exception:
+						pass
+					try:
+						_after_log = getattr(frappe.local, "message_log", None)
+						if isinstance(_after_log, list) and len(_after_log) > _msg_len:
+							frappe.local.message_log = _after_log[:_msg_len]
+					except Exception:
+						pass
+			except Exception:
+				frappe.log_error(
+					title="Biozone min-order precalc failed",
+					message=frappe.get_traceback(),
+				)
+				return _min_order_unavailable()
+			finally:
+				frappe.session.user = _precalc_user
+
+			if _checked_net is None:
+				frappe.log_error(
+					title="Biozone min-order precalc empty total",
+					message=f"group={customer_group}",
+				)
+				return _min_order_unavailable()
+
+			if _checked_net < _q_limit:
+				_shortfall = _q_limit - _checked_net
+				return {
+					"ok": False,
+					"error": _(
+						"الحد الأدنى للطلب لفئة «{0}» هو {1} ج.م لقيمة المنتجات — "
+						"صافي طلبك الحالي {2} ج.م. أضف أصنافًا بقيمة {3} ج.م لإتمام الطلب."
+					).format(
+						customer_group,
+						f"{float(_q_limit):,.2f}",
+						f"{float(_checked_net):,.2f}",
+						f"{float(_shortfall):,.2f}",
+					),
+					"error_code": "MIN_ORDER_BELOW_MINIMUM",
+					"customer_group": customer_group,
+					"min_limit": float(_q_limit),
+					"net_total": float(_checked_net),
+					"shortfall": float(_shortfall),
+				}
+
 		# الملكية: ordering_user هو الجلسة الحقيقية قبل أي انتحال.
 		# نافذة الانتحال أدناه تضبط owner مؤقتًا على Administrator،
 		# لذلك يُصحَّح فورًا بعد insert() عبر db_set (المسار الثاني).
@@ -450,6 +603,11 @@ def biozone_confirm_order(items):
 
 		for attempt in range(max_attempts):
 			try:
+				# حارس الاتساق M3: savepoint قبل الإدخال — فقط عند حد مفعّل
+				# (المعطَّل سلوكه مطابق لما قبل الميزة). يُحرَّر عند التطابق،
+				# ويُرجع إليه عند الاختلاف قبل أي notify.
+				if _checked_net is not None:
+					frappe.db.savepoint("bz_min_preinsert_sp")
 				so = frappe.get_doc(
 					{
 						"doctype": "Sales Order",
@@ -513,6 +671,44 @@ def biozone_confirm_order(items):
 					so.reload()
 				finally:
 					frappe.session.user = original_session_user
+
+				# حارس الاتساق M3: تطابق الصافي بعد الإدخال مع المفحوص —
+				# اختلافه حالة حرجة (ليست صفر أثر): لا notify، rollback أولًا،
+				# فالحذف بديلًا، وفشل التنظيف حادثة حرجة (لا نجاح أبدًا).
+				if _checked_net is not None:
+					if quantize_2dp(so.net_total) != _checked_net:
+						try:
+							frappe.db.rollback(save_point="bz_min_preinsert_sp")
+							try:
+								frappe.db.release_savepoint("bz_min_preinsert_sp")
+							except Exception:
+								pass
+						except Exception:
+							try:
+								frappe.delete_doc(
+									"Sales Order",
+									so.name,
+									ignore_permissions=True,
+									force=True,
+								)
+							except Exception:
+								frappe.log_error(
+									frappe.get_traceback(),
+									"Biozone min-order cleanup failed",
+								)
+						frappe.log_error(
+							title="Biozone min-order post-insert mismatch",
+							message=(
+								f"Checked net: {_checked_net}\n"
+								f"Stored net: {so.net_total}\n"
+								f"Sales Order: {so.name}"
+							),
+						)
+						return _min_order_unavailable()
+					try:
+						frappe.db.release_savepoint("bz_min_preinsert_sp")
+					except Exception:
+						pass
 
 				# ضمان صريح: owner يجب أن يكون المستخدم الذي أرسل
 				# الطلب. الفحص هنا (داخل نفس المحاولة، قبل أي commit)
@@ -1413,6 +1609,51 @@ def staff_create_customer_group(customer_group_name: str):
 		"ok": True,
 		"customer_group": doc.name,
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_save_order_limit(customer_group=None, min_order_amount=None):
+	"""حفظ الحد الأدنى لقيمة الطلب لفئة (ستاف فقط) — قرار M1–M6 النهائي.
+
+	- الفئة العامة read-only سيرفر-سايد: الحفظ لها مرفوض برسالة (لا تجاهل صامت).
+	- الحقل غائب (قبل migrate) ← رفض لطيف بلا كتابة؛ meta غير مقروءة ← رفض تقني.
+	- التحقق العددي مركزي في parse_min_order_amount (utils — بلا DB).
+	- تثبيت صريح بعد نجاح الحفظ فقط (P1 المعتمد — نمط الجيران units.py:216).
+	"""
+	from biozone_web.utils import (
+		customer_group_has_min_order_field,
+		get_public_customer_group,
+		parse_min_order_amount,
+		require_staff_access,
+	)
+
+	require_staff_access()
+
+	customer_group = (customer_group or "").strip()
+	if not customer_group or not frappe.db.exists(
+		"Customer Group", {"name": customer_group, "is_group": 0}
+	):
+		return {"ok": False, "error": _("فئة العميل غير صالحة")}
+	if customer_group == get_public_customer_group():
+		return {
+			"ok": False,
+			"error": _("لا يُقبل حد أدنى لفئة الجمهور — حساباتها غير مفعّلة أصلًا"),
+		}
+
+	present = customer_group_has_min_order_field()
+	if present is None:
+		return {"ok": False, "error": _("تعذر قراءة إعداد الحد، يرجى المحاولة مرة أخرى")}
+	if not present:
+		return {"ok": False, "error": _("إعداد الحد غير مهيأ بعد (بانتظار الترحيل)")}
+
+	ok, value, err = parse_min_order_amount(min_order_amount)
+	if not ok:
+		return {"ok": False, "error": err}
+
+	frappe.db.set_value("Customer Group", customer_group, "min_order_amount", value)
+	frappe.db.commit()
+
+	return {"ok": True, "group": customer_group, "min_limit": value}
 
 
 @frappe.whitelist(methods=["POST"])

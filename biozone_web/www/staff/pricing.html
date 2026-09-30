@@ -89,6 +89,7 @@
 <tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold">
 <th class="text-right py-3 px-4">الفئة</th>
 <th class="text-right py-3 px-4">الحالة</th>
+<th class="text-right py-3 px-4">الحد الأدنى (ج.م)</th>
 <th class="text-right py-3 px-4">إجراء</th>
 </tr>
 </thead>
@@ -109,6 +110,18 @@
 {% endif %}
 </td>
 <td class="py-3 px-4">
+{% if g.name == public_group %}
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-xs font-bold">غير مطبَّق (الجمهور)</span>
+{% else %}
+<div class="flex items-center gap-2">
+<input class="w-28 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" id="minlimit-{{ loop.index }}" min="0" placeholder="بلا حد" step="0.01" type="number" value="{{ g.get('min_order_amount') if g.get('min_order_amount') else '' }}">
+<button class="text-xs font-bold text-primary hover:underline" onclick="saveLimit('{{ g.name }}', {{ loop.index }})">حفظ</button>
+<span class="hidden text-xs text-navy-text/40" id="saved-minlimit-{{ loop.index }}">تم الحفظ ✓</span>
+</div>
+<p class="hidden text-xs text-alert-red font-bold" id="error-minlimit-{{ loop.index }}"></p>
+{% endif %}
+</td>
+<td class="py-3 px-4">
 <button class="text-xs font-bold {% if g.disabled %}text-primary{% else %}text-alert-red{% endif %} hover:underline" onclick="toggleGroup('{{ g.name }}', {{ 0 if g.disabled else 1 }})">
 {% if g.disabled %}تفعيل{% else %}تعطيل{% endif %}
 </button>
@@ -116,7 +129,7 @@
 </tr>
 {% endfor %}
 {% if not groups %}
-<tr><td class="py-8 px-4 text-center text-navy-text/40" colspan="3">مفيش فئات لسه — أضف واحدة من الفورم فوق</td></tr>
+<tr><td class="py-8 px-4 text-center text-navy-text/40" colspan="4">مفيش فئات لسه — أضف واحدة من الفورم فوق</td></tr>
 {% endif %}
 </tbody>
 </table>
@@ -219,6 +232,38 @@
         }
       })
       .catch(() => StaffUI.toast('خطأ', 'تعذر الاتصال بالسيرفر', 'error'));
+  }
+
+  function saveLimit(name, idx) {
+    const input = document.getElementById('minlimit-' + idx);
+    const savedLabel = document.getElementById('saved-minlimit-' + idx);
+    const errorEl = document.getElementById('error-minlimit-' + idx);
+    errorEl.classList.add('hidden');
+    errorEl.innerText = '';
+    savedLabel.classList.add('hidden');
+
+    fetch('/api/method/biozone_web.api.staff_save_order_limit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-CSRF-Token': CSRF_TOKEN,
+      },
+      body: JSON.stringify({ customer_group: name, min_order_amount: input.value }),
+    })
+      .then((res) => { if (!res.ok) throw new Error('resok-limit-save'); return res.json(); })
+      .then((res) => {
+        if (res.message && res.message.ok) {
+          savedLabel.classList.remove('hidden');
+          setTimeout(() => savedLabel.classList.add('hidden'), 1500);
+        } else {
+          errorEl.innerText = (res.message && res.message.error) || 'حصل خطأ أثناء الحفظ';
+          errorEl.classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        errorEl.innerText = 'تعذر الاتصال بالسيرفر';
+        errorEl.classList.remove('hidden');
+      });
   }
 
   function createGroup(event) {

@@ -711,6 +711,122 @@ def require_active_price_customer():
 	return customer, group
 
 
+# الحد الأدنى لقيمة الطلب على مستوى الفئة (قرار M1–M6 النهائي).
+MIN_ORDER_AMOUNT_FIELD = "min_order_amount"
+MIN_ORDER_MAX = 100000000.0
+
+
+class MinOrderConfigError(Exception):
+	"""عطل تهيئة/قراءة لحد الطلب الأدنى — يُترجم دائمًا لـMIN_ORDER_CALC_FAILED.
+
+	يُرفع حصرًا عند: تعذّر قراءة الـmeta أو صف الفئة أو إعدادات التسعير،
+	أو قيمة مخزنة غير صالحة (سالبة/غير رقمية/غير منتهية). لا يُرفع أبدًا
+	للحالات المشروعة المعطِّلة (الفارغ/الصفر/العامة/المعطّلة) فتلك تُرجع 0.0.
+	"""
+
+
+def customer_group_has_min_order_field():
+	"""هل حقل الحد موجود على Customer Group؟ ثلاثي القيم.
+
+	True/False للحالتين الحتميتين (موجود/غائب قبل migrate)، وNone عند
+	تعذّر قراءة الـmeta نفسها — فيُعامل كعطل (M4) لا كغياب.
+	"""
+	try:
+		return bool(frappe.get_meta("Customer Group").has_field(MIN_ORDER_AMOUNT_FIELD))
+	except Exception:
+		return None
+
+
+def quantize_2dp(value):
+	"""تكميم نصف-لأعلى لخانتين عبر Decimal(str) — نفس دلالة money2 في units.
+
+	تُستخدم للمقارنة فقط (تُرجع Decimal لا float) حتى لا يتسرب خطأ الثنائي:
+	4999.995 ← 5000.00 (مقبول عند حد 5000)، و4999.994 ← 4999.99 (مرفوض). لا تُستدعى أبدًا على مدخل المتصفح (لا يُقرأ أصلًا).
+	"""
+	from decimal import Decimal, ROUND_HALF_UP
+
+	return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+_ARABIC_DIGITS_MAP = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def normalize_arabic_digits(text):
+	"""تطبيع الأرقام العربية/الفارسية للاتينية قبل أي تحليل رقمي."""
+	if not isinstance(text, str):
+		return text
+	return text.translate(_ARABIC_DIGITS_MAP)
+
+
+def parse_min_order_amount(raw):
+	"""تحليل صارم لقيمة الحد المدخلة من الستاف — بلا DB، قابلة للاختبار.
+
+	تُرجع (ok_bool, float_value, error_msg|None). الفارغ/None = (True, 0.0,
+	None) أي التعطيل. أي فشل = رسالة عربية جاهزة للعرض.
+	"""
+	if raw is None:
+		return True, 0.0, None
+	if isinstance(raw, bool):
+		return False, 0.0, _("الحد يجب أن يكون رقمًا لا يقل عن صفر")
+	if isinstance(raw, (int, float)):
+		value = float(raw)
+	else:
+		text = normalize_arabic_digits(raw).strip().replace(",", "") if isinstance(raw, str) else ""
+		if not text:
+			return True, 0.0, None
+		try:
+			value = float(text)
+		except (TypeError, ValueError):
+			return False, 0.0, _("الحد يجب أن يكون رقمًا لا يقل عن صفر")
+	import math
+
+	if not math.isfinite(value) or value < 0:
+		return False, 0.0, _("الحد يجب أن يكون رقمًا لا يقل عن صفر")
+	if value > MIN_ORDER_MAX:
+		return False, 0.0, _("الحد كبير بشكل غير معقول، راجع القيمة")
+	return True, value, None
+
+
+def get_group_min_order_amount(customer_group):
+	"""الحد الأدنى الفعّال لفئة — float؛ 0.0 = معطَّل (M4 النهائي).
+
+	- فارغ/غير موجودة/مجمّعة/معطّلة/عامة/بلا قيمة/صفر ← 0.0 (تعطيل مشروع).
+	- الحقل غائب (قبل migrate — فحص meta حتمي) ← 0.0 (نافذة نشر موثقة fail-open).
+	- meta غير مقروءة، أو صف غير مقروء، أو قيمة مخزنة سالبة/غير رقمية/
+	  غير منتهية ← MinOrderConfigError (fail-closed → CALC_FAILED).
+	"""
+	group = (customer_group or "").strip() if isinstance(customer_group, str) else ""
+	if not group:
+		return 0.0
+	present = customer_group_has_min_order_field()
+	if present is None:
+		raise MinOrderConfigError("customer-group meta unreadable")
+	if not present:
+		return 0.0
+	if group == get_public_customer_group():
+		return 0.0
+	try:
+		row = frappe.db.get_value(
+			"Customer Group", group, ["is_group", "disabled", "min_order_amount"], as_dict=True
+		)
+	except Exception as exc:
+		raise MinOrderConfigError("customer-group row unreadable") from exc
+	if not row or row.get("is_group") or row.get("disabled"):
+		return 0.0
+	raw = row.get("min_order_amount")
+	if raw is None or raw == "":
+		return 0.0
+	import math
+
+	try:
+		value = float(raw)
+	except (TypeError, ValueError) as exc:
+		raise MinOrderConfigError("stored min_order_amount non-numeric") from exc
+	if not math.isfinite(value) or value < 0:
+		raise MinOrderConfigError("stored min_order_amount invalid")
+	return value
+
+
 def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 	"""السعر النهائي (بعد خصم الفئة) لمجموعة أصناف، دفعة واحدة عبر محرك
 	ERPNext الحقيقي — نفس المحرك الذي يسعّر صفوف Sales Order.

@@ -1,8 +1,24 @@
 import frappe
 
-from biozone_web.utils import get_header_context, require_staff_access
+from biozone_web.utils import (
+	get_header_context,
+	get_public_customer_group,
+	require_staff_access,
+)
 
 PAGE_SIZE = 20
+
+
+def _group_fields():
+	"""حقول تبويب الفئات — يلحق min_order_amount فقط إن وُجد (قبل migrate
+	يُعرض بدونه بلا كسر: حارس الفترة البينية على نمط utils)."""
+	fields = ["name", "disabled"]
+	try:
+		if frappe.get_meta("Customer Group").has_field("min_order_amount"):
+			fields.append("min_order_amount")
+	except Exception:
+		pass
+	return fields
 
 
 def get_context(context):
@@ -24,9 +40,10 @@ def get_context(context):
 	context.groups = frappe.get_all(
 		"Customer Group",
 		filters={"is_group": 0},
-		fields=["name", "disabled"],
+		fields=_group_fields(),
 		order_by="disabled asc, name asc",
 	)
+	context.public_group = get_public_customer_group()
 
 	if tab == "discounts":
 		_load_discounts_tab(context)
