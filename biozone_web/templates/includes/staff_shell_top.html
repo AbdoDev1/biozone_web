@@ -69,19 +69,21 @@
 <span class="material-symbols-outlined text-[22px]">sync_alt</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">حركة المخزون</span>
 </a>
-<a class="flex items-center justify-between px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'orders' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/orders" title="تجهيز الطلبات">
+<a class="relative flex items-center justify-between px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'orders' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/orders" title="تجهيز الطلبات">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-[22px]">receipt_long</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">تجهيز الطلبات</span>
 </div>
+<span aria-live="polite" id="sb-orders-badge" class="absolute top-1 left-1 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-alert-red text-white text-[11px] font-bold leading-5 text-center {% if sb_new_orders|default(0) %}flex{% else %}hidden{% endif %}">{{ sb_new_orders|default(0) if (sb_new_orders|default(0)) <= 99 else '99+' }}</span>
 </a>
 <a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'pricing' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/pricing" title="التسعير">
 <span class="material-symbols-outlined text-[22px]">sell</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">التسعير</span>
 </a>
-<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'customers' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/customers" title="العملاء">
+<a class="relative flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'customers' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/customers" title="العملاء">
 <span class="material-symbols-outlined text-[22px]">group</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">العملاء</span>
+<span aria-live="polite" id="sb-customers-badge" class="absolute top-1 left-1 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-alert-red text-white text-[11px] font-bold leading-5 text-center {% if sb_unreviewed|default(0) %}flex{% else %}hidden{% endif %}">{{ sb_unreviewed|default(0) if (sb_unreviewed|default(0)) <= 99 else '99+' }}</span>
 </a>
 </nav>
 </div>

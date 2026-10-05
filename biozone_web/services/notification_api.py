@@ -10,7 +10,11 @@ API responses (see ``frappe/app.py``).
 import frappe
 
 from biozone_web.services import notification_core as core
-from biozone_web.utils import require_staff_access
+from biozone_web.utils import (
+	_count_preparing_orders,
+	_count_unreviewed_customers,
+	require_staff_access,
+)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -41,3 +45,20 @@ def notif_mark_all_read():
 	require_staff_access()
 	core.mark_all(frappe.session.user)
 	return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_sidebar_counts():
+	"""Sidebar badges: preparing orders + unreviewed customers.
+
+	One data query per counter, via the same helpers that seed the
+	server-rendered badges in get_header_context (no copied logic, no
+	get_doc, no loops, no N+1). Same staff guard and POST-only contract
+	as the bell endpoints above; CSRF enforced by the framework.
+	"""
+	require_staff_access()
+	return {
+		"ok": True,
+		"new_orders": _count_preparing_orders(),
+		"unreviewed": _count_unreviewed_customers(),
+	}

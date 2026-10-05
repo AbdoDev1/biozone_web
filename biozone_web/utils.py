@@ -359,12 +359,21 @@ def get_header_context():
 	- notif_unread_count: customer bell counter — Website Users only and
 	  only when the notifications flag is on. Guests, staff and flag-off
 	  cost zero notification queries.
+	- sb_new_orders: staff sidebar badge — preparing Sales Orders
+	  (docstatus=0, not Cancelled, not fully confirmed; zero-item orders
+	  count as preparing per b9_utils.get_order_prep_state). System Users
+	  only; everyone else gets 0 with zero extra queries.
+	- sb_unreviewed: staff sidebar badge — customers with
+	  category_assigned_by_staff != 1. System Users only; everyone else
+	  gets 0 with zero extra queries.
 	"""
 	user = frappe.session.user
 	is_logged_in = user != "Guest"
 
 	user_full_name = None
 	notif_unread_count = 0
+	sb_new_orders = 0
+	sb_unreviewed = 0
 	if is_logged_in:
 		info = frappe.db.get_value("User", user,
 		                           ["full_name", "user_type", "enabled"],
@@ -378,11 +387,16 @@ def get_header_context():
 					"Notification Log",
 					{"for_user": user, "read": 0,
 					 "type": ("in", list(_BZ_NOTIFICATION_TYPES))})
+			if info.user_type == "System User" and info.enabled:
+				sb_new_orders = _count_preparing_orders()
+				sb_unreviewed = _count_unreviewed_customers()
 
 	return {
 		"is_logged_in": is_logged_in,
 		"user_full_name": user_full_name,
 		"notif_unread_count": notif_unread_count,
+		"sb_new_orders": sb_new_orders,
+		"sb_unreviewed": sb_unreviewed,
 	}
 
 
@@ -399,6 +413,57 @@ def _notifications_flag_on():
 	if isinstance(val, str):
 		return val.strip().lower() in ("1", "true", "yes", "on")
 	return False
+
+
+def _count_preparing_orders():
+	"""Sidebar badge: preparing Sales Orders only (literal b9_utils logic).
+
+	- docstatus=0 AND status != 'Cancelled', and NOT fully confirmed.
+	- LEFT JOIN (not INNER) so zero-item orders survive as one grouped row
+	  and count as preparing (b9_utils: total=0 → preparing).
+	- COUNT(soi.name) counts item rows (0 for zero-item orders); the double
+	  COALESCE treats NULL custom_confirmed as unconfirmed and a fully-NULL
+	  SUM as 0 instead of NULL.
+	- Never raises: any failure returns 0 so the header/sidebar still renders.
+	"""
+	try:
+		rows = frappe.db.sql(
+			"""
+			SELECT COUNT(*) AS c FROM (
+				SELECT so.name
+				FROM `tabSales Order` so
+				LEFT JOIN `tabSales Order Item` soi ON soi.parent = so.name
+				WHERE so.docstatus = 0 AND so.status != 'Cancelled'
+				GROUP BY so.name
+				HAVING NOT (
+					COUNT(soi.name) > 0
+					AND COALESCE(SUM(COALESCE(soi.custom_confirmed, 0)), 0)
+						= COUNT(soi.name)
+				)
+			) t
+			""",
+			as_dict=True,
+		)
+		return int(rows[0].c or 0) if rows else 0
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Preparing orders sidebar count")
+		return 0
+
+
+def _count_unreviewed_customers():
+	"""Sidebar badge: customers with no staff-assigned category.
+
+	Same filter as the customers page unreviewed tab
+	(category_assigned_by_staff != 1). Returns 0 when the field does not
+	exist yet (pre-migrate safe). Never raises.
+	"""
+	try:
+		if not customer_has_category_assigned_field():
+			return 0
+		return int(frappe.db.count("Customer", {"category_assigned_by_staff": ["!=", 1]}) or 0)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Unreviewed customers sidebar count")
+		return 0
 
 
 def find_customer_for_current_user():

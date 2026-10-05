@@ -129,6 +129,10 @@
     });
   }
   var refreshBusy = false;
+  // Sidebar badges hook (Unit 3): no-op by default; the staff branch
+  // below replaces it with the real poller. Customer pages keep calling
+  // a no-op, so bell behavior there is byte-identical.
+  var sbRefresh = function () {};
   function refresh() {
     if (!(window.frappe && window.frappe.csrf_token)) return;
     if (refreshBusy) return;  // focus+visibility firing together: one request
@@ -164,7 +168,7 @@
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape") { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
   });
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { refresh(); sbRefresh(); } });
   if (MODE === "staff") {
     // Staff sound: always on, no mute control. The tone is generated
     // (no file). The browser unlocks audio on the first interaction, so
@@ -214,6 +218,35 @@
     window.bzMaybeRing = maybeRing;
     document.addEventListener("pointerdown", function () { ensureAudio(); });
     document.addEventListener("keydown", function () { ensureAudio(); });
+    // Sidebar badges (Unit 3, staff only): silent live counters riding the
+    // bell's transport (post + CSRF header) and badge pattern (textContent
+    // only, hidden/flex toggle, 99+ cap). No timer of its own, no sound,
+    // no localStorage. Any failure keeps the last rendered value: the
+    // server seed first, then the previous successful poll.
+    var sbOrders = document.getElementById("sb-orders-badge");
+    var sbCustomers = document.getElementById("sb-customers-badge");
+    var sbBusy = false;
+    function sbSetOne(el, n) {
+      if (!el) return;
+      n = Math.max(0, parseInt(n, 10) || 0);
+      el.textContent = n > 99 ? "99+" : String(n);
+      var show = n > 0;
+      el.classList.toggle("hidden", !show);
+      el.classList.toggle("flex", show);
+    }
+    sbRefresh = function () {
+      if (sbBusy) return;  // a single in-flight request per refresh
+      if (!sbOrders && !sbCustomers) return;
+      if (!(window.frappe && window.frappe.csrf_token)) return;
+      sbBusy = true;
+      post("staff_sidebar_counts", {}).then(function (r) {
+        r = r || {};
+        if (r.ok !== true) return;
+        if (typeof r.new_orders === "undefined" || typeof r.unreviewed === "undefined") return;
+        sbSetOne(sbOrders, r.new_orders);
+        sbSetOne(sbCustomers, r.unreviewed);
+      }).catch(function () {}).then(function () { sbBusy = false; });
+    };
   } else {
     window.bzMaybeRing = function () {};
   }
@@ -226,11 +259,11 @@
     // Bounded: ~25 tries x 200ms, then stops (R-i) — no endless timer.
     var bootTries = 0;
     function boot() {
-      if (window.frappe && window.frappe.csrf_token) { refresh(); }
+      if (window.frappe && window.frappe.csrf_token) { refresh(); sbRefresh(); }
       else if (++bootTries < 25) { setTimeout(boot, 200); }
     }
     boot();
-    setInterval(refresh, 30000);
+    setInterval(function () { refresh(); sbRefresh(); }, 30000);
   }
 })();
 </script>
