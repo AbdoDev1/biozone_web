@@ -1,7 +1,7 @@
 {# Shared site header — included by biozone-home.html, catalog.html,
-   cart.html. Uses the same Tailwind color/spacing tokens already
-   configured in catalog.html — do not rename those keys without
-   updating every page's <script id="tailwind-config"> block.
+   cart.html. Uses the central Tailwind tokens from tailwind.config.js
+   (single source of truth) — do not use page-local design tokens;
+   every page loads them via /assets/biozone_web/css/app.*.css.
    Pass `active_page` = "home" | "catalog" | "cart" from each page's
    get_context so the current section is highlighted.
    The category <select> only renders when a page passes `categories`

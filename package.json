@@ -1,0 +1,12 @@
+{
+  "name": "biozone-web-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local Tailwind CSS build for biozone_web store/staff pages (replaces Play CDN).",
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i ./css-src/input.css -o ./biozone_web/public/css/app.css"
+  }
+}
