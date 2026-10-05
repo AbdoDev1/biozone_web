@@ -5,7 +5,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/biozone_web/css/app.acee7b13.css">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.247a063e.css">
 <style>
     body {
       font-family: 'Tajawal', sans-serif;
@@ -67,6 +67,23 @@
 {% elif orders_count <= 10 %}{{ orders_count }} طلبات
 {% else %}{{ orders_count }} طلبًا{% endif %}
 </p>
+<!-- شريط الحالات: عدّادات تحترم البحث/العميل/التاريخ وتتجاهل فلتر الحالة.
+     attention فلاج وreturned قد يتداخل مع التشغيلية — فليست تقسيمًا متبادلًا. -->
+<div class="flex items-center gap-2 overflow-x-auto pb-1 -mt-3" role="tablist" aria-label="حالات الطلبات">
+{% for _st in [('all', 'النشطة'), ('preparing', 'جارٍ التجهيز'), ('ready', 'جاهز للتسليم'), ('delivered', 'تم التسليم'), ('returned', 'مرتجع'), ('attention', 'تحتاج انتباه'), ('cancelled', 'ملغى')] %}
+{% if filters.state == _st[0] %}
+<span role="tab" aria-selected="true" aria-current="true" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all whitespace-nowrap shrink-0">
+<span>{{ _st[1] }}</span>
+<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-white/20 tracking-tight">{{ state_counts[_st[0]] }}</span>
+</span>
+{% else %}
+<a role="tab" aria-selected="false" href="{{ state_urls[_st[0]] }}" title="{% if _st[0] == 'attention' %}فلاج داخلي قد يجتمع مع أي حالة{% elif _st[0] == 'returned' %}طلبات لها مرتجع معتمد قد تتداخل مع حالتها التشغيلية{% else %}عرض طلبات {{ _st[1] }} فقط{% endif %}" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all whitespace-nowrap shrink-0 focus:outline-none focus:ring-2 focus:ring-primary/40">
+<span>{{ _st[1] }}</span>
+<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-surface-subtle text-navy-text/70 tracking-tight">{{ state_counts[_st[0]] }}</span>
+</a>
+{% endif %}
+{% endfor %}
+</div>
 <!-- البحث والفلاتر -->
 <div class="bg-white p-4 rounded-2xl shadow-sm border border-surface-subtle/60 flex flex-col gap-4">
 <form method="get" action="/staff/orders" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -90,7 +107,7 @@
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">حالة الطلب</label>
 <select name="state" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
-<option value="all" {% if filters.state == 'all' %}selected{% endif %}>كل الحالات</option>
+<option value="all" {% if filters.state == 'all' %}selected{% endif %}>النشطة</option>
 <option value="preparing" {% if filters.state == 'preparing' %}selected{% endif %}>جارٍ التجهيز</option>
 <option value="ready" {% if filters.state == 'ready' %}selected{% endif %}>جاهز للتسليم</option>
 <option value="delivered" {% if filters.state == 'delivered' %}selected{% endif %}>تم التسليم</option>

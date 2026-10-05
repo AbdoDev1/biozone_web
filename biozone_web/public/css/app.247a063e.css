@@ -2072,6 +2072,10 @@ video {
   background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
 }
 
+.bg-white\/20 {
+  background-color: rgb(255 255 255 / 0.2);
+}
+
 .object-contain {
   -o-object-fit: contain;
      object-fit: contain;

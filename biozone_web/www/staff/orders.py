@@ -34,6 +34,8 @@ def get_context(context):
 	context.orders = data["orders"]
 	context.orders_count = data["total"]
 	context.filter_urls = data["filter_urls"]
+	context.state_counts = data["state_counts"]
+	context.state_urls = data["state_urls"]
 	context.customers = _customer_options()
 	context.page = data["page"]
 	context.total_pages = data["total_pages"]
@@ -192,16 +194,12 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		order_by="creation desc, name desc",
 	)
 
-	# إسقاط الملغاة من الصف الخفيف مباشرة (status عمود مخزّن) — بلا get_doc.
-	# تُستثنى من الإسقاط عند فلتر "ملغى" صراحة (S1: الملغى ظاهر ومقفل).
-	if filters["state"] != "cancelled":
-		rows = [r for r in rows if r.get("status") != "Cancelled"]
-
 	# حالة التجهيز لكل طلب دفعة واحدة: عدد البنود وعدد المؤكَّدة عبر
 	# GROUP BY واحد، بدل get_doc كامل (بكل جداوله الفرعية) لكل صف.
+	# (تشمل الملغاة هنا لغرض العدّ فقط — تُستبعد من العرض أدناه.)
 	counts = _get_prep_counts([r.name for r in rows])
 
-	filtered = []
+	counted = []
 	for r in rows:
 		total, confirmed = counts.get(r.name, (0, 0))
 		# كائن خفيف بنفس الحقول التي تقرأها get_order_prep_state تمامًا
@@ -217,7 +215,52 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 				}
 			)
 		)
-		filtered.append((r, state))
+		counted.append((r, state))
+
+	# الطلبات ذات مرتجع معتمد (DN مرتجع) — نفس تعريف العرض أدناه حرفيًا،
+	# يُحسب مرة واحدة غير مشروط لعدّاد الشريط (استعلام تجميعي واحد).
+	returned_orders = {
+		r[0]
+		for r in frappe.db.sql(
+			"""select distinct ch.against_sales_order from `tabDelivery Note Item` ch
+			inner join `tabDelivery Note` par on par.name = ch.parent
+			where par.is_return = 1 and par.docstatus = 1"""
+		)
+	}
+
+	# عدّادات الشريط: تحترم فلاتر البحث/العميل/التاريخ (مطبقة في rows
+	# أعلاه) وتتجاهل فلتر الحالة. attention فلاج لا حالة، وreturned قد
+	# يتداخل مع الحالات التشغيلية — فالمجموع ليس تقسيمًا متبادلًا.
+	state_counts = {
+		"all": 0,
+		"preparing": 0,
+		"ready": 0,
+		"delivered": 0,
+		"attention": 0,
+		"cancelled": 0,
+		"returned": 0,
+	}
+	for r, s in counted:
+		if s["state"] == STATE_CANCELLED:
+			state_counts["cancelled"] += 1
+			continue
+		state_counts["all"] += 1
+		if s["state"] == STATE_PREPARING:
+			state_counts["preparing"] += 1
+		elif s["state"] == STATE_READY:
+			state_counts["ready"] += 1
+		elif s["state"] == STATE_DELIVERED:
+			state_counts["delivered"] += 1
+		if s["needs_attention"]:
+			state_counts["attention"] += 1
+		if r.name in returned_orders:
+			state_counts["returned"] += 1
+
+	# إسقاط الملغاة من العرض فقط (S1: ظاهر ومقفل بفلتر "ملغى" صراحة).
+	if filters["state"] != "cancelled":
+		filtered = [(r, s) for r, s in counted if s["state"] != STATE_CANCELLED]
+	else:
+		filtered = list(counted)
 
 	state_filter = filters["state"]
 	if state_filter == "preparing":
@@ -231,15 +274,6 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 	elif state_filter == "cancelled":
 		filtered = [(r, s) for r, s in filtered if s["state"] == STATE_CANCELLED]
 	elif state_filter == "returned":
-		# الطلبات ذات مرتجع معتمد (DN مرتجع) — استعلام واحد بلا API/مخطط جديد.
-		returned_orders = {
-			r[0]
-			for r in frappe.db.sql(
-				"""select distinct ch.against_sales_order from `tabDelivery Note Item` ch
-				inner join `tabDelivery Note` par on par.name = ch.parent
-				where par.is_return = 1 and par.docstatus = 1"""
-			)
-		}
 		filtered = [(r, s) for r, s in filtered if r.name in returned_orders]
 
 	total = len(filtered)
@@ -303,4 +337,16 @@ def _load_orders(filters: dict, page: int) -> dict | None:
 		"page": page,
 		"total_pages": total_pages,
 		"filter_urls": _filter_urls_without(filters),
+		"state_counts": state_counts,
+		"state_urls": {s: _state_url(filters, s) for s in state_counts},
 	}
+
+
+def _state_url(filters: dict, state: str) -> str:
+	"""رابط حبة الشريط: نفس الفلاتر الحالية مع استبدال state فقط (وصفحة 1)."""
+	params = {"page": 1, "state": state}
+	for key in ("q", "customer", "date_from", "date_to"):
+		if filters.get(key):
+			params[key] = filters[key]
+	qs = urlencode(params)
+	return f"/staff/orders?{qs}"
