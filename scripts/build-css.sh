@@ -35,7 +35,8 @@ grep -rlE "/assets/biozone_web/css/app\.[0-9a-f]+\.css" biozone_web/www biozone_
 
 # Fail closed: every CDN-migrated page must reference the built file.
 # (not-available.html is intentionally unstyled and out of scope.)
-MISSING="$(grep -rL "app\.$HASH\.css" biozone_web/www --include='*.html' | grep -v 'not-available\.html' | tr '\n' ' ')"
+# (grep exits 1 on no matches; neutralized so an all-linked tree passes.)
+MISSING="$(grep -rL "app\.$HASH\.css" biozone_web/www --include='*.html' | grep -v 'not-available\.html' | tr '\n' ' ' || true)"
 [ -z "$MISSING" ] || { echo "ERROR: pages missing hashed css link: $MISSING" >&2; exit 1; }
 
 echo "CSS built: biozone_web/public/css/app.$HASH.css"
