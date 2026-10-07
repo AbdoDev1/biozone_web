@@ -10,7 +10,7 @@
 <table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;">
 <tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">فاتورة رقم</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;font-weight:bold;white-space:nowrap;line-height:1.2;">{{ invoice_name }}</td></tr>
 <tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">التاريخ</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;line-height:1.2;">{{ posting_date }}</td></tr>
-<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">اسم العميل</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;font-weight:bold;line-height:1.2;">{{ customer_name }}</td></tr>
+<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">اسم العميل</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;font-weight:bold;line-height:1.2;">{{ customer_name|e }}</td></tr>
 <tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">العنوان</div></td><td style="width:70%;vertical-align:middle;font-size:10pt;line-height:1.2;">{{ customer_address }}</td></tr>
 </table>
 </td>
@@ -40,7 +40,7 @@
 {% for it in pg.rows %}
 <tr>
 <td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.idx }}</td>
-<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;overflow-wrap:break-word;">{{ it.item_name }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;overflow-wrap:break-word;">{{ it.item_name|e }}</td>
 <td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;font-weight:bold;">{{ it.qty_s }}</td>
 <td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.price_s }}</td>
 <td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.disc_s }}</td>
@@ -76,7 +76,7 @@
 </div>
 <table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:1mm;">
 <tr>
-<td style="width:84%;vertical-align:middle;"><span style="background:#eee;font-size:10pt;padding:1mm 3mm;">المستخدم</span> <span style="font-size:11pt;">{{ staff_name }}</span></td>
+<td style="width:84%;vertical-align:middle;"><span style="background:#eee;font-size:10pt;padding:1mm 3mm;">المستخدم</span> <span style="font-size:11pt;">{{ staff_name|e }}</span></td>
 <td style="width:16%;text-align:right;font-size:12pt;font-weight:bold;">{{ time12 }}</td>
 </tr>
 </table>
