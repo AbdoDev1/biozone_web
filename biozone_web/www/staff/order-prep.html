@@ -71,6 +71,7 @@ body.is-resizing * { cursor: col-resize !important; }
 </div>
 <div class="flex items-center gap-2.5 w-full lg:w-auto">
 <a href="/staff/orders" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
+<a href="/staff/picking?order={{ order_name }}" target="_blank" rel="noopener" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">print</span>طباعة الفاتورة</a>
 <button onclick="openModal('cancelOrderModal')" type="button" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"><span class="material-symbols-outlined text-[18px]">cancel</span>إلغاء الطلب</button>
 </div>
 </section>

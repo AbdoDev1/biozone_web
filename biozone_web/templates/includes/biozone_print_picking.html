@@ -1,0 +1,96 @@
+{# ورقة المخزن للطباعة — مطابقة الفاتورة الورقية الحقيقية (صورتي المرجع)،
+   تُستخدم في صفحة picking المستقلة فقط. ملفات الفاتورة الأصلية لم تُمس.
+   - تخطيط بجداول HTML عادية فقط (بلا grid/Tailwind/عروض مم ثابتة للحاويات):
+     الجداول width:100% مع table-layout:fixed والأعمدة بالنسب.
+   - ميزانية الارتفاع (A4 ناقص 16مم = 281مم): ترويسة 34 + عناوين 8 +
+     20 صفًا × 9مم + ملخص 24 + مستخدم/وقت 7 + تذييل 5 = 258مم.
+   - حد أقصى 20 صنفًا للصفحة؛ الملخص في آخر صفحة فقط.
+   - الانحرافات الموثقة (لا فاتورة بعد): رقم الخلية = رقم الطلب، التسليم = —،
+     اشعار الخصم والمسدد = صفر (صفر في المرجعين ولا مصدر لهما في التجهيز). #}
+{% for pg in pages %}
+<div class="invoice-sheet" style="font-family:Arial,Tahoma,'Noto Sans Arabic',sans-serif;color:#000;background:#fff;border:0.4mm solid #000;{% if not loop.last %}page-break-after:always;{% endif %}">
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;border-bottom:0.4mm solid #000;">
+<tr>
+<td style="width:39.5%;vertical-align:middle;padding:1mm;">
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;">
+<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">فاتورة رقم</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;font-weight:bold;white-space:nowrap;line-height:1.2;">{{ invoice_name }} <span style="font-size:9pt;font-weight:normal;">أصل</span></td></tr>
+<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">التاريخ</div></td><td style="width:70%;vertical-align:middle;font-size:12pt;line-height:1.2;">{{ posting_date }}</td></tr>
+<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">اسم العميل</div></td><td style="width:67%;vertical-align:middle;font-size:12pt;font-weight:bold;line-height:1.2;">{{ customer_name }}</td></tr>
+<tr><td style="width:30%;text-align:center;vertical-align:middle;"><div style="border:0.4mm solid #000;font-size:10pt;font-weight:bold;padding:0.5mm;line-height:1.2;">العنوان</div></td><td style="width:70%;vertical-align:middle;font-size:10pt;line-height:1.2;">{{ customer_address }}</td></tr>
+</table>
+</td>
+<td style="width:44.7%;text-align:center;vertical-align:middle;">
+<div style="font-size:22pt;font-weight:bold;line-height:1.2;">Bio Zone - بيو زون</div>
+<div style="font-size:11pt;font-weight:bold;line-height:1.2;">للمستلزمات الطبية ومستحضرات التجميل</div>
+<div style="font-size:13pt;font-weight:bold;line-height:1.2;">010 555 46 330</div>
+<div style="font-size:13pt;font-weight:bold;line-height:1.2;">01556462929 - 01101551533</div>
+</td>
+<td style="width:15.8%;text-align:center;vertical-align:middle;">
+<div style="color:#bbb;font-size:10pt;letter-spacing:2pt;">BIO ZONE</div>
+</td>
+</tr>
+</table>
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;border:0.6mm solid #000;border-top:none;">
+<thead>
+<tr style="font-size:12pt;font-weight:bold;line-height:1.2;">
+<th style="width:5%;border:0.3mm solid #000;padding:0 1mm;">م</th>
+<th style="width:54%;border:0.3mm solid #000;padding:0 1mm;">الصنف</th>
+<th style="width:9%;border:0.3mm solid #000;padding:0 1mm;">الكمية</th>
+<th style="width:10%;border:0.3mm solid #000;padding:0 1mm;">السعر</th>
+<th style="width:10.5%;border:0.3mm solid #000;padding:0 1mm;">الخصم</th>
+<th style="width:11.5%;border:0.3mm solid #000;padding:0 1mm;">الاجمالى</th>
+</tr>
+</thead>
+<tbody style="font-size:13pt;line-height:1.2;">
+{% for it in pg.rows %}
+<tr>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.idx }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;overflow-wrap:break-word;">{{ it.item_name }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;font-weight:bold;">{{ it.qty_s }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.price_s }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.disc_s }}</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;height:9mm;text-align:center;">{{ it.amount_s }}</td>
+</tr>
+{% endfor %}
+{% if shipping and loop.last %}
+<tr>
+<td colspan="5" style="border:0.3mm solid #000;padding:0 1mm;text-align:center;font-weight:bold;">مصاريف الشحن</td>
+<td style="border:0.3mm solid #000;padding:0 1mm;text-align:center;font-weight:bold;">{{ shipping }}</td>
+</tr>
+{% endif %}
+</tbody>
+</table>
+{% if loop.last %}
+<div class="sheet-footer" style="border:0.4mm solid #000;border-top:none;border-radius:0 0 2.5mm 2.5mm;">
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;">
+<tr style="text-align:center;line-height:1.2;">
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">عدد الاصناف</div><div style="font-size:12pt;font-weight:bold;">{{ items_count }}</div></td>
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">صافى الفاتورة</div><div style="font-size:12pt;font-weight:bold;">{{ net_s }}</div></td>
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">الحساب السابق</div><div style="font-size:14pt;font-weight:bold;">{{ prev_s }}</div></td>
+</tr>
+<tr style="text-align:center;line-height:1.2;">
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">الرصيد الحالى</div><div style="font-size:12pt;font-weight:bold;">{{ curr_s }}</div></td>
+<td colspan="2" style="border:0.3mm solid #000;padding:0.3mm;font-size:9pt;">{{ amount_words }}</td>
+</tr>
+<tr style="text-align:center;line-height:1.2;">
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">اشعار خصم</div><div style="font-size:12pt;font-weight:bold;">{{ discnote_s }}</div></td>
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">اجمالى جمهور</div><div style="font-size:12pt;font-weight:bold;">{{ public_s }}</div></td>
+<td style="border:0.3mm solid #000;padding:0.3mm;"><div style="font-size:9pt;">المسدد</div><div style="font-size:12pt;font-weight:bold;">{{ paid_s }}</div></td>
+</tr>
+</table>
+</div>
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:1mm;">
+<tr>
+<td style="width:84%;vertical-align:middle;"><span style="background:#eee;font-size:10pt;padding:1mm 3mm;">المستخدم</span> <span style="font-size:11pt;">{{ staff_name }}</span></td>
+<td style="width:16%;text-align:right;font-size:12pt;font-weight:bold;">{{ time12 }}</td>
+</tr>
+</table>
+{% endif %}
+<table dir="rtl" style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:1mm;">
+<tr>
+<td style="width:90%;text-align:center;font-size:6pt;">أورجا سوفت للتصميم البرامج - 01222562089 - 01065541991 - 01065541992 - 01065541994</td>
+<td style="width:10%;text-align:left;font-size:8pt;">{{ pg.page_no }}</td>
+</tr>
+</table>
+</div>
+{% endfor %}

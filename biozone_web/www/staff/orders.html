@@ -211,8 +211,10 @@
 <a href="/staff/order-prep?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-surface-subtle text-navy-text/50 text-xs font-bold hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[16px]">lock</span>عرض (مقفل — بلا تجهيز)</a>
 {% elif so.state == 'جاهز للتسليم' %}
 <a href="/staff/order-prep?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary-accent transition-colors"><span class="material-symbols-outlined text-[16px]">task_alt</span>مراجعة وتأكيد التسليم</a>
+<a href="/staff/picking?order={{ so.name }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-surface-subtle text-navy-text text-xs font-bold hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[16px]">print</span>طباعة الفاتورة</a>
 {% else %}
 <a href="/staff/order-prep?order={{ so.name }}" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"><span class="material-symbols-outlined text-[16px]">barcode_scanner</span>متابعة التجهيز</a>
+<a href="/staff/picking?order={{ so.name }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-surface-subtle text-navy-text text-xs font-bold hover:bg-surface-container transition-colors"><span class="material-symbols-outlined text-[16px]">print</span>طباعة الفاتورة</a>
 {% endif %}
 </div>
 </td>

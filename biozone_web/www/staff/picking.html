@@ -1,0 +1,76 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>ورقة تجهيز مخزن - بيوزون</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.247a063e.css">
+<style>
+body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b1c30; }
+.invoice-sheet, .invoice-sheet * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* الورقة تتمدد حسب عدد الأصناف فقط — بلا ارتفاع أدنى ثابت. */
+.sheet-footer { break-inside: avoid; }
+@media print {
+  .no-print { display: none !important; }
+  /* فصل الطباعة عن تخطيط التطبيق: إخفاء كل الشيل وتصفير كل آباء الورقة. */
+  #sidebar,
+  #drawer-backdrop,
+  #staff-toast-stack,
+  .sidebar-main > header,
+  .sidebar-main > nav { display: none !important; }
+  html, body, .sidebar-main, .sidebar-main main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; padding: 0 !important; }
+  .invoice-sheet tr { break-inside: avoid; }
+  .invoice-sheet thead { display: table-header-group; }
+  .sheet-footer { break-inside: avoid; }
+  .picking-page-break { break-after: page; }
+}
+/* مواصفة الطباعة المقاسة: الرسمية بلا @page (مفحوصة في print.html) —
+   فحُددت هنا صراحة A4 طولي بهامش 8مم قيمة واحدة بلا هوامش إضافية. */
+@page {
+  size: A4 portrait;
+  margin: 8mm;
+}
+</style>
+</head>
+<body>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+<main class="flex-1 p-4 sm:p-6 w-full max-w-[1000px] mx-auto flex flex-col gap-4">
+{% if error_state %}
+<div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
+<p class="text-[20px] font-bold">{{ error_title }}</p>
+{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order }}</p>{% endif %}
+<p class="text-navy-text/70">{{ error_message }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<div class="flex items-center gap-2 flex-wrap justify-center mt-2">
+<a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
+</div>
+</div>
+{% else %}
+<div class="no-print bg-white border border-surface-container rounded-xl px-4 py-3 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+<p class="text-sm font-bold">ورقة تجهيز مخزن: <span class="text-primary font-mono" dir="ltr">{{ order_name }}</span></p>
+<div class="flex items-center gap-2">
+<a class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-all" href="/staff/order-prep?order={{ order_name }}">عودة للتجهيز</a>
+<button class="inline-flex items-center gap-1.5 px-5 py-2 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-lg transition-all" onclick="window.print()" type="button"><span class="material-symbols-outlined text-[18px]">print</span>طباعة</button>
+</div>
+</div>
+<div class="w-full flex flex-col items-center justify-center">
+{% include "biozone_web/templates/includes/biozone_print_picking.html" %}
+</div>
+{% endif %}
+</main>
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+</body></html>
