@@ -1,7 +1,12 @@
 import frappe
 from frappe import _
 
-from biozone_web.b9_utils import amount_in_arabic_words
+from biozone_web.b9_utils import (
+	amount_in_arabic_words,
+	amount_in_words_sheet,
+	format_balance_3,
+	format_sheet_number,
+)
 from biozone_web.utils import (
 	get_csrf_token_safe,
 	get_header_context,
@@ -97,21 +102,36 @@ def _b9_credit_print(si_name):
 					"idx": idx,
 					"item_name": it.item_name,
 					"qty": qty,
+					"qty_s": format_sheet_number(qty),
 					"uom": it.uom or "",
 					"rate": rate,
+					"price_s": format_sheet_number(rate),
 					"amount": round(qty * rate, 2),
+					"amount_s": format_sheet_number(round(qty * rate, 2)),
 				}
 			)
-		return {
+		credit_print = {
 			"name": cn.name,
 			"original": si_name,
 			"posting_date": frappe.utils.format_date(cn.posting_date, "dd/MM/yyyy"),
 			"customer_name": cn.customer_name,
 			"lines": lines,
 			"total": abs(float(cn.grand_total or 0)),
+			"total_s": format_sheet_number(abs(float(cn.grand_total or 0))),
 			"staff_name": staff,
 			"print_time": frappe.utils.now_datetime().strftime("%H:%M - %d/%m/%Y"),
+			"time12": "%s %s"
+			% (
+				frappe.utils.now_datetime().strftime("%I:%M:%S"),
+				"م" if frappe.utils.now_datetime().hour >= 12 else "ص",
+			),
 		}
+		credit_print["pages"] = [
+			{"rows": lines[i : i + 20], "page_no": n + 1}
+			for n, i in enumerate(range(0, max(len(lines), 1), 20))
+		]
+		credit_print["total_pages"] = len(credit_print["pages"])
+		return credit_print
 	except Exception:
 		frappe.log_error(title="Biozone credit print context failed")
 		return None
@@ -230,20 +250,37 @@ def get_context(context):
 	context.customer_name = si.customer_name
 	context.customer_address = si.address_display or si.customer_address or ""
 	context.posting_date = frappe.utils.format_date(si.posting_date, "dd/MM/yyyy")
-	context.items = [
+	# ملحوظة F17: لا تقرأ context.items كخاصية بايثون أبدًا — كائن السياق
+	# يعيد dict.items() المدمجة بدل القائمة المعينة. ابنِ على متغير محلي
+	# ومرر نسخته للقالب (القالب يقرأ بالمفتاح فيعمل).
+	inv_items = [
 		{
 			"idx": i + 1,
 			"item_name": it.item_name,
 			"qty": float(it.qty or 0),
+			"qty_s": format_sheet_number(float(it.qty or 0)),
 			"rate": float(it.rate or 0),
 			"public_rate": float(it.price_list_rate or it.rate or 0),
+			"price_s": format_sheet_number(float(it.price_list_rate or it.rate or 0)),
 			"discount_percentage": float(it.discount_percentage or 0),
+			"disc_s": format_sheet_number(float(it.discount_percentage or 0)),
 			"discount_amount": float(it.discount_amount or 0),
 			"amount": float(it.amount or 0),
+			"amount_s": format_sheet_number(float(it.amount or 0)),
 		}
 		for i, it in enumerate(si.items or [])
 	]
+	context.items = inv_items
 	context.items_count = len(si.items or [])
+	context.pages = [
+		{"rows": inv_items[i : i + 20], "page_no": n + 1}
+		for n, i in enumerate(range(0, max(len(inv_items), 1), 20))
+	]
+	context.total_pages = len(context.pages)
+	context.public_total = sum(
+		float(it.get("qty") or 0) * float(it.get("public_rate") or 0)
+		for it in inv_items
+	)
 	context.return_rows, context.returns_history = _b9_return_context(dn_name, si.name)
 	if context.returns_history and all(r["remaining"] <= 0 for r in context.return_rows):
 		context.return_state = "مكتمل المرتجع"
@@ -262,10 +299,27 @@ def get_context(context):
 		if (t.account_head or "").strip() == SHIPPING_ACCOUNT:
 			_shipping += float(t.get("tax_amount") or 0)
 	context.shipping = _shipping
+	now_dt = frappe.utils.now_datetime()
+	paid = max(float(grand or 0) - float(si.outstanding_amount or 0), 0.0)
 	context.previous_balance = previous_balance
-	context.current_balance = current_balance
+	context.prev_s = format_balance_3(previous_balance)
+	context.current_balance = previous_balance + invoice_outstanding
+	context.curr_s = format_balance_3(previous_balance + invoice_outstanding)
+	context.paid = paid
+	context.paid_s = format_sheet_number(paid)
+	context.discount_notice = abs(float(si.discount_amount or 0))
+	context.discnote_s = format_sheet_number(abs(float(si.discount_amount or 0)))
+	context.net_s = format_sheet_number(grand)
+	context.public_s = format_sheet_number(context.public_total)
+	context.shipping_s = format_sheet_number(_shipping)
 	context.amount_words = amount_in_arabic_words(grand)
+	context.photo_words = amount_in_words_sheet(grand)
 	context.confirmed_by = confirmer
+	context.staff_name = confirmer
+	context.time12 = "%s %s" % (
+		now_dt.strftime("%I:%M:%S"),
+		"م" if now_dt.hour >= 12 else "ص",
+	)
 	context.print_time = frappe.utils.now_datetime().strftime("%H:%M - %d/%m/%Y")
 	context.company = si.company
 	return context

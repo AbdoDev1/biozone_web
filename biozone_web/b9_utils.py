@@ -264,3 +264,54 @@ def amount_in_arabic_words(amount: float, currency_word: str = "جنيه") -> st
 	if piastres:
 		return f"{pound_text} و{_piastre_part(piastres)} فقط لا غير"
 	return f"{pound_text} فقط لا غير"
+
+
+def format_sheet_number(value) -> str:
+	"""تنسيق رقمي لأوراق الطباعة: بلا فاصل آلاف وبلا أصفار زائدة.
+
+	150 ← "150"، 112.5 ← "112.5"، 30.72 ← "30.72" (مطابق للفاتورة الورقية).
+	دالة عرض خالصة — لا DB ولا كتابة.
+	"""
+	text = "%.10f" % float(value or 0)
+	if "." in text:
+		text = text.rstrip("0").rstrip(".")
+	return text if text not in ("", "-0") else "0"
+
+
+def format_balance_3(value) -> str:
+	"""رصيد بحد أقصى 3 خانات عشرية مع حذف الأصفار الزائدة.
+
+	43185.75 ← "43185.75"، 41219.438 ← "41219.438" (مطابق لصورتي الأصل).
+	دالة عرض خالصة — لا DB ولا كتابة.
+	"""
+	text = "%.3f" % float(value or 0)
+	if "." in text:
+		text = text.rstrip("0").rstrip(".")
+	return text if text not in ("", "-0") else "0"
+
+
+def amount_in_words_sheet(amount) -> str:
+	"""تفقيط بصيغة الورقة: "مطلوب فقط وقدره ... جنيه و... قرش فقط لاغير".
+
+	مبني على _integer_in_words (بلا تعديل عليه) مع توحيد "ألف" البادئة كما
+	في المطبوع. دالة عرض خالصة — لا DB ولا كتابة.
+	"""
+	amount = float(amount or 0)
+	pounds = int(amount)
+	piastres = int(round((amount - pounds) * 100))
+	if piastres == 100:
+		pounds += 1
+		piastres = 0
+
+	def _w(n: int) -> str:
+		text = _integer_in_words(int(n))
+		if text.startswith("ألف"):
+			text = "الف" + text[len("ألف") :]
+		return text
+
+	if not piastres:
+		return "مطلوب فقط وقدره %s جنيه فقط لاغير" % _w(pounds)
+	return "مطلوب فقط وقدره %s جنيه و%s قرش فقط لاغير" % (
+		_w(pounds),
+		_w(piastres),
+	)

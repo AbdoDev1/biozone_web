@@ -18,9 +18,30 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b
 .sheet-footer { break-inside: avoid; }
 @media print {
   .no-print { display: none !important; }
-  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
+  #sidebar,
+  #drawer-backdrop,
+  #staff-toast-stack,
+  .sidebar-main > header,
+  .sidebar-main > nav { display: none !important; }
+  html, body, .sidebar-main, .sidebar-main main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .invoice-sheet { box-shadow: none !important; max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; padding: 0 !important; }
   .invoice-sheet tr { break-inside: avoid; }
+  .invoice-sheet thead { display: table-header-group; }
   .sheet-footer { break-inside: avoid; }
+}
+/* مواصفة الطباعة المقاسة — مطابقة لصفحة المخزن: A4 طولي بهامش 8مم. */
+@page {
+  size: A4 portrait;
+  margin: 8mm;
 }
 </style>
 </head>
