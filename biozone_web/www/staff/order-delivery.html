@@ -16,12 +16,12 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 {% if error_state %}
 <!-- حالة ناعمة: طلب غير موجود / ملغى / بلا فاتورة / فاتورة غير صالحة — بلا traceback -->
 <div class="bg-white rounded-2xl p-8 shadow-sm border border-surface-subtle flex flex-col items-center gap-4 text-center">
-<p class="text-[20px] font-bold">{{ error_title }}</p>
-<p class="text-navy-text/70">{{ error_message }}</p>
-{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<p class="text-[20px] font-bold">{{ error_title|e }}</p>
+<p class="text-navy-text/70">{{ error_message|e }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint|e }}</p>{% endif %}
 <div class="flex items-center gap-2 flex-wrap justify-center mt-2">
 <a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
-{% if error_order %}<a class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl font-bold transition-all" href="/staff/order-prep?order={{ error_order }}"><span class="material-symbols-outlined text-[20px]">barcode_scanner</span>متابعة تجهيز الطلب</a>{% endif %}
+{% if error_order %}<a class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl font-bold transition-all" href="/staff/order-prep?order={{ error_order|e }}"><span class="material-symbols-outlined text-[20px]">barcode_scanner</span>متابعة تجهيز الطلب</a>{% endif %}
 </div>
 </div>
 {% else %}
@@ -31,17 +31,17 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-subtle">
 <p class="text-[18px] font-bold">تم إصدار الفاتورة المعتمَدة وخصم المخزون وتسليم الطلب بالكامل.</p>
 <div class="flex items-center gap-2 flex-wrap">
-<a href="/staff/print?doc=invoice&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</a>
-{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-alert-red text-white rounded-xl font-bold shadow-md hover:bg-red-700 transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة إشعار المرتجع</a>{% endif %}
+<a href="/staff/print?doc=invoice&order={{ order_name|e }}{% if invoice_name %}&invoice={{ invoice_name|e }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-accent transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة الفاتورة</a>
+{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name|e }}{% if invoice_name %}&invoice={{ invoice_name|e }}{% endif %}" target="_blank" rel="noopener" class="flex items-center gap-1.5 px-5 py-2.5 bg-alert-red text-white rounded-xl font-bold shadow-md hover:bg-red-700 transition-all"><span class="material-symbols-outlined text-[20px]">print</span>طباعة إشعار المرتجع</a>{% endif %}
 <a class="flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="/staff/orders"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
 </div>
 </div>
 <div class="grid grid-cols-2 md:grid-cols-6 gap-2">
-<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الطلب</span><span class="font-bold mt-1">{{ order_name }}</span></div>
-<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الفاتورة</span><span class="font-bold text-primary mt-1">{{ invoice_name }}</span></div>
-<div class="bg-surface-subtle p-3 rounded-xl flex flex-col col-span-2 md:col-span-1"><span class="text-xs text-navy-text/60">اسم العميل</span><span class="font-bold mt-1 truncate">{{ customer_name }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الطلب</span><span class="font-bold mt-1">{{ order_name|e }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">رقم الفاتورة</span><span class="font-bold text-primary mt-1">{{ invoice_name|e }}</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col col-span-2 md:col-span-1"><span class="text-xs text-navy-text/60">اسم العميل</span><span class="font-bold mt-1 truncate">{{ customer_name|e }}</span></div>
 <div class="bg-surface-subtle p-3 rounded-xl flex flex-col col-span-2 md:col-span-1"><span class="text-xs text-navy-text/60">رقم التسليم</span><span class="font-bold mt-1 truncate">{{ delivery_note or '—' }}</span></div>
-<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">عدد الأصناف</span><span class="font-bold mt-1">{{ items_count }} صنف</span></div>
+<div class="bg-surface-subtle p-3 rounded-xl flex flex-col"><span class="text-xs text-navy-text/60">عدد الأصناف</span><span class="font-bold mt-1">{{ items_count|e }} صنف</span></div>
 <div class="bg-primary/10 p-3 rounded-xl flex flex-col"><span class="text-xs text-primary font-bold">صافي الفاتورة</span><span class="font-bold text-primary mt-1">{{ "{:,.2f}".format(grand_total) }} ج.م</span></div>
 </div>
 </div>
@@ -51,7 +51,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-surface-subtle">
 <div class="flex items-center gap-2">
 <p class="text-[16px] font-bold">مرتجع الأصناف</p>
-{% if return_state %}<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-alert-bg text-alert-red">{{ return_state }}</span>{% endif %}
+{% if return_state %}<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-alert-bg text-alert-red">{{ return_state|e }}</span>{% endif %}
 </div>
 <div class="flex items-center gap-2 flex-wrap">
 <button type="button" onclick="fillFullReturn()" class="px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold transition-colors">تعبئة الكامل المتبقي</button>
@@ -62,7 +62,7 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <div class="flex items-center gap-2 flex-wrap text-xs">
 <span class="text-navy-text/60 font-bold">مرتجعات سابقة:</span>
 {% for h in returns_history %}
-<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-subtle font-bold" dir="ltr">{{ h.name }}</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-subtle font-bold" dir="ltr">{{ h.name|e }}</span>
 {% endfor %}
 </div>
 {% endif %}
@@ -83,13 +83,13 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b
 <tbody class="divide-y divide-surface-subtle">
 {% for r in return_rows %}
 <tr>
-<td class="py-2.5 px-3 font-bold">{{ r.item_name }}<span class="block text-[11px] font-normal text-navy-text/50">{{ r.uom }}</span></td>
-<td class="py-2.5 px-3 text-center">{{ r.delivered }}</td>
-<td class="py-2.5 px-3 text-center">{{ r.returned }}</td>
-<td class="py-2.5 px-3 text-center font-bold">{{ r.remaining }}</td>
+<td class="py-2.5 px-3 font-bold">{{ r.item_name|e }}<span class="block text-[11px] font-normal text-navy-text/50">{{ r.uom|e }}</span></td>
+<td class="py-2.5 px-3 text-center">{{ r.delivered|e }}</td>
+<td class="py-2.5 px-3 text-center">{{ r.returned|e }}</td>
+<td class="py-2.5 px-3 text-center font-bold">{{ r.remaining|e }}</td>
 <td class="py-2.5 px-3 text-center">
 {% if r.remaining > 0 %}
-<input type="number" min="0" max="{{ r.remaining }}" step="any" value="0" data-so-detail="{{ r.so_detail }}" data-max="{{ r.remaining }}"
+<input type="number" min="0" max="{{ r.remaining|e }}" step="any" value="0" data-so-detail="{{ r.so_detail|e }}" data-max="{{ r.remaining|e }}"
 class="ret-qty w-24 text-center text-sm font-bold p-2 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary">
 {% else %}
 <span class="text-navy-text/40 text-xs">مكتمل</span>
@@ -231,8 +231,8 @@ document.getElementById('btnDoReturn').addEventListener('click', () => {
 <div class="no-print bg-white rounded-2xl p-6 shadow-sm border border-surface-subtle flex flex-col gap-4">
 <p class="text-[16px] font-bold">مستندات الطلب للطباعة</p>
 <div class="flex items-center gap-2.5 flex-wrap">
-<a href="/staff/print?doc=invoice&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">receipt</span>فتح الفاتورة {{ invoice_name }}</a>
-{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name }}{% if invoice_name %}&invoice={{ invoice_name }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">print</span>فتح إشعار المرتجع {{ credit_print.name }}</a>{% endif %}
+<a href="/staff/print?doc=invoice&order={{ order_name|e }}{% if invoice_name %}&invoice={{ invoice_name|e }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">receipt</span>فتح الفاتورة {{ invoice_name|e }}</a>
+{% if credit_print %}<a href="/staff/print?doc=credit&order={{ order_name|e }}{% if invoice_name %}&invoice={{ invoice_name|e }}{% endif %}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-5 py-2.5 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md transition-all"><span class="material-symbols-outlined text-[20px]">print</span>فتح إشعار المرتجع {{ credit_print.name|e }}</a>{% endif %}
 </div>
 <p class="text-[11px] text-navy-text/50">كل مستند يفتح في صفحة طباعة مستقلة باسمه — بلا عرض مباشر هنا.</p>
 </div>

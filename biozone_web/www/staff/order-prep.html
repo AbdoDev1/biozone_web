@@ -23,16 +23,16 @@ body.is-resizing * { cursor: col-resize !important; }
 {% if error_state %}
 <!-- حالة ناعمة: طلب غير موجود / ملغى — بلا traceback -->
 <div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
-<p class="text-[20px] font-bold">{{ error_title }}</p>
-{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order }}</p>{% endif %}
-<p class="text-navy-text/70">{{ error_message }}</p>
-{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<p class="text-[20px] font-bold">{{ error_title|e }}</p>
+{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order|e }}</p>{% endif %}
+<p class="text-navy-text/70">{{ error_message|e }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint|e }}</p>{% endif %}
 {% if read_only and items %}
 <div class="w-full text-right space-y-3 bg-surface-subtle/60 border border-surface-container rounded-xl p-4">
 <div class="flex items-center flex-wrap gap-2.5">
-<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono" dir="ltr">{{ order_name }}</span></div>
-<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name }}</span></div>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-alert-bg text-alert-red text-xs font-bold">{{ state }}</span>
+<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono" dir="ltr">{{ order_name|e }}</span></div>
+<div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name|e }}</span></div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-alert-bg text-alert-red text-xs font-bold">{{ state|e }}</span>
 </div>
 <div class="overflow-x-auto bg-white rounded-lg border border-surface-container">
 <table class="w-full text-right text-xs">
@@ -42,10 +42,10 @@ body.is-resizing * { cursor: col-resize !important; }
 <tbody class="divide-y divide-surface-subtle">
 {% for it in items %}
 <tr>
-<td class="py-2 px-3 text-navy-text/50">{{ it.idx }}</td>
-<td class="py-2 px-3 font-bold">{{ it.item_name }}<span class="block font-mono font-normal text-navy-text/50" dir="ltr">{{ it.item_code }}</span></td>
-<td class="py-2 px-3 text-center font-bold">{{ it.qty }}</td>
-<td class="py-2 px-3 text-center">{{ it.uom }}</td>
+<td class="py-2 px-3 text-navy-text/50">{{ it.idx|e }}</td>
+<td class="py-2 px-3 font-bold">{{ it.item_name|e }}<span class="block font-mono font-normal text-navy-text/50" dir="ltr">{{ it.item_code|e }}</span></td>
+<td class="py-2 px-3 text-center font-bold">{{ it.qty|e }}</td>
+<td class="py-2 px-3 text-center">{{ it.uom|e }}</td>
 <td class="py-2 px-3 text-center">{{ "%.2f"|format(it.rate) }}</td>
 <td class="py-2 px-3 text-center font-bold">{{ "%.2f"|format(it.qty * it.rate) }}</td>
 </tr>
@@ -65,13 +65,13 @@ body.is-resizing * { cursor: col-resize !important; }
 <!-- بيانات الطلب وإجراءات العودة -->
 <section class="bg-white border border-surface-container rounded-xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-sm">
 <div class="flex items-center flex-wrap gap-2.5">
-<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono">{{ order_name }}</span></div>
-<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name }}</span></div>
-<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-navy-text/70 text-xs font-bold">{{ state }}</span>
+<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">رقم الطلب:</span><span class="text-xs font-bold text-primary font-mono">{{ order_name|e }}</span></div>
+<div class="flex items-center gap-2 bg-surface-subtle px-3 py-1.5 rounded-lg border border-surface-container"><span class="text-xs text-navy-text/60 font-medium">العميل:</span><span class="text-xs font-bold">{{ customer_name|e }}</span></div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-navy-text/70 text-xs font-bold">{{ state|e }}</span>
 </div>
 <div class="flex items-center gap-2.5 w-full lg:w-auto">
 <a href="/staff/orders" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">arrow_forward</span>العودة إلى قائمة الطلبات</a>
-<a href="/staff/picking?order={{ order_name }}" target="_blank" rel="noopener" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">print</span>طباعة الفاتورة</a>
+<a href="/staff/picking?order={{ order_name|e }}" target="_blank" rel="noopener" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg border border-surface-container transition-all"><span class="material-symbols-outlined text-[18px]">print</span>طباعة الفاتورة</a>
 <button onclick="openModal('cancelOrderModal')" type="button" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-alert-red hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all"><span class="material-symbols-outlined text-[18px]">cancel</span>إلغاء الطلب</button>
 </div>
 </section>
@@ -83,15 +83,15 @@ body.is-resizing * { cursor: col-resize !important; }
 <div class="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center border border-primary/20"><span class="material-symbols-outlined text-[28px]">fact_check</span></div>
 <div>
 <h2 class="text-base font-bold">معدل إنجاز فحص الأصناف وتأكيدها</h2>
-<p class="text-xs text-navy-text/60 mt-0.5">الأصناف المؤكدة: <strong class="text-primary text-sm" id="metricRatioText">{{ progress_text }}</strong></p>
+<p class="text-xs text-navy-text/60 mt-0.5">الأصناف المؤكدة: <strong class="text-primary text-sm" id="metricRatioText">{{ progress_text|e }}</strong></p>
 </div>
 </div>
 <div class="flex items-baseline gap-2 bg-surface-subtle px-4 py-2 rounded-lg border border-surface-container">
-<span class="text-3xl font-extrabold text-primary" id="metricPercentText">{{ percent }}%</span>
+<span class="text-3xl font-extrabold text-primary" id="metricPercentText">{{ percent|e }}%</span>
 <span class="text-xs font-semibold text-navy-text/60">من الإجمالي</span>
 </div>
 </div>
-<div class="mt-4 w-full bg-surface-subtle h-2 rounded-full overflow-hidden"><div class="bg-primary h-full transition-all duration-500 rounded-full" id="progressBar" style="width:{{ percent }}%"></div></div>
+<div class="mt-4 w-full bg-surface-subtle h-2 rounded-full overflow-hidden"><div class="bg-primary h-full transition-all duration-500 rounded-full" id="progressBar" style="width:{{ percent|e }}%"></div></div>
 </section>
 
 <!-- منطقة استقبال الباركود -->
@@ -128,19 +128,19 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 </thead>
 <tbody id="itemsTableBody">
 {% for it in items %}
-<tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name }}">
-<td class="py-3 px-3 text-center text-navy-text/50 font-mono">{{ it.idx }}</td>
+<tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name|e }}">
+<td class="py-3 px-3 text-center text-navy-text/50 font-mono">{{ it.idx|e }}</td>
 <td class="py-3 px-4">
 <div class="flex flex-col">
-<a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/items?code={{ it.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد"><span>{{ it.item_name }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
-<span class="text-[10px] text-primary font-mono mt-0.5">كود الصنف: {{ it.item_code }}</span>
+<a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/items?code={{ it.item_code|e }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد"><span>{{ it.item_name|e }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
+<span class="text-[10px] text-primary font-mono mt-0.5">كود الصنف: {{ it.item_code|e }}</span>
 </div>
 </td>
 <td class="py-3 px-4">
 {% if it.barcodes %}
 <div class="flex flex-col items-start gap-1.5">
 {% for bc in it.barcodes %}
-<div class="inline-flex items-center px-3 py-1 rounded-md bg-surface-subtle border border-surface-container font-mono font-bold text-xs tracking-wider" dir="ltr"><span>{{ bc }}</span></div>
+<div class="inline-flex items-center px-3 py-1 rounded-md bg-surface-subtle border border-surface-container font-mono font-bold text-xs tracking-wider" dir="ltr"><span>{{ bc|e }}</span></div>
 {% endfor %}
 </div>
 {% else %}
@@ -149,31 +149,31 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 </td>
 <td class="py-3 px-4 text-center">
 <div class="inline-flex items-center gap-1.5 bg-surface-subtle px-2.5 py-1 rounded-lg">
-<span class="font-bold text-xs" id="qty-{{ it.name }}">{{ it.qty }} {{ it.uom }}</span>
-<button class="text-navy-text/50 hover:text-primary p-0.5 rounded transition-colors" onclick="openEditQtyModal('{{ it.name }}')" title="تعديل الكمية" type="button"><span class="material-symbols-outlined text-[15px]">edit</span></button>
+<span class="font-bold text-xs" id="qty-{{ it.name|e }}">{{ it.qty|e }} {{ it.uom|e }}</span>
+<button class="text-navy-text/50 hover:text-primary p-0.5 rounded transition-colors" onclick="openEditQtyModal('{{ it.name|e }}')" title="تعديل الكمية" type="button"><span class="material-symbols-outlined text-[15px]">edit</span></button>
 </div>
 </td>
 <td class="py-3 px-4 text-center">
 <div class="flex flex-col items-center gap-0.5">
-<span class="font-bold text-xs whitespace-nowrap">{{ "%.2f"|format(it.rate) }} / {{ it.uom }}</span>
-{% if it.public_price is not none %}<span class="text-[10px] text-navy-text/50 whitespace-nowrap">المرجع: {{ "%.2f"|format(it.public_price) }} / {{ it.public_uom }}</span>{% else %}<span class="text-[10px] text-navy-text/30 whitespace-nowrap">بلا سعر مرجع</span>{% endif %}
+<span class="font-bold text-xs whitespace-nowrap">{{ "%.2f"|format(it.rate) }} / {{ it.uom|e }}</span>
+{% if it.public_price is not none %}<span class="text-[10px] text-navy-text/50 whitespace-nowrap">المرجع: {{ "%.2f"|format(it.public_price) }} / {{ it.public_uom|e }}</span>{% else %}<span class="text-[10px] text-navy-text/30 whitespace-nowrap">بلا سعر مرجع</span>{% endif %}
 </div>
 </td>
-<td class="py-3 px-4 text-center" id="status-{{ it.name }}">
+<td class="py-3 px-4 text-center" id="status-{{ it.name|e }}">
 {% if it.confirmed %}
 <div class="flex flex-col items-center gap-0.5">
 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300"><span class="material-symbols-outlined text-[14px]">check_circle</span>تم التأكيد</span>
-<span class="text-[10px] text-navy-text/50">{{ it.confirmed_by }}</span>
+<span class="text-[10px] text-navy-text/50">{{ it.confirmed_by|e }}</span>
 </div>
 {% else %}
 <div class="flex flex-col items-center gap-1.5">
 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-[11px] font-bold"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>لم يُفحص بعد</span>
-<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect('{{ it.name }}')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect('{{ it.name|e }}')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button>
 </div>
 {% endif %}
 </td>
 <td class="py-3 px-4 text-center">
-<button class="p-1.5 text-navy-text/40 hover:text-alert-red hover:bg-alert-bg/40 rounded-lg transition-colors" onclick="openDeleteItemModal('{{ it.name }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+<button class="p-1.5 text-navy-text/40 hover:text-alert-red hover:bg-alert-bg/40 rounded-lg transition-colors" onclick="openDeleteItemModal('{{ it.name|e }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[18px]">delete</span></button>
 </td>
 </tr>
 {% endfor %}
@@ -187,7 +187,7 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <h3 class="text-sm font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-[18px] text-amber-text">warning</span>متابعة خاصة بالطلب</h3>
 <div class="flex flex-col sm:flex-row gap-3">
 <label class="inline-flex items-center gap-2 text-xs font-bold cursor-pointer"><input type="checkbox" id="attentionCheck" {% if needs_attention %}checked{% endif %} class="rounded text-primary focus:ring-primary">يحتاج هذا الطلب إلى انتباه</label>
-<input id="attentionNote" value="{{ attention_note }}" placeholder="تفاصيل المشكلة (تظهر هنا فقط، وليست في القائمة)..." class="flex-1 text-xs p-2.5 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary">
+<input id="attentionNote" value="{{ attention_note|e }}" placeholder="تفاصيل المشكلة (تظهر هنا فقط، وليست في القائمة)..." class="flex-1 text-xs p-2.5 bg-surface-subtle border border-surface-container rounded-lg focus:outline-none focus:border-primary">
 <button onclick="saveAttention()" type="button" class="px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-colors">حفظ</button>
 </div>
 </section>
@@ -268,7 +268,7 @@ class="px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center g
 <script>
 const CSRF_TOKEN = {{ csrf_token|tojson }};
 const ORDER_NAME = {{ order_name|tojson }};
-let ITEMS = {{ items_json }};
+let ITEMS = {{ items_json|tojson }};
 let activeRow = null;
 
 function apiCall(method, args) {
@@ -340,15 +340,18 @@ function refreshFromPayload(p) {
     if (!statusCell || !row) return;
     if (it.confirmed) {
       row.classList.remove('bg-amber-50/30');
-      const by = (it.confirmed_by || '').replace(/</g, '&lt;');
+      const by = (it.confirmed_by || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       statusCell.innerHTML = '<div class="flex flex-col items-center gap-0.5">'
         + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300"><span class="material-symbols-outlined text-[14px]">check_circle</span>تم التأكيد</span>'
         + '<span class="text-[10px] text-navy-text/50">' + by + '</span></div>';
     } else {
       row.classList.add('bg-amber-50/30');
+      // تفويض النقر (بلا onclick مضمن): الاسم يُمرر كبيانات عبر data-attribute
+      // مهربة لكل السياقات، وgetAttribute يعيد فك الترميز تلقائيًا.
+      const rowName = (it.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       statusCell.innerHTML = '<div class="flex flex-col items-center gap-1.5">'
         + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-[11px] font-bold"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>لم يُفحص بعد</span>'
-        + '<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect(\'' + it.name + '\')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button></div>';
+        + '<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" data-confirm-row="' + rowName + '" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button></div>';
     }
   });
   // حذف الصفوف المحذوفة من العرض
@@ -496,7 +499,7 @@ function showToast(title, desc, type) {
     });
   });
 })();
-document.addEventListener('DOMContentLoaded', () => { const i = document.getElementById('barcodeInput'); if (i) i.focus(); });
+document.addEventListener('DOMContentLoaded', () => { const i = document.getElementById('barcodeInput'); if (i) i.focus(); const tb = document.getElementById('itemsTableBody'); if (tb && !tb.dataset.confirmBound) { tb.dataset.confirmBound = '1'; tb.addEventListener('click', (e) => { const b = e.target && e.target.closest ? e.target.closest('[data-confirm-row]') : null; if (b) confirmManualDirect(b.getAttribute('data-confirm-row')); }); } });
 </script>
 {% endif %}
 </body></html>

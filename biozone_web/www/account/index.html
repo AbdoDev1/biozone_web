@@ -28,7 +28,7 @@
     {% if active_tab == 'debt' %}
     <!-- تبويب المديونية: قائمة كل الفواتير المرحّلة للعميل الحالي فقط -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
-      <div class="font-bold text-on-surface mb-3">الفواتير ({{ invoices_count }})</div>
+      <div class="font-bold text-on-surface mb-3">الفواتير ({{ invoices_count|e }})</div>
       <!-- تخطيط صريح بثلاث حالات (راجع تقرير إصلاح تخطيط الفلاتر):
            الهاتف (أساسًا) عمود واحد، العرض المتوسط (sm) عمودان متساويان،
            سطح المكتب (lg) صف واحد: بحث مرن + مسار صريح 10rem لكل حقل تاريخ
@@ -37,9 +37,9 @@
            للحاوية ولا تداخل ولا فائض أفقي — وترتيب العناصر المنطقي يحفظ RTL. -->
       <form method="get" action="/account" class="grid grid-cols-1 gap-2.5 mb-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]">
         <input type="hidden" name="tab" value="debt">
-        <input type="search" name="q" value="{{ invoice_q }}" placeholder="بحث برقم الفاتورة" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-        <input type="date" name="date_from" value="{{ invoice_date_from }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-        <input type="date" name="date_to" value="{{ invoice_date_to }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <input type="search" name="q" value="{{ invoice_q|e }}" placeholder="بحث برقم الفاتورة" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <input type="date" name="date_from" value="{{ invoice_date_from|e }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+        <input type="date" name="date_to" value="{{ invoice_date_to|e }}" class="w-full min-w-0 px-3.5 py-2.5 text-sm rounded-xl border border-outline-variant/40 bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
         <div class="flex gap-2.5">
           <button type="submit" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-bold text-sm transition-colors">بحث</button>
           <a href="/account?tab=debt" class="px-5 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant font-bold text-sm hover:border-primary/40 transition-all">مسح</a>
@@ -55,21 +55,21 @@
       <div class="flex flex-col gap-2.5">
         {% for inv in invoices %}
         <div class="flex items-center justify-between gap-3 rounded-xl border border-outline-variant/40 px-3.5 py-3">
-          <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ inv.name }}</div>
-          <div class="text-sm font-bold whitespace-nowrap {% if inv.is_return %}text-error{% else %}text-on-surface{% endif %}" style="direction: ltr;">{{ inv.value_display }}</div>
+          <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ inv.name|e }}</div>
+          <div class="text-sm font-bold whitespace-nowrap {% if inv.is_return %}text-error{% else %}text-on-surface{% endif %}" style="direction: ltr;">{{ inv.value_display|e }}</div>
         </div>
         {% endfor %}
       </div>
       {% if invoices_pages > 1 %}
       <div class="flex items-center justify-between gap-3 mt-4">
         {% if invoice_page > 1 %}
-        <a href="/account?tab=debt&page={{ invoice_page - 1 }}&q={{ invoice_q }}&date_from={{ invoice_date_from }}&date_to={{ invoice_date_to }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">السابق</a>
+        <a href="/account?tab=debt&page={{ invoice_page - 1 }}&q={{ invoice_q|e }}&date_from={{ invoice_date_from|e }}&date_to={{ invoice_date_to|e }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">السابق</a>
         {% else %}
         <span class="px-4 py-2 rounded-xl border border-outline-variant/20 text-on-surface-variant/40 font-bold text-sm">السابق</span>
         {% endif %}
-        <span class="text-xs text-on-surface-variant">صفحة {{ invoice_page }} من {{ invoices_pages }}</span>
+        <span class="text-xs text-on-surface-variant">صفحة {{ invoice_page|e }} من {{ invoices_pages|e }}</span>
         {% if invoice_page < invoices_pages %}
-        <a href="/account?tab=debt&page={{ invoice_page + 1 }}&q={{ invoice_q }}&date_from={{ invoice_date_from }}&date_to={{ invoice_date_to }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">التالي</a>
+        <a href="/account?tab=debt&page={{ invoice_page + 1 }}&q={{ invoice_q|e }}&date_from={{ invoice_date_from|e }}&date_to={{ invoice_date_to|e }}" class="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-sm hover:border-primary/40 transition-all">التالي</a>
         {% else %}
         <span class="px-4 py-2 rounded-xl border border-outline-variant/20 text-on-surface-variant/40 font-bold text-sm">التالي</span>
         {% endif %}
@@ -82,31 +82,31 @@
     <!-- تبويب البيانات الأساسية -->
     <!-- بيانات العميل الأساسية -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
-      <div class="font-bold text-on-surface">{{ customer_name }}</div>
-      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ email }}</div>
-      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ phone_display }}</div>
+      <div class="font-bold text-on-surface">{{ customer_name|e }}</div>
+      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ email|e }}</div>
+      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ phone_display|e }}</div>
     </div>
 
     {% if has_address %}
     <!-- عنوان الشحن — قراءة فقط (الإدخال للستاف حصرًا) -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="text-xs text-on-surface-variant mb-1">عنوان الشحن</div>
-      <div class="font-bold text-on-surface">{{ address_brief }}</div>
-      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ address_phone }}</div>
+      <div class="font-bold text-on-surface">{{ address_brief|e }}</div>
+      <div class="text-xs text-on-surface-variant mt-1 font-mono" style="direction: ltr; text-align: right;">{{ address_phone|e }}</div>
     </div>
     {% else %}
-    <p class="text-sm text-on-surface-variant">{{ address_empty_label }}</p>
+    <p class="text-sm text-on-surface-variant">{{ address_empty_label|e }}</p>
     {% endif %}
 
     {% if not category_assigned %}
-    <p class="text-sm text-on-surface-variant">{{ unassigned_label }}</p>
+    <p class="text-sm text-on-surface-variant">{{ unassigned_label|e }}</p>
     {% endif %}
 
     <!-- آخر الطلبات -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="font-bold text-on-surface">آخر الطلبات</div>
-        <a href="/account/orders" class="text-xs font-bold text-primary hover:underline whitespace-nowrap">عرض كل الطلبات ({{ orders_count }})</a>
+        <a href="/account/orders" class="text-xs font-bold text-primary hover:underline whitespace-nowrap">عرض كل الطلبات ({{ orders_count|e }})</a>
       </div>
       {% if not recent_orders %}
       <p class="text-sm text-on-surface-variant">لسه مفيش طلبات — أول ما تعمل طلب من المتجر، هيظهر هنا فورًا.</p>
@@ -114,16 +114,16 @@
       <div class="flex flex-col gap-2.5">
         {% for order in recent_orders %}
         <a
-          href="/account/orders/{{ order.name }}"
+          href="/account/orders/{{ order.name|e }}"
           class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3 hover:border-primary/40 transition-all"
         >
           <div>
-            <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ order.name }}</div>
-            <div class="text-xs text-on-surface-variant mt-0.5">{{ order.date_display }} · {{ order.items_count }} أصناف</div>
+            <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ order.name|e }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ order.date_display|e }} · {{ order.items_count|e }} أصناف</div>
           </div>
           <div class="flex items-center gap-2.5">
             <span class="text-sm font-bold text-on-surface whitespace-nowrap">{{ "{:,.2f}".format(order.grand_total) }} ج.م</span>
-            <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ order.status_style }}">{{ order.status_label }}</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ order.status_style|e }}">{{ order.status_label|e }}</span>
             {% if order.has_return %}<span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-surface-container text-on-surface-variant">مرتجع</span>{% endif %}
           </div>
         </a>
@@ -140,14 +140,14 @@
       <div class="flex flex-col gap-2.5">
         {% for ret in recent_returns %}
         <a
-          href="/account/returns/{{ ret.name }}"
+          href="/account/returns/{{ ret.name|e }}"
           class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3 hover:border-primary/40 transition-all"
         >
           <div>
-            <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ ret.name }}</div>
-            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display }}</div>
+            <div class="font-mono text-sm font-bold text-on-surface" style="direction: ltr; text-align: right;">#{{ ret.name|e }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display|e }}</div>
           </div>
-          <span class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display }} ج.م</span>
+          <span class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display|e }} ج.م</span>
         </a>
         {% endfor %}
       </div>

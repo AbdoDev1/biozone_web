@@ -101,15 +101,15 @@
                     location: {{ (m.warehouse or '')|tojson }}
                   })'>
 <td class="py-4 pr-2 font-medium text-navy-text group-hover:text-primary transition-colors">
-                  {{ m.item_name }}
+                  {{ m.item_name|e }}
                 </td>
 <td class="py-4 text-center">
 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ 'bg-primary/10 text-primary' if m.direction == 'in' else 'bg-amber-50 text-amber-700' }}">
                     {{ 'وارد' if m.direction == 'in' else 'صادر' }}
                   </span>
 </td>
-<td class="py-4 text-center font-bold {{ 'text-primary' if m.direction == 'in' else 'text-navy-text/80' }}" dir="ltr">{{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display }} {{ m.stock_uom or '' }}</td>
-<td class="py-4 pl-2 text-left text-navy-text/60 text-xs">{{ m.ago }}</td>
+<td class="py-4 text-center font-bold {{ 'text-primary' if m.direction == 'in' else 'text-navy-text/80' }}" dir="ltr">{{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display|e }} {{ m.stock_uom or '' }}</td>
+<td class="py-4 pl-2 text-left text-navy-text/60 text-xs">{{ m.ago|e }}</td>
 </tr>
 {% else %}
 <tr><td colspan="4" class="py-6 text-center text-navy-text/50 text-sm">لا توجد حركات مخزون مسجّلة بعد</td></tr>
@@ -131,11 +131,11 @@
                     staff: {{ (m.staff_name or '')|tojson }},
                     location: {{ (m.warehouse or '')|tojson }}
                   })'>
-<span class="font-bold text-sm text-navy-text">{{ m.item_name }}</span>
+<span class="font-bold text-sm text-navy-text">{{ m.item_name|e }}</span>
 <div class="flex items-center gap-2 text-xs">
-<span class="font-bold {{ 'text-primary' if m.direction == 'in' else 'text-amber-700' }}">{{ 'وارد' if m.direction == 'in' else 'صادر' }} {{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display }} {{ m.stock_uom or '' }}</span>
+<span class="font-bold {{ 'text-primary' if m.direction == 'in' else 'text-amber-700' }}">{{ 'وارد' if m.direction == 'in' else 'صادر' }} {{ '+' if m.direction == 'in' else '-' }}{{ m.qty_display|e }} {{ m.stock_uom or '' }}</span>
 <span class="text-navy-text/30">·</span>
-<span class="text-navy-text/50">{{ m.ago }}</span>
+<span class="text-navy-text/50">{{ m.ago|e }}</span>
 </div>
 </button>
 {% else %}

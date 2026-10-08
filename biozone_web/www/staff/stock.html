@@ -55,7 +55,7 @@
 <label class="flex items-center gap-2 bg-white border border-surface-subtle rounded-xl px-3 py-2 text-sm font-bold text-navy-text/70 cursor-pointer whitespace-nowrap">
 <input type="checkbox" name="low_only" value="1" onchange="this.form.submit()" {% if low_only %}checked{% endif %} class="rounded border-outline-variant text-primary focus:ring-primary">
 المنخفض فقط
-<span class="bg-alert-bg text-alert-red text-xs font-bold rounded-full px-2 py-0.5">{{ low_stock_count }}</span>
+<span class="bg-alert-bg text-alert-red text-xs font-bold rounded-full px-2 py-0.5">{{ low_stock_count|e }}</span>
 </label>
 <div class="relative flex-grow sm:w-64">
 <input class="w-full pr-9 pl-3 py-2 bg-white rounded-xl border border-surface-subtle focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm outline-none" name="q" placeholder="ابحث بالاسم أو الكود..." type="text" value="{{ search_term or '' }}">
@@ -80,9 +80,9 @@
 <tbody class="divide-y divide-surface-subtle">
 {% for row in stock_rows %}
 <tr class="hover:bg-surface transition-colors">
-<td class="py-3.5 px-4 font-bold text-navy-text col-name bg-white"><div class="cell-truncate truncate"><a class="hover:text-primary hover:underline transition-colors inline-flex items-center gap-1.5" href="/staff/items?code={{ row.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name }}<span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a></div></td>
-<td class="py-3.5 px-4 text-navy-text/60 font-mono text-sm"><div class="cell-truncate truncate">{{ row.item_code }}</div></td>
-<td class="py-3.5 px-4 font-bold text-navy-text">{{ row.actual_qty|int }} <span class="text-xs font-normal text-navy-text/50">{{ row.stock_uom }}</span></td>
+<td class="py-3.5 px-4 font-bold text-navy-text col-name bg-white"><div class="cell-truncate truncate"><a class="hover:text-primary hover:underline transition-colors inline-flex items-center gap-1.5" href="/staff/items?code={{ row.item_code|e }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name|e }}<span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a></div></td>
+<td class="py-3.5 px-4 text-navy-text/60 font-mono text-sm"><div class="cell-truncate truncate">{{ row.item_code|e }}</div></td>
+<td class="py-3.5 px-4 font-bold text-navy-text">{{ row.actual_qty|int }} <span class="text-xs font-normal text-navy-text/50">{{ row.stock_uom|e }}</span></td>
 <td class="py-3.5 px-4 text-navy-text/50 text-sm lg:max-xl:hidden">{{ row.reorder_level|int if row.reorder_level else "—" }}</td>
 <td class="py-3.5 px-4">
 {% if row.status == "available" %}
@@ -111,10 +111,10 @@
 {% for row in stock_rows %}
 <div class="bg-white rounded-xl p-4 shadow-sm flex items-start justify-between gap-3">
 <div class="flex flex-col gap-1 min-w-0">
-<span class="font-bold text-navy-text text-sm truncate"><a class="hover:text-primary hover:underline transition-colors" href="/staff/items?code={{ row.item_code }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name }}</a></span>
-<span class="text-xs text-navy-text/50 font-mono">{{ row.item_code }}</span>
+<span class="font-bold text-navy-text text-sm truncate"><a class="hover:text-primary hover:underline transition-colors" href="/staff/items?code={{ row.item_code|e }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد">{{ row.item_name|e }}</a></span>
+<span class="text-xs text-navy-text/50 font-mono">{{ row.item_code|e }}</span>
 <div class="flex items-center gap-2 mt-1">
-<span class="font-bold text-navy-text">{{ row.actual_qty|int }} {{ row.stock_uom }}</span>
+<span class="font-bold text-navy-text">{{ row.actual_qty|int }} {{ row.stock_uom|e }}</span>
 {% if row.status == "available" %}
 <span class="bg-primary/10 text-primary text-[11px] font-bold px-2 py-0.5 rounded-full">متوفر</span>
 {% elif row.status == "low" %}
@@ -135,14 +135,14 @@
 
 <!-- Pagination -->
 <div class="flex items-center justify-between text-sm text-navy-text/60 px-1">
-<span>عرض {{ stock_rows|length }} من أصل {{ total_count_ar }} صنف</span>
+<span>عرض {{ stock_rows|length }} من أصل {{ total_count_ar|e }} صنف</span>
 <div class="flex items-center gap-2">
 {% if has_prev %}
-<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ prev_page }}{% if search_term %}&q={{ search_term }}{% endif %}{% if low_only %}&low_only=1{% endif %}">السابق</a>
+<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ prev_page|e }}{% if search_term %}&q={{ search_term|e }}{% endif %}{% if low_only %}&low_only=1{% endif %}">السابق</a>
 {% endif %}
-<span class="px-3 py-1.5 rounded-lg bg-primary text-white font-bold">{{ page }}</span>
+<span class="px-3 py-1.5 rounded-lg bg-primary text-white font-bold">{{ page|e }}</span>
 {% if has_next %}
-<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ next_page }}{% if search_term %}&q={{ search_term }}{% endif %}{% if low_only %}&low_only=1{% endif %}">التالي</a>
+<a class="px-3 py-1.5 rounded-lg border border-surface-subtle hover:bg-surface-subtle font-bold" href="?page={{ next_page|e }}{% if search_term %}&q={{ search_term|e }}{% endif %}{% if low_only %}&low_only=1{% endif %}">التالي</a>
 {% endif %}
 </div>
 </div>
@@ -202,7 +202,7 @@
 
 <script>
 const CSRF_TOKEN = {{ csrf_token|tojson }};
-const ITEMS = {{ items_json }};
+const ITEMS = {{ items_json|tojson }};
 let mpSelectedType = 'in';
 
 function switchTab(tab) {
@@ -275,7 +275,14 @@ document.getElementById('mp-item-search').addEventListener('input', function () 
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'w-full text-right px-3.5 py-2.5 hover:bg-surface-subtle text-sm border-b border-surface-subtle last:border-0 flex flex-col';
-      row.innerHTML = '<span class="font-bold text-navy-text">' + item.item_name + '</span><span class="text-xs text-navy-text/50 font-mono">' + item.item_code + '</span>';
+      row.innerHTML = '';
+      const nm = document.createElement('span');
+      nm.className = 'font-bold text-navy-text';
+      nm.textContent = item.item_name;
+      const cd = document.createElement('span');
+      cd.className = 'text-xs text-navy-text/50 font-mono';
+      cd.textContent = item.item_code;
+      row.append(nm, cd);
       row.addEventListener('click', () => selectItem(item));
       resultsEl.appendChild(row);
     });

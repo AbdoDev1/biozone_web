@@ -18,8 +18,8 @@
   {% if error_state %}
   <!-- حالة ناعمة: طلب غير موجود — بلا traceback -->
   <div class="w-full max-w-[820px] mx-auto flex flex-col items-center text-center gap-4 bg-surface-container-low rounded-2xl p-8">
-    <p class="text-xl font-bold">{{ error_title }}</p>
-    <p class="text-on-surface-variant">{{ error_message }}</p>
+    <p class="text-xl font-bold">{{ error_title|e }}</p>
+    <p class="text-on-surface-variant">{{ error_message|e }}</p>
     <a href="{{ error_back_url or '/account/orders' }}" class="text-sm font-bold text-primary hover:underline">{{ error_back_label or 'العودة إلى الطلبات' }}</a>
   </div>
   {% else %}
@@ -27,24 +27,24 @@
 
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <div class="font-mono text-lg font-extrabold text-on-surface" style="direction: ltr; text-align: right;">#{{ order_number }}</div>
-        <div class="text-xs text-on-surface-variant mt-1">{{ date_display }}</div>
+        <div class="font-mono text-lg font-extrabold text-on-surface" style="direction: ltr; text-align: right;">#{{ order_number|e }}</div>
+        <div class="text-xs text-on-surface-variant mt-1">{{ date_display|e }}</div>
       </div>
-      <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ status_style }}">{{ status_label }}</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap {{ status_style|e }}">{{ status_label|e }}</span>
     </div>
 
     <!-- بنود الطلب -->
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
-      <div class="font-bold text-on-surface mb-3">الأصناف ({{ item_count }})</div>
+      <div class="font-bold text-on-surface mb-3">الأصناف ({{ item_count|e }})</div>
       {% if items %}
       <div class="flex flex-col gap-2.5">
         {% for item in items %}
         <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3">
           <div>
-            <div class="font-bold text-sm text-on-surface">{{ item.item_name }}</div>
-            <div class="text-xs text-on-surface-variant mt-0.5">{{ item.qty }} {{ item.uom }} × {{ item.rate_display }} ج.م</div>
+            <div class="font-bold text-sm text-on-surface">{{ item.item_name|e }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ item.qty|e }} {{ item.uom|e }} × {{ item.rate_display|e }} ج.م</div>
           </div>
-          <div class="text-sm font-bold text-on-surface whitespace-nowrap">{{ item.amount_display }} ج.م</div>
+          <div class="text-sm font-bold text-on-surface whitespace-nowrap">{{ item.amount_display|e }} ج.م</div>
         </div>
         {% endfor %}
       </div>
@@ -57,7 +57,7 @@
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="flex items-center justify-between gap-3">
         <div class="font-bold text-on-surface">الإجمالي</div>
-        <div class="text-base font-extrabold text-on-surface whitespace-nowrap">{{ grand_total_display }} ج.م</div>
+        <div class="text-base font-extrabold text-on-surface whitespace-nowrap">{{ grand_total_display|e }} ج.م</div>
       </div>
     </div>
 
@@ -69,10 +69,10 @@
         {% for ret in returns %}
         <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3">
           <div>
-            <div class="font-bold text-sm text-on-surface">إشعار دائن {{ ret.name }}</div>
-            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display }}</div>
+            <div class="font-bold text-sm text-on-surface">إشعار دائن {{ ret.name|e }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ ret.date_display|e }}</div>
           </div>
-          <div class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display }} ج.م</div>
+          <div class="text-sm font-bold text-on-surface whitespace-nowrap">− {{ ret.value_display|e }} ج.م</div>
         </div>
         {% endfor %}
       </div>

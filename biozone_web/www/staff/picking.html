@@ -51,19 +51,19 @@ body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b
 <main class="flex-1 p-4 sm:p-6 w-full max-w-[1000px] mx-auto flex flex-col gap-4">
 {% if error_state %}
 <div class="bg-white border border-surface-container rounded-xl p-8 shadow-sm flex flex-col items-center gap-4 text-center">
-<p class="text-[20px] font-bold">{{ error_title }}</p>
-{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order }}</p>{% endif %}
-<p class="text-navy-text/70">{{ error_message }}</p>
-{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint }}</p>{% endif %}
+<p class="text-[20px] font-bold">{{ error_title|e }}</p>
+{% if error_order %}<p class="text-xs font-bold text-primary font-mono" dir="ltr">{{ error_order|e }}</p>{% endif %}
+<p class="text-navy-text/70">{{ error_message|e }}</p>
+{% if error_hint %}<p class="text-sm text-navy-text/50">{{ error_hint|e }}</p>{% endif %}
 <div class="flex items-center gap-2 flex-wrap justify-center mt-2">
 <a class="inline-flex items-center gap-1.5 px-4 py-2.5 border border-surface-subtle hover:bg-surface-subtle rounded-xl font-medium transition-all" href="{{ error_back_url or '/staff/orders' }}"><span class="material-symbols-outlined text-[20px]">arrow_forward</span>{{ error_back_label or 'العودة إلى قائمة الطلبات' }}</a>
 </div>
 </div>
 {% else %}
 <div class="no-print bg-white border border-surface-container rounded-xl px-4 py-3 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-<p class="text-sm font-bold">ورقة تجهيز مخزن: <span class="text-primary font-mono" dir="ltr">{{ order_name }}</span></p>
+<p class="text-sm font-bold">ورقة تجهيز مخزن: <span class="text-primary font-mono" dir="ltr">{{ order_name|e }}</span></p>
 <div class="flex items-center gap-2">
-<a class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-all" href="/staff/order-prep?order={{ order_name }}">عودة للتجهيز</a>
+<a class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-subtle hover:bg-surface-container text-navy-text text-xs font-bold rounded-lg transition-all" href="/staff/order-prep?order={{ order_name|e }}">عودة للتجهيز</a>
 <button class="inline-flex items-center gap-1.5 px-5 py-2 bg-primary hover:bg-primary-accent text-white text-xs font-bold rounded-lg transition-all" onclick="window.print()" type="button"><span class="material-symbols-outlined text-[18px]">print</span>طباعة</button>
 </div>
 </div>

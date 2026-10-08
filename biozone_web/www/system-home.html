@@ -25,10 +25,10 @@
          من get_home_route_for_system_user — /staff/dashboard للموظف
          العادي و/desk للإداري. #}
     <div class="flex flex-col gap-4 w-full max-w-sm">
-      <a href="{{ store_url }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center bg-primary text-on-primary font-bold rounded-full px-8 py-3.5 hover:bg-primary-container transition-colors shadow-sm text-lg">
+      <a href="{{ store_url|e }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center bg-primary text-on-primary font-bold rounded-full px-8 py-3.5 hover:bg-primary-container transition-colors shadow-sm text-lg">
         الرجوع للمتجر
       </a>
-      <a href="{{ home_route }}" class="inline-flex items-center justify-center bg-surface-container-high text-on-surface font-bold rounded-full px-8 py-3.5 hover:bg-surface-container-low transition-colors text-lg">
+      <a href="{{ home_route|e }}" class="inline-flex items-center justify-center bg-surface-container-high text-on-surface font-bold rounded-full px-8 py-3.5 hover:bg-surface-container-low transition-colors text-lg">
         الرئيسية
       </a>
     </div>

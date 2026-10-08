@@ -18,14 +18,18 @@
   بصيغة الورقة (amount_in_words_sheet — مشتركة مع مسار التسليم).
 """
 
+from decimal import Decimal
+
 import frappe
 from frappe import _
 
 from biozone_web.b9_utils import (
 	amount_in_words_sheet,
+	clean_address_html,
 	format_balance_3,
 	format_sheet_number,
 	get_customer_balances,
+	moneyd,
 )
 from biozone_web.utils import (
 	get_header_context,
@@ -69,13 +73,14 @@ def get_context(context):
 		)
 
 	# نسخة عرض فقط من البنود — لا تُمرر كائنات البنود الأصلية إلى القالب.
-	# الأرقام منسقة بلا فاصل آلاف وبلا أصفار زائدة (_num) مطابقة للورقة.
+	# الأرقام منسقة بلا فاصل آلاف وبلا أصفار زائدة مطابقة للورقة، والمجاميع
+	# المشتقة بـDecimal (moneyd: النصف للأعلى) لا float.
 	items = []
-	public_total = 0.0
+	public_total = Decimal("0.00")
 	for idx, it in enumerate(so.items or [], start=1):
 		rate = float(it.price_list_rate or it.rate or 0)
 		qty = float(it.qty or 0)
-		public_total += qty * rate
+		public_total += moneyd(qty) * moneyd(rate)
 		items.append(
 			{
 				"idx": idx,
@@ -91,11 +96,11 @@ def get_context(context):
 			}
 		)
 	grand = float(so.rounded_total or so.grand_total or 0)
-	paid = 0.0
+	paid = Decimal("0.00")
 	discount_notice = abs(float(so.discount_amount or 0))
 	balances = get_customer_balances(so.customer, so.company)
-	previous_balance = float(balances["previous"] or 0)
-	current_balance = previous_balance + grand - paid
+	previous_balance = moneyd(balances["previous"] or 0)
+	current_balance = previous_balance + moneyd(grand) - paid
 
 	from biozone_web.api import SHIPPING_ACCOUNT
 
@@ -108,7 +113,9 @@ def get_context(context):
 	context.delivery_note = ""
 	context.invoice_name = so.name
 	context.customer_name = so.customer_name
-	context.customer_address = so.address_display or so.customer_address or ""
+	context.customer_address = clean_address_html(
+		so.address_display or so.customer_address or ""
+	)
 	context.posting_date = frappe.utils.format_date(so.transaction_date, "dd/MM/yyyy")
 	context.items = items
 	context.items_count = len(items)

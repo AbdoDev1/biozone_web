@@ -59,11 +59,11 @@
     <h2 class="text-2xl font-bold text-on-surface mb-lg text-right">التصنيفات الرئيسية</h2>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
       {% for cat in top_categories %}
-      <a href="/catalog?category={{ cat.item_group }}" class="group bg-surface-container-lowest border border-outline-variant rounded-xl p-lg flex flex-col items-center justify-center text-center hover:shadow-md hover:border-primary transition-all">
+      <a href="/catalog?category={{ cat.item_group|e }}" class="group bg-surface-container-lowest border border-outline-variant rounded-xl p-lg flex flex-col items-center justify-center text-center hover:shadow-md hover:border-primary transition-all">
         <div class="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center mb-md group-hover:bg-primary/10 transition-colors">
           <span class="material-symbols-outlined text-primary text-3xl">medical_services</span>
         </div>
-        <h3 class="font-bold text-on-surface">{{ cat.item_group }}</h3>
+        <h3 class="font-bold text-on-surface">{{ cat.item_group|e }}</h3>
       </a>
       {% endfor %}
     </div>
@@ -84,17 +84,17 @@
         {% for item in featured_items %}
         <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col">
           <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
-            <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name }}">
+            <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name|e }}">
             {% if item.thumbnail %}
-            <img src="{{ item.thumbnail }}" alt="{{ item.item_name }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+            <img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
             {% else %}
             <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
             {% endif %}
             </a>
           </div>
           <div class="p-3 flex flex-col flex-grow">
-            <span class="text-xs text-primary mb-0.5">{{ item.item_group }}</span>
-            <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name }}</a>
+            <span class="text-xs text-primary mb-0.5">{{ item.item_group|e }}</span>
+            <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name|e }}</a>
             <div class="mt-auto pt-2">
               {% if item.price %}
               <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م</span>

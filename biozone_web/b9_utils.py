@@ -4,6 +4,7 @@
 """
 
 import frappe
+from decimal import Decimal, ROUND_HALF_UP
 from frappe import _
 
 
@@ -270,9 +271,15 @@ def format_sheet_number(value) -> str:
 	"""تنسيق رقمي لأوراق الطباعة: بلا فاصل آلاف وبلا أصفار زائدة.
 
 	150 ← "150"، 112.5 ← "112.5"، 30.72 ← "30.72" (مطابق للفاتورة الورقية).
+	يقبل Decimal فيمرره بدقة تامة (بلا تحويل ثنائي)، وغيره عبر float.
 	دالة عرض خالصة — لا DB ولا كتابة.
 	"""
-	text = "%.10f" % float(value or 0)
+	from decimal import Decimal
+
+	if isinstance(value, Decimal):
+		text = format(value, "f")
+	else:
+		text = "%.10f" % float(value or 0)
 	if "." in text:
 		text = text.rstrip("0").rstrip(".")
 	return text if text not in ("", "-0") else "0"
@@ -315,3 +322,27 @@ def amount_in_words_sheet(amount) -> str:
 		_w(pounds),
 		_w(piastres),
 	)
+
+
+def clean_address_html(value) -> str:
+	"""يطهّر عنوانًا مركبًا كـHTML: يهرّب كل النص ويسمح بـ`<br>` فقط.
+
+	حقول العنوان بشرية (غير موثوقة) وERPNext يدمجها خامًا في القالب، لذا
+	التنظيف هنا لا الثقة بالمصدر. دالة عرض خالصة — لا DB ولا كتابة.
+	"""
+	import html as _html
+	import re
+
+	text = _html.escape(str(value or ""), quote=False)
+	return re.sub(r"&lt;(br|BR)\s*/?&gt;", "<br>", text)
+
+
+def moneyd(value):
+	"""مبلغ عشري دقيق للعرض المالي: تقريب النصف للأعلى لخانتين.
+
+	سياسة التقريب الصريحة: ROUND_HALF_UP على القيمة العشرية — تختلف عن
+	%.3f/%g العائمة عند الحدود (2.675 ← 2.68 هنا مقابل 2.67 عائمًا).
+	تُستخدم لمجاميع العرض المشتقة (جمهور/مدفوع/حالي) لا لقيم المستندات
+	المخزنة. دالة خالصة — لا DB ولا كتابة.
+	"""
+	return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

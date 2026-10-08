@@ -20,14 +20,14 @@
 <!-- Main Content -->
 <main class="max-w-container-max mx-auto px-md py-lg min-h-screen">
   <div class="flex justify-between items-end mb-lg border-b border-surface-variant pb-2">
-    <h1 class="text-2xl md:text-4xl font-bold text-on-surface">{{ selected_category if selected_category else "كل المنتجات" }}</h1>
-    <span class="text-base text-secondary whitespace-nowrap">{{ total_count_ar }} صنف</span>
+    <h1 class="text-2xl md:text-4xl font-bold text-on-surface">{{ (selected_category|e) if selected_category else "كل المنتجات" }}</h1>
+    <span class="text-base text-secondary whitespace-nowrap">{{ total_count_ar|e }} صنف</span>
   </div>
 
   {% if search_term %}
   <div class="mb-lg flex items-center gap-sm text-sm text-on-surface-variant">
-    <span>نتائج البحث عن "<span class="font-bold text-on-surface">{{ search_term }}</span>"</span>
-    <a href="/catalog{% if selected_category %}?category={{ selected_category }}{% endif %}" class="text-primary font-bold hover:underline">مسح البحث</a>
+    <span>نتائج البحث عن "<span class="font-bold text-on-surface">{{ search_term|e }}</span>"</span>
+    <a href="/catalog{% if selected_category %}?category={{ selected_category|urlencode }}{% endif %}" class="text-primary font-bold hover:underline">مسح البحث</a>
   </div>
   {% endif %}
 
@@ -36,21 +36,21 @@
     {% for item in items %}
     <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col">
       <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
-        <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name }}">
+        <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name|e }}">
         {% if item.thumbnail %}
-        <img src="{{ item.thumbnail }}" alt="{{ item.item_name }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+        <img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
         {% else %}
         <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
         {% endif %}
         </a>
-        <span class="absolute top-2 left-2 text-[10px] text-on-surface-variant bg-surface/80 px-1.5 py-0.5 rounded">{{ item.item_code }}</span>
+        <span class="absolute top-2 left-2 text-[10px] text-on-surface-variant bg-surface/80 px-1.5 py-0.5 rounded">{{ item.item_code|e }}</span>
       </div>
       <div class="flex flex-col flex-grow p-3">
-        <span class="text-xs text-primary mb-0.5 block">{{ item.item_group }}</span>
-        <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name }}</a>
+        <span class="text-xs text-primary mb-0.5 block">{{ item.item_group|e }}</span>
+        <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name|e }}</a>
         <div class="mt-auto pt-2 flex items-center justify-between">
           {% if item.price %}
-          <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ item.display_uom }}</span>{% endif %}</span>
+          <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ item.display_uom|e }}</span>{% endif %}</span>
           {% else %}
           <span class="text-sm text-outline">السعر غير متاح</span>
           {% endif %}
@@ -88,18 +88,18 @@
   </div>
   {% else %}
   <div class="text-center py-xl text-on-surface-variant">
-    {% if search_term %}لا توجد نتائج لـ"{{ search_term }}"{% else %}لا توجد أصناف{% endif %}
+    {% if search_term %}لا توجد نتائج لـ"{{ search_term|e }}"{% else %}لا توجد أصناف{% endif %}
   </div>
   {% endif %}
 
   <!-- Pagination -->
   <div class="mt-xl flex justify-center items-center gap-md pb-xl">
     {% if has_prev %}
-    <a href="/catalog?page={{ prev_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-6 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container transition-all">السابق</a>
+    <a href="/catalog?page={{ prev_page|e }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}{% if search_term %}&q={{ search_term|urlencode }}{% endif %}" class="px-6 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container transition-all">السابق</a>
     {% endif %}
-    <span class="text-sm text-secondary">صفحة {{ page }}</span>
+    <span class="text-sm text-secondary">صفحة {{ page|e }}</span>
     {% if has_next %}
-    <a href="/catalog?page={{ next_page }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search_term %}&q={{ search_term }}{% endif %}" class="px-8 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container hover:border-primary transition-all flex items-center gap-2">
+    <a href="/catalog?page={{ next_page|e }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}{% if search_term %}&q={{ search_term|urlencode }}{% endif %}" class="px-8 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container hover:border-primary transition-all flex items-center gap-2">
       التالي
       <span class="material-symbols-outlined text-[20px]">expand_more</span>
     </a>

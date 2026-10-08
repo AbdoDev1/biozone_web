@@ -74,7 +74,7 @@
 <!-- 3. شريط البحث والفلاتر -->
 <section aria-label="أدوات البحث والفلترة" class="bg-white rounded-2xl shadow-sm p-4 space-y-3.5 border border-surface-container">
 <form class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3" method="get" action="/staff/customers">
-<input name="show" type="hidden" value="{{ show }}">
+<input name="show" type="hidden" value="{{ show|e }}">
 <div class="relative flex-1">
 <label class="sr-only" for="customer-search-input">بحث بالاسم أو كود العميل</label>
 <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-navy-text/40 pointer-events-none text-xl">search</span>
@@ -85,7 +85,7 @@
 <select class="bg-transparent border-0 text-xs sm:text-sm font-bold text-navy-text focus:ring-0 cursor-pointer py-1 pr-1 pl-6" id="category-filter-select" name="group" onchange="this.form.submit()">
 <option value="all" {% if selected_group == 'all' %}selected{% endif %}>جميع الفئات</option>
 {% for g in groups %}
-<option value="{{ g.name }}" {% if g.name == selected_group %}selected{% endif %}>{{ g.name }}</option>
+<option value="{{ g.name|e }}" {% if g.name == selected_group %}selected{% endif %}>{{ g.name|e }}</option>
 {% endfor %}
 </select>
 </div>
@@ -94,7 +94,7 @@
 <span class="material-symbols-outlined text-lg">search</span>
 <span>بحث</span>
 </button>
-<a class="flex-1 lg:flex-none px-4 py-2.5 bg-white hover:bg-surface-subtle text-navy-text/70 text-sm font-bold rounded-xl border border-surface-container transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}">
+<a class="flex-1 lg:flex-none px-4 py-2.5 bg-white hover:bg-surface-subtle text-navy-text/70 text-sm font-bold rounded-xl border border-surface-container transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}">
 <span class="material-symbols-outlined text-base">refresh</span>
 <span>إعادة ضبط</span>
 </a>
@@ -105,13 +105,13 @@
 <span aria-current="true" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all">
 <span class="material-symbols-outlined text-base">pending_actions</span>
 <span>بانتظار المراجعة</span>
-<span aria-live="polite" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight" id="pending-count-badge">{{ unreviewed_count }}</span>
+<span aria-live="polite" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight" id="pending-count-badge">{{ unreviewed_count|e }}</span>
 </span>
 {% else %}
-<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=unreviewed&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}">
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=unreviewed&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
 <span class="material-symbols-outlined text-base text-navy-text/50">pending_actions</span>
 <span>بانتظار المراجعة</span>
-<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight">{{ unreviewed_count }}</span>
+<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight">{{ unreviewed_count|e }}</span>
 </a>
 {% endif %}
 {% if show == 'all' %}
@@ -120,7 +120,7 @@
 <span>جميع العملاء</span>
 </span>
 {% else %}
-<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=all&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}">
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=all&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
 <span class="material-symbols-outlined text-base text-navy-text/50">groups</span>
 <span>جميع العملاء</span>
 </a>
@@ -143,12 +143,12 @@
 </thead>
 <tbody class="divide-y divide-surface-container text-sm" id="customers-table-body">
 {% for c in customers %}
-<tr class="hover:bg-surface/60 transition-colors group relative" data-row="{{ c.name }}" id="customer-row-{{ loop.index }}">
+<tr class="hover:bg-surface/60 transition-colors group relative" data-row="{{ c.name|e }}" id="customer-row-{{ loop.index }}">
 <td class="py-4 px-5 sticky-col-right sticky-shadow align-middle relative">
 <div class="flex items-start justify-between gap-2">
 <button type="button" onclick='openCustomerDrawer({{ c.name|tojson }})' class="text-right group-hover:text-primary transition-colors focus:outline-none focus:underline">
-<p class="font-bold text-navy-text text-sm leading-snug group-hover:text-primary"><a href="/staff/customers/{{ c.name | urlencode }}" onclick="event.stopPropagation()">{{ c.customer_name }}</a></p>
-<p class="text-xs font-mono text-navy-text/40 mt-1">{{ c.name }}</p>
+<p class="font-bold text-navy-text text-sm leading-snug group-hover:text-primary"><a href="/staff/customers/{{ c.name | urlencode }}" onclick="event.stopPropagation()">{{ c.customer_name|e }}</a></p>
+<p class="text-xs font-mono text-navy-text/40 mt-1">{{ c.name|e }}</p>
 </button>
 <button type="button" onclick='openCustomerDrawer({{ c.name|tojson }})' class="text-navy-text/40 hover:text-primary p-1 rounded-lg hover:bg-surface-subtle transition-colors shrink-0" aria-label="عرض تفاصيل العميل">
 <span class="material-symbols-outlined text-lg">info</span>
@@ -157,35 +157,35 @@
 </td>
 <td class="py-4 px-5 align-middle">
 <div class="space-y-2">
-<div class="flex items-center gap-2 flex-wrap" data-current-badge="{{ c.name }}">
+<div class="flex items-center gap-2 flex-wrap" data-current-badge="{{ c.name|e }}">
 <span class="text-xs font-medium text-navy-text/50">الحالية:</span>
 {% if c.customer_group == 'الجمهور' %}
-<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10">{{ c.customer_group }}</span>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10">{{ c.customer_group|e }}</span>
 {% else %}
-<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{{ c.customer_group }}</span>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{{ c.customer_group|e }}</span>
 {% endif %}
 {% if show == 'all' %}
 {% if c.reviewed %}
-<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary" data-review-badge="{{ c.name }}">تمت المراجعة</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary" data-review-badge="{{ c.name|e }}">تمت المراجعة</span>
 {% else %}
-<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text" data-review-badge="{{ c.name }}">بانتظار المراجعة</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text" data-review-badge="{{ c.name|e }}">بانتظار المراجعة</span>
 {% endif %}
 {% endif %}
 </div>
 <div class="w-full max-w-[210px]">
 {% if show == 'unreviewed' %}
-<label for="select-cat-{{ loop.index }}" class="sr-only">تغيير فئة {{ c.customer_name }}</label>
-<select id="select-cat-{{ loop.index }}" data-current="{{ c.customer_group }}" data-customer="{{ c.name }}" onchange="handleCategoryChange(this)" class="w-full px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer">
+<label for="select-cat-{{ loop.index }}" class="sr-only">تغيير فئة {{ c.customer_name|e }}</label>
+<select id="select-cat-{{ loop.index }}" data-current="{{ c.customer_group|e }}" data-customer="{{ c.name|e }}" onchange="handleCategoryChange(this)" class="w-full px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer">
 {% for g in groups %}
-<option value="{{ g.name }}" {% if g.name == c.customer_group %}selected{% endif %}>{{ g.name }}</option>
+<option value="{{ g.name|e }}" {% if g.name == c.customer_group %}selected{% endif %}>{{ g.name|e }}</option>
 {% endfor %}
 </select>
 {% endif %}
-<div class="hidden items-center gap-1 mt-1.5 text-alert-red text-xs font-bold" data-row-error="{{ c.name }}">
+<div class="hidden items-center gap-1 mt-1.5 text-alert-red text-xs font-bold" data-row-error="{{ c.name|e }}">
 <span class="material-symbols-outlined text-sm">error</span>
-<span data-row-error-text="{{ c.name }}"></span>
+<span data-row-error-text="{{ c.name|e }}"></span>
 </div>
-<div class="hidden items-center gap-1 mt-1.5 text-primary-accent text-xs font-bold" data-row-modified="{{ c.name }}">
+<div class="hidden items-center gap-1 mt-1.5 text-primary-accent text-xs font-bold" data-row-modified="{{ c.name|e }}">
 <span class="material-symbols-outlined text-sm">edit</span>
 <span>تعديل غير محفوظ</span>
 </div>
@@ -193,14 +193,14 @@
 </div>
 </td>
 <td class="py-4 px-5 align-middle">
-<div class="font-bold text-navy-text">{{ c.outstanding_display }}</div>
-<div class="text-xs text-navy-text/40">{{ c.invoice_count }} فاتورة</div>
+<div class="font-bold text-navy-text">{{ c.outstanding_display|e }}</div>
+<div class="text-xs text-navy-text/40">{{ c.invoice_count|e }} فاتورة</div>
 </td>
 <td class="py-4 px-5 align-middle">
 {% if c.last_invoice %}
 <div>
-<p class="font-bold text-navy-text font-mono text-xs leading-tight">{{ c.last_invoice.name }}</p>
-<p class="text-navy-text/50 text-xs mt-1 leading-tight">{{ c.last_invoice.date_display }}</p>
+<p class="font-bold text-navy-text font-mono text-xs leading-tight">{{ c.last_invoice.name|e }}</p>
+<p class="text-navy-text/50 text-xs mt-1 leading-tight">{{ c.last_invoice.date_display|e }}</p>
 </div>
 {% else %}
 <span class="text-navy-text/40 text-xs font-medium">لا توجد فواتير</span>
@@ -209,7 +209,7 @@
 <td class="py-4 px-5 align-middle whitespace-nowrap">
 <div class="flex flex-col items-start gap-1.5">
 {% if show == 'unreviewed' and c.customer_group == public_group %}
-<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name }}" onclick='approveAsPublic({{ c.name|tojson }})' type="button">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name|e }}" onclick='approveAsPublic({{ c.name|tojson }})' type="button">
 <span class="material-symbols-outlined text-sm">verified</span>
 اعتماد كجمهور
 </button>
@@ -264,18 +264,18 @@
 <!-- 6. الترقيم -->
 <div aria-label="شريط الترقيم" class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 select-none">
 <div class="text-xs sm:text-sm font-bold text-navy-text/60">
-<span id="pagination-total-text">{{ total_count }} عميلًا</span>
+<span id="pagination-total-text">{{ total_count|e }} عميلًا</span>
 </div>
 <div class="flex items-center gap-2">
 {% if has_prev %}
-<a aria-label="الصفحة السابقة" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text/70 hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}&amp;page={{ prev_page }}">
+<a aria-label="الصفحة السابقة" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text/70 hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ prev_page|e }}">
 <span class="material-symbols-outlined text-base">chevron_right</span>
 <span>السابق</span>
 </a>
 {% endif %}
-<span class="text-xs font-bold text-navy-text/50 px-2">صفحة {{ page }} من {{ total_pages }}</span>
+<span class="text-xs font-bold text-navy-text/50 px-2">صفحة {{ page|e }} من {{ total_pages|e }}</span>
 {% if has_next %}
-<a aria-label="الصفحة التالية" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group }}&amp;page={{ next_page }}">
+<a aria-label="الصفحة التالية" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ next_page|e }}">
 <span>التالي</span>
 <span class="material-symbols-outlined text-base">chevron_left</span>
 </a>
@@ -341,7 +341,7 @@
   const CSRF_TOKEN = {{ csrf_token|tojson }};
   const SHOW_MODE = {{ show|tojson }};
   const PUBLIC_GROUP = {{ public_group|tojson }};
-  const CUSTOMERS = {{ customers_json }};
+  const CUSTOMERS = {{ customers_json|tojson }};
   const CUSTOMER_MAP = {};
   CUSTOMERS.forEach((c) => { CUSTOMER_MAP[c.name] = c; });
   const dirty = new Map();

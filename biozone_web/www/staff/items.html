@@ -64,7 +64,7 @@
 <select name="group" onchange="this.form.submit()" class="appearance-none bg-white border border-borderSubtle text-sm text-slate-700 font-medium rounded-xl pr-4 pl-9 py-2.5 hover:border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer">
 <option value="">المجموعة: الكل</option>
 {% for g in item_groups %}
-<option value="{{ g.name }}" {% if selected_group == g.name %}selected{% endif %}>{{ g.name }}</option>
+<option value="{{ g.name|e }}" {% if selected_group == g.name %}selected{% endif %}>{{ g.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
@@ -78,7 +78,7 @@
 <select name="brand" onchange="this.form.submit()" class="appearance-none bg-white border border-borderSubtle text-sm text-slate-700 font-medium rounded-xl pr-4 pl-9 py-2.5 hover:border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer">
 <option value="">العلامة التجارية: الكل</option>
 {% for b in brands %}
-<option value="{{ b.name }}" {% if selected_brand == b.name %}selected{% endif %}>{{ b.name }}</option>
+<option value="{{ b.name|e }}" {% if selected_brand == b.name %}selected{% endif %}>{{ b.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
@@ -141,15 +141,15 @@
 <td class="py-4 px-6 font-bold text-darkNavy col-name bg-white">
 <div class="flex items-center gap-2.5">
 {% if it.thumbnail %}
-<img src="{{ it.thumbnail }}" alt="" class="h-10 w-10 rounded-lg object-cover ring-1 ring-inset ring-borderSubtle shrink-0" loading="lazy" decoding="async" data-row-thumb="{{ it.item_code|e }}">
+<img src="{{ it.thumbnail|e }}" alt="" class="h-10 w-10 rounded-lg object-cover ring-1 ring-inset ring-borderSubtle shrink-0" loading="lazy" decoding="async" data-row-thumb="{{ it.item_code|e }}">
 {% else %}
 <span class="h-10 w-10 rounded-lg bg-slate-100 text-slate-400 inline-flex items-center justify-center shrink-0" data-row-thumb="{{ it.item_code|e }}"><span class="material-symbols-outlined text-xl">image</span></span>
 {% endif %}
-<div class="cell-truncate truncate" title="{{ it.item_name|e }}">{{ it.item_name }}</div>
+<div class="cell-truncate truncate" title="{{ it.item_name|e }}">{{ it.item_name|e }}</div>
 </div>
 </td>
 <td class="py-4 px-6 font-mono text-xs font-semibold text-slate-600">
-<div class="cell-truncate truncate">{{ it.item_code }}</div>
+<div class="cell-truncate truncate">{{ it.item_code|e }}</div>
 </td>
 <td class="py-4 px-6">
 <span class="font-bold text-darkNavy text-base block">{{ "{:,.0f}".format(it.stock_qty) }}</span>
@@ -160,7 +160,7 @@
 {% if it.discounts %}
 <div class="flex flex-wrap items-center justify-center gap-1 max-w-[140px] mx-auto">
 {% for d in it.discounts[:2] %}
-<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">{{ d.group }} -{{ d.percent|int }}%</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">{{ d.group|e }} -{{ d.percent|int }}%</span>
 {% endfor %}
 {% if it.discounts|length > 2 %}
 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500">+{{ it.discounts|length - 2 }}</span>
@@ -197,7 +197,7 @@
 </div>
 <!-- BEGIN: PaginationFooter -->
 <footer class="py-4 px-6 border-t border-borderSubtle flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" data-purpose="table-pagination">
-<span class="text-slate-500 font-medium">صفحة {{ page }} — {{ items|length }} صنف معروض</span>
+<span class="text-slate-500 font-medium">صفحة {{ page|e }} — {{ items|length }} صنف معروض</span>
 <div class="flex items-center gap-1.5 font-medium">
 {% set qs = '&group=' + selected_group if selected_group else '' %}
 {% set qs = qs + '&brand=' + selected_brand if selected_brand else qs %}
@@ -205,13 +205,13 @@
 {% set qs = qs + '&code=' + selected_code if selected_code else qs %}
 {% set qs = qs + '&tab=list' %}
 {% if has_prev %}
-<a href="/staff/items?page={{ prev_page }}{{ qs }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">السابق</a>
+<a href="/staff/items?page={{ prev_page|e }}{{ qs|e }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">السابق</a>
 {% else %}
 <span class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-400 bg-white opacity-50 cursor-not-allowed">السابق</span>
 {% endif %}
-<span class="w-8 h-8 rounded-lg bg-primary text-white font-bold transition-all shadow-2xs flex items-center justify-center">{{ page }}</span>
+<span class="w-8 h-8 rounded-lg bg-primary text-white font-bold transition-all shadow-2xs flex items-center justify-center">{{ page|e }}</span>
 {% if has_next %}
-<a href="/staff/items?page={{ next_page }}{{ qs }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">التالي</a>
+<a href="/staff/items?page={{ next_page|e }}{{ qs|e }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">التالي</a>
 {% else %}
 <span class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-400 bg-white opacity-50 cursor-not-allowed">التالي</span>
 {% endif %}
@@ -234,12 +234,12 @@
 </svg>
 </button>
 <div id="qty-delta-body" class="hidden text-sm pt-2">
-<p class="font-black text-amber-800">الكمية = كمية مضافة جديدة إلى المخزن الافتراضي{% if import_warehouse %} ({{ import_warehouse }}){% endif %}، وليست الرصيد الكلي الحالي.</p>
+<p class="font-black text-amber-800">الكمية = كمية مضافة جديدة إلى المخزن الافتراضي{% if import_warehouse %} ({{ import_warehouse|e }}){% endif %}، وليست الرصيد الكلي الحالي.</p>
 <p class="text-amber-700/90 text-xs mt-1 font-medium">تُسجَّل كل كمية مدخلة كحركة وارد (Material Receipt) حقيقية بتأثيرها المحاسبي الكامل. إعادة تشغيل نفس الملف ستضيف الكميات مرة أخرى — راجع التأكيد قبل الاعتماد.</p>
 </div>
 </div>
 {% if import_warehouse_error %}
-<div class="bg-alert-bg/60 border border-alert-red/30 rounded-2xl px-4 py-3.5 text-sm font-bold text-alert-red">خطأ إعداد يمنع الاستيراد: {{ import_warehouse_error }}</div>
+<div class="bg-alert-bg/60 border border-alert-red/30 rounded-2xl px-4 py-3.5 text-sm font-bold text-alert-red">خطأ إعداد يمنع الاستيراد: {{ import_warehouse_error|e }}</div>
 {% endif %}
 <!-- مساعدة الأعمدة (مطوية افتراضيًا، تُفتح بزر بنمط السيستم) -->
 <div class="bg-white rounded-2xl border border-borderSubtle shadow-card px-5 py-4" data-purpose="import-columns-help">
@@ -251,9 +251,9 @@
 </svg>
 </button>
 <div id="import-columns-body" class="hidden text-sm text-slate-600 font-medium leading-7 pt-2">
-<p><b>الاسم</b> مطلوب للصنف الجديد فقط • <b>الباركود</b> أو <b>الكود</b> أحدهما على الأقل لتحديد الصف (الكود وحده مفتاح صالح، ومعًا يجب أن يتفقا على نفس الصنف) • <b>سعر الجمهور</b> يُكتب فوق سعر قائمة {{ import_price_list }} ويبدأ فورًا بلا مدة صلاحية • <b>الوحدة</b> فارغها يعني وحدة الصنف الحالية (والجديد بلا وحدة = Nos) • <b>القسم</b> مطلوب للجديد فقط ويجب أن يكون قسمًا فرعيًا موجودًا • أعمدة <b>خصم: اسم الفئة</b> تُولَّد لكل فئة نشطة (الحالية: {% if import_groups %}{% for g in import_groups %}{{ g.name }}{% if not loop.last %}، {% endif %}{% endfor %}{% else %}لا يوجد{% endif %}) — القيمة 0 تعني إلغاء الخصم، والفارغ بجميع الأعمدة يعني <b>اترك القيمة الحالية دون تغيير</b> ولا يمسح شيئًا أبدًا.</p>
+<p><b>الاسم</b> مطلوب للصنف الجديد فقط • <b>الباركود</b> أو <b>الكود</b> أحدهما على الأقل لتحديد الصف (الكود وحده مفتاح صالح، ومعًا يجب أن يتفقا على نفس الصنف) • <b>سعر الجمهور</b> يُكتب فوق سعر قائمة {{ import_price_list|e }} ويبدأ فورًا بلا مدة صلاحية • <b>الوحدة</b> فارغها يعني وحدة الصنف الحالية (والجديد بلا وحدة = Nos) • <b>القسم</b> مطلوب للجديد فقط ويجب أن يكون قسمًا فرعيًا موجودًا • أعمدة <b>خصم: اسم الفئة</b> تُولَّد لكل فئة نشطة (الحالية: {% if import_groups %}{% for g in import_groups %}{{ g.name|e }}{% if not loop.last %}، {% endif %}{% endfor %}{% else %}لا يوجد{% endif %}) — القيمة 0 تعني إلغاء الخصم، والفارغ بجميع الأعمدة يعني <b>اترك القيمة الحالية دون تغيير</b> ولا يمسح شيئًا أبدًا.</p>
 <p><b>الوحدة الكبرى</b> قبل <b>الوحدة</b> ثم <b>عدد الوحدات في الكبرى</b> (رقم أكبر من صفر — إلزامي مع الكبرى ومرفوض بدونها؛ اترك الكبرى فارغة للصنف الوحيد).</p>
-<p class="mt-1 text-xs text-slate-400">الحدود: ملف حتى {{ import_max_mb }}MB وبحد أقصى {{ import_max_rows }} صف. الصيغ: xlsx أو csv بترميز UTF-8.</p>
+<p class="mt-1 text-xs text-slate-400">الحدود: ملف حتى {{ import_max_mb|e }}MB وبحد أقصى {{ import_max_rows|e }} صف. الصيغ: xlsx أو csv بترميز UTF-8.</p>
 </div>
 </div>
 <!-- أزرار القالب والتصدير -->
@@ -349,11 +349,11 @@
 </tr></thead>
 <tbody class="divide-y divide-borderSubtle">
 {% for g in display_groups %}
-<tr class="hover:bg-slate-50/60 transition-colors" data-group="{{ g.name }}">
-<td class="py-3 px-6 font-bold text-darkNavy">{{ g.name }}</td>
+<tr class="hover:bg-slate-50/60 transition-colors" data-group="{{ g.name|e }}">
+<td class="py-3 px-6 font-bold text-darkNavy">{{ g.name|e }}</td>
 <td class="py-3 px-6 text-xs text-slate-500">{% if g.disabled %}معطّلة{% else %}نشطة{% endif %}</td>
 <td class="py-3 px-6">
-<select onchange="markDisplayDirty(this)" data-group="{{ g.name }}" {% if g.disabled %}disabled{% endif %} class="appearance-none bg-white border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-darkNavy cursor-pointer disabled:opacity-50">
+<select onchange="markDisplayDirty(this)" data-group="{{ g.name|e }}" {% if g.disabled %}disabled{% endif %} class="appearance-none bg-white border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-darkNavy cursor-pointer disabled:opacity-50">
 <option value="small" {% if g.display_unit == 'small' %}selected{% endif %}>الصغرى</option>
 <option value="large" {% if g.display_unit == 'large' %}selected{% endif %}>الكبرى</option>
 </select>
@@ -421,7 +421,7 @@
 <div class="relative">
 <select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-group">
 {% for g in item_groups %}
-<option value="{{ g.name }}">{{ g.name }}</option>
+<option value="{{ g.name|e }}">{{ g.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -438,7 +438,7 @@
 <select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-brand">
 <option value="">بدون علامة تجارية</option>
 {% for b in brands %}
-<option value="{{ b.name }}">{{ b.name }}</option>
+<option value="{{ b.name|e }}">{{ b.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -455,7 +455,7 @@
 <select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-unit">
 <option value="">اختر الوحدة</option>
 {% for u in uoms %}
-<option value="{{ u.name }}">{{ u.name }}</option>
+<option value="{{ u.name|e }}">{{ u.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -472,7 +472,7 @@
 <select class="w-full appearance-none bg-white border border-borderSubtle rounded-xl px-3.5 py-2.5 text-sm text-darkNavy font-medium focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer" id="item-large">
 <option value="">بدون وحدة كبرى (صنف وحيد)</option>
 {% for u in uoms %}
-<option value="{{ u.name }}">{{ u.name }}</option>
+<option value="{{ u.name|e }}">{{ u.name|e }}</option>
 {% endfor %}
 </select>
 <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
@@ -1153,10 +1153,10 @@ function loadImportPreview() {
         const tr = document.createElement('tr');
         tr.className = 'border-b border-borderSubtle';
         const badge = r.errors && r.errors.length
-          ? '<span class="text-alert-red font-bold">أخطاء: ' + r.errors.join('؛ ') + '</span>'
+          ? '<span class="text-alert-red font-bold">أخطاء: ' + importEsc(r.errors.join('؛ ')) + '</span>'
           : '<span class="text-primary font-bold">' + (r.action === 'create' ? 'إنشاء' : 'تحديث') + '</span>';
         const v = r.values || {};
-        tr.innerHTML = '<td class="py-2 px-2 font-mono">' + r.n + '</td>'
+        tr.innerHTML = '<td class="py-2 px-2 font-mono">' + importEsc(r.n) + '</td>'
           + '<td class="py-2 px-2">' + (r.action === 'create' ? 'إنشاء' : r.action === 'update' ? 'تحديث' : '—') + '</td>'
           + '<td class="py-2 px-2 font-mono">' + importEsc(importCellText(r.item_code)) + '</td>'
           + '<td class="py-2 px-2 font-mono">' + importEsc(importCellText(v.price)) + '</td>'
@@ -1169,7 +1169,7 @@ function loadImportPreview() {
       const rw = document.getElementById('import-rerun-wrap');
       const rl = document.getElementById('import-rerun-label');
       if (d.prior_runs && d.prior_runs.length) {
-        rw.innerHTML = 'تنبيه: هذا الملف سُجّل كتشغيل مكتمل من قبل (' + d.prior_runs[0].name + ' بتاريخ ' + d.prior_runs[0].creation + '). إعادة التشغيل ستضيف الكميات مرة أخرى.';
+        rw.innerHTML = 'تنبيه: هذا الملف سُجّل كتشغيل مكتمل من قبل (' + importEsc(d.prior_runs[0].name) + ' بتاريخ ' + importEsc(d.prior_runs[0].creation) + '). إعادة التشغيل ستضيف الكميات مرة أخرى.';
         rw.classList.remove('hidden');
         rl.classList.remove('hidden'); rl.classList.add('flex');
       } else { rw.classList.add('hidden'); rl.classList.add('hidden'); rl.classList.remove('flex'); }

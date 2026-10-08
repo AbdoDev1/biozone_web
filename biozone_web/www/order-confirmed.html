@@ -34,8 +34,8 @@
   {% if error_state %}
   <!-- حالة ناعمة: طلب غير موجود — بلا traceback -->
   <div class="w-full max-w-[620px] mx-auto flex flex-col items-center text-center gap-4 bg-surface-container-low rounded-2xl p-8">
-    <p class="text-xl font-bold">{{ error_title }}</p>
-    <p class="text-on-surface-variant">{{ error_message }}</p>
+    <p class="text-xl font-bold">{{ error_title|e }}</p>
+    <p class="text-on-surface-variant">{{ error_message|e }}</p>
     <a href="{{ error_back_url or '/account/orders' }}" class="text-sm font-bold text-primary hover:underline">{{ error_back_label or 'العودة إلى الطلبات' }}</a>
   </div>
   {% else %}
@@ -65,14 +65,14 @@
             class="font-mono text-sm font-bold text-primary tracking-wider"
             style="direction: ltr;"
           >
-            #{{ order_number }}
+            #{{ order_number|e }}
           </span>
 
           <button
             type="button"
             title="نسخ رقم الطلب"
             class="text-outline hover:text-primary transition-colors pr-1"
-            data-order-number="{{ order_number }}"
+            data-order-number="{{ order_number|e }}"
             onclick="navigator.clipboard?.writeText(this.dataset.orderNumber)"
           >
             <span class="material-symbols-outlined text-base">
@@ -101,7 +101,7 @@
           </div>
 
           <span class="text-xs font-semibold px-2.5 py-1 bg-surface-container-low text-primary rounded-md">
-            {{ item_count }} أصناف
+            {{ item_count|e }} أصناف
           </span>
         </div>
 
@@ -112,14 +112,14 @@
 
               <div class="flex-1">
                 <h3 class="text-sm font-semibold text-on-surface leading-snug">
-                  {{ it.item_name }}
+                  {{ it.item_name|e }}
                 </h3>
 
                 <div class="flex items-center gap-2 mt-1">
                   <span class="text-xs text-on-surface-variant">
                     الكمية:
                     <span class="font-bold text-on-surface">
-                      {{ it.qty|int }} {{ it.uom }}
+                      {{ it.qty|int }} {{ it.uom|e }}
                     </span>
                   </span>
 
@@ -127,14 +127,14 @@
 
                   <span class="text-xs text-outline">
                     سعر الوحدة:
-                    {{ it.rate_display }}
-                    ج.م{% if it.uom %} / {{ it.uom }}{% endif %}
+                    {{ it.rate_display|e }}
+                    ج.م{% if it.uom %} / {{ it.uom|e }}{% endif %}
                   </span>
                 </div>
               </div>
 
               <div class="text-left font-bold text-sm sm:text-base text-on-surface whitespace-nowrap">
-                {{ it.amount_display }}
+                {{ it.amount_display|e }}
 
                 <span class="text-xs font-normal text-on-surface-variant">
                   ج.م
@@ -152,17 +152,17 @@
             <span>المجموع الفرعي:</span>
 
             <span>
-              {{ net_total_display }}
+              {{ net_total_display|e }}
               ج.م
             </span>
           </div>
 
           {% for tax in taxes %}
             <div class="flex items-center justify-between text-xs sm:text-sm text-on-surface-variant">
-              <span>{{ tax.description }}:</span>
+              <span>{{ tax.description|e }}:</span>
 
               <span>
-                {{ tax.tax_amount_display }}
+                {{ tax.tax_amount_display|e }}
                 ج.م
               </span>
             </div>
@@ -172,7 +172,7 @@
             <span>الإجمالي النهائي:</span>
 
             <span class="text-primary text-xl font-bold">
-              {{ grand_total_display }}
+              {{ grand_total_display|e }}
 
               <span class="text-sm font-medium text-on-surface-variant">
                 ج.م

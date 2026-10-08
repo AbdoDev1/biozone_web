@@ -18,8 +18,8 @@
   {% if error_state %}
   <!-- حالة ناعمة: إشعار غير موجود — بلا traceback -->
   <div class="w-full max-w-[820px] mx-auto flex flex-col items-center text-center gap-4 bg-surface-container-low rounded-2xl p-8">
-    <p class="text-xl font-bold">{{ error_title }}</p>
-    <p class="text-on-surface-variant">{{ error_message }}</p>
+    <p class="text-xl font-bold">{{ error_title|e }}</p>
+    <p class="text-on-surface-variant">{{ error_message|e }}</p>
     <a href="{{ error_back_url or '/account' }}" class="text-sm font-bold text-primary hover:underline">{{ error_back_label or 'العودة إلى الحساب' }}</a>
   </div>
   {% else %}
@@ -27,15 +27,15 @@
 
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div>
-        <div class="font-mono text-lg font-extrabold text-on-surface" style="direction: ltr; text-align: right;">#{{ credit_number }}</div>
-        <div class="text-xs text-on-surface-variant mt-1">{{ date_display }} · إشعار مرتجع</div>
+        <div class="font-mono text-lg font-extrabold text-on-surface" style="direction: ltr; text-align: right;">#{{ credit_number|e }}</div>
+        <div class="text-xs text-on-surface-variant mt-1">{{ date_display|e }} · إشعار مرتجع</div>
       </div>
       <span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-surface-container text-on-surface-variant">يخفض المديونية</span>
     </div>
 
     <div class="text-xs text-on-surface-variant">
-      عن الفاتورة <span class="font-mono font-bold" dir="ltr">{{ original_invoice }}</span>
-      {% if order_number %}· الطلب <a class="font-bold text-primary hover:underline" href="/account/orders/{{ order_number }}">{{ order_number }}</a>{% endif %}
+      عن الفاتورة <span class="font-mono font-bold" dir="ltr">{{ original_invoice|e }}</span>
+      {% if order_number %}· الطلب <a class="font-bold text-primary hover:underline" href="/account/orders/{{ order_number|e }}">{{ order_number|e }}</a>{% endif %}
     </div>
 
     <!-- البنود المرتجعة -->
@@ -46,10 +46,10 @@
         {% for item in items %}
         <div class="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-outline-variant/40 px-3.5 py-3">
           <div>
-            <div class="font-bold text-sm text-on-surface">{{ item.item_name }}</div>
-            <div class="text-xs text-on-surface-variant mt-0.5">{{ item.qty }} {{ item.uom }} × {{ item.rate_display }} ج.م</div>
+            <div class="font-bold text-sm text-on-surface">{{ item.item_name|e }}</div>
+            <div class="text-xs text-on-surface-variant mt-0.5">{{ item.qty|e }} {{ item.uom|e }} × {{ item.rate_display|e }} ج.م</div>
           </div>
-          <div class="text-sm font-bold text-on-surface whitespace-nowrap">{{ item.amount_display }} ج.م</div>
+          <div class="text-sm font-bold text-on-surface whitespace-nowrap">{{ item.amount_display|e }} ج.م</div>
         </div>
         {% endfor %}
       </div>
@@ -62,11 +62,11 @@
     <div class="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 sm:p-5">
       <div class="flex items-center justify-between gap-3">
         <div class="font-bold text-on-surface">إجمالي المرتجع</div>
-        <div class="text-base font-extrabold text-on-surface whitespace-nowrap">− {{ grand_total_display }} ج.م</div>
+        <div class="text-base font-extrabold text-on-surface whitespace-nowrap">− {{ grand_total_display|e }} ج.م</div>
       </div>
     </div>
 
-    <a href="/account/orders{% if order_number %}/{{ order_number }}{% endif %}" class="text-xs font-bold text-primary hover:underline self-start">العودة إلى {% if order_number %}الطلب{% else %}الحساب{% endif %}</a>
+    <a href="/account/orders{% if order_number %}/{{ order_number|e }}{% endif %}" class="text-xs font-bold text-primary hover:underline self-start">العودة إلى {% if order_number %}الطلب{% else %}الحساب{% endif %}</a>
 
   </div>
   {% endif %}

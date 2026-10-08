@@ -77,7 +77,7 @@
 <span class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
 <span class="material-symbols-outlined text-base">category</span>
 </span>
-{{ g.name }}
+{{ g.name|e }}
 </td>
 <td class="py-3 px-4">
 {% if g.disabled %}
@@ -92,14 +92,14 @@
 {% else %}
 <div class="flex items-center gap-2">
 <input class="w-28 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" id="minlimit-{{ loop.index }}" min="0" placeholder="بلا حد" step="0.01" type="number" value="{{ g.get('min_order_amount') if g.get('min_order_amount') else '' }}">
-<button class="text-xs font-bold text-primary hover:underline" onclick="saveLimit('{{ g.name }}', {{ loop.index }})">حفظ</button>
+<button class="text-xs font-bold text-primary hover:underline" onclick="saveLimit('{{ g.name|e }}', {{ loop.index }})">حفظ</button>
 <span class="hidden text-xs text-navy-text/40" id="saved-minlimit-{{ loop.index }}">تم الحفظ ✓</span>
 </div>
 <p class="hidden text-xs text-alert-red font-bold" id="error-minlimit-{{ loop.index }}"></p>
 {% endif %}
 </td>
 <td class="py-3 px-4">
-<button class="text-xs font-bold {% if g.disabled %}text-primary{% else %}text-alert-red{% endif %} hover:underline" onclick="toggleGroup('{{ g.name }}', {{ 0 if g.disabled else 1 }})">
+<button class="text-xs font-bold {% if g.disabled %}text-primary{% else %}text-alert-red{% endif %} hover:underline" onclick="toggleGroup('{{ g.name|e }}', {{ 0 if g.disabled else 1 }})">
 {% if g.disabled %}تفعيل{% else %}تعطيل{% endif %}
 </button>
 </td>
@@ -119,7 +119,7 @@
 <!-- Group selector -->
 <div class="flex gap-2 overflow-x-auto pb-1">
 {% for g in active_groups %}
-<a class="shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-colors {% if g.name == selected_group %}bg-primary text-white{% else %}bg-white text-navy-text/70 hover:bg-surface-subtle{% endif %}" href="/staff/pricing?tab=discounts&amp;group={{ g.name | urlencode }}">{{ g.name }}</a>
+<a class="shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-colors {% if g.name == selected_group %}bg-primary text-white{% else %}bg-white text-navy-text/70 hover:bg-surface-subtle{% endif %}" href="/staff/pricing?tab=discounts&amp;group={{ g.name | urlencode }}">{{ g.name|e }}</a>
 {% endfor %}
 </div>
 
@@ -131,7 +131,7 @@
 <!-- Search -->
 <form class="flex gap-2" method="get">
 <input name="tab" type="hidden" value="discounts">
-<input name="group" type="hidden" value="{{ selected_group }}">
+<input name="group" type="hidden" value="{{ selected_group|e }}">
 <input class="flex-1 rounded-xl border border-surface-subtle bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" name="q" placeholder="ابحث بالاسم أو الكود أو الباركود..." type="text" value="{{ search_term or '' }}">
 <button class="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold" type="submit">بحث</button>
 </form>
@@ -148,18 +148,18 @@
 </thead>
 <tbody>
 {% for it in items %}
-<tr class="border-t border-surface-subtle" id="row-{{ it.item_code }}">
+<tr class="border-t border-surface-subtle" id="row-{{ it.item_code|e }}">
 <td class="py-3 px-4">
-<div class="font-bold text-navy-text">{{ it.item_name }}</div>
-<div class="text-xs text-navy-text/40">{{ it.item_code }}</div>
+<div class="font-bold text-navy-text">{{ it.item_name|e }}</div>
+<div class="text-xs text-navy-text/40">{{ it.item_code|e }}</div>
 </td>
-<td class="py-3 px-4 text-navy-text/60">{{ it.item_group }}</td>
+<td class="py-3 px-4 text-navy-text/60">{{ it.item_group|e }}</td>
 <td class="py-3 px-4">
-<input class="w-20 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" data-item-code="{{ it.item_code }}" id="discount-{{ it.item_code }}" max="100" min="0" step="0.01" type="number" value="{{ it.discount_percent }}">
+<input class="w-20 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" data-item-code="{{ it.item_code|e }}" id="discount-{{ it.item_code|e }}" max="100" min="0" step="0.01" type="number" value="{{ it.discount_percent|e }}">
 </td>
 <td class="py-3 px-4">
-<button class="text-xs font-bold text-primary hover:underline" onclick="saveDiscount('{{ it.item_code }}')">حفظ</button>
-<span class="text-xs text-navy-text/40 mr-2 hidden" id="saved-{{ it.item_code }}">تم الحفظ ✓</span>
+<button class="text-xs font-bold text-primary hover:underline" onclick="saveDiscount('{{ it.item_code|e }}')">حفظ</button>
+<span class="text-xs text-navy-text/40 mr-2 hidden" id="saved-{{ it.item_code|e }}">تم الحفظ ✓</span>
 </td>
 </tr>
 {% endfor %}
@@ -172,13 +172,13 @@
 
 <!-- Pagination -->
 <div class="flex items-center justify-between text-sm text-navy-text/60">
-<span>{{ total_count }} صنف</span>
+<span>{{ total_count|e }} صنف</span>
 <div class="flex gap-2">
 {% if has_prev %}
-<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ prev_page }}">السابق</a>
+<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ prev_page|e }}">السابق</a>
 {% endif %}
 {% if has_next %}
-<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ next_page }}">التالي</a>
+<a class="px-3 py-1.5 rounded-lg bg-white hover:bg-surface-subtle" href="/staff/pricing?tab=discounts&amp;group={{ selected_group | urlencode }}&amp;q={{ search_term or '' }}&amp;page={{ next_page|e }}">التالي</a>
 {% endif %}
 </div>
 </div>
@@ -189,7 +189,7 @@
 </main>
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 <script>
-  const CSRF_TOKEN = '{{ csrf_token }}';
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
 
   function toggleGroup(name, disabled) {
     fetch('/api/method/biozone_web.api.staff_toggle_customer_group', {
@@ -297,7 +297,7 @@
       },
       body: JSON.stringify({
         item_code: itemCode,
-        customer_group: '{{ selected_group }}',
+        customer_group: '{{ selected_group|e }}',
         discount_percent: value,
       }),
     })

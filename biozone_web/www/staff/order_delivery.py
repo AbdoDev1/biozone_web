@@ -4,8 +4,10 @@ from frappe import _
 from biozone_web.b9_utils import (
 	amount_in_arabic_words,
 	amount_in_words_sheet,
+	clean_address_html,
 	format_balance_3,
 	format_sheet_number,
+	moneyd,
 )
 from biozone_web.utils import (
 	get_csrf_token_safe,
@@ -238,9 +240,11 @@ def get_context(context):
 	dn_name = orig_dns[0][0] if orig_dns else ""
 
 	# السابق من الحقل المثبَّت لحظة إنشاء الفاتورة (C2) — بلا حساب جديد هنا.
-	previous_balance = frappe.utils.flt(si.get("custom_previous_balance"))
-	invoice_outstanding = frappe.utils.flt(si.outstanding_amount) or frappe.utils.flt(si.grand_total)
-	current_balance = previous_balance + invoice_outstanding
+	# المجاميع المشتقة بـDecimal (moneyd: النصف للأعلى) لا float.
+	previous_balance = moneyd(frappe.utils.flt(si.get("custom_previous_balance")))
+	invoice_outstanding = moneyd(
+		frappe.utils.flt(si.outstanding_amount) or frappe.utils.flt(si.grand_total)
+	)
 	confirmer = frappe.db.get_value("User", si.owner, "full_name") or si.owner
 	grand = float(si.rounded_total or si.grand_total or 0)
 
@@ -248,7 +252,9 @@ def get_context(context):
 	context.delivery_note = dn_name or ""
 	context.invoice_name = si.name
 	context.customer_name = si.customer_name
-	context.customer_address = si.address_display or si.customer_address or ""
+	context.customer_address = clean_address_html(
+		si.address_display or si.customer_address or ""
+	)
 	context.posting_date = frappe.utils.format_date(si.posting_date, "dd/MM/yyyy")
 	# ملحوظة F17: لا تقرأ context.items كخاصية بايثون أبدًا — كائن السياق
 	# يعيد dict.items() المدمجة بدل القائمة المعينة. ابنِ على متغير محلي
@@ -278,7 +284,7 @@ def get_context(context):
 	]
 	context.total_pages = len(context.pages)
 	context.public_total = sum(
-		float(it.get("qty") or 0) * float(it.get("public_rate") or 0)
+		(moneyd(it.get("qty") or 0) * moneyd(it.get("public_rate") or 0))
 		for it in inv_items
 	)
 	context.return_rows, context.returns_history = _b9_return_context(dn_name, si.name)
@@ -300,7 +306,9 @@ def get_context(context):
 			_shipping += float(t.get("tax_amount") or 0)
 	context.shipping = _shipping
 	now_dt = frappe.utils.now_datetime()
-	paid = max(float(grand or 0) - float(si.outstanding_amount or 0), 0.0)
+	from decimal import Decimal
+
+	paid = max(moneyd(grand) - moneyd(si.outstanding_amount or 0), Decimal("0.00"))
 	context.previous_balance = previous_balance
 	context.prev_s = format_balance_3(previous_balance)
 	context.current_balance = previous_balance + invoice_outstanding
