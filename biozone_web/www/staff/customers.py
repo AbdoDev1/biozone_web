@@ -1,4 +1,5 @@
-import json
+import datetime
+from decimal import Decimal
 
 import frappe
 
@@ -26,12 +27,13 @@ def get_context(context):
 	context.has_review_field = has_review_field
 	context.public_group = get_public_customer_group()
 
-	show = (frappe.form_dict.get("show") or "unreviewed").strip()
-	if show not in ("unreviewed", "all"):
-		show = "unreviewed"
+	# D1: صفحة واحدة بلا أوضاع — مرشح الحالة: الكل أو لم تُصنَّف فقط.
+	st = (frappe.form_dict.get("st") or "all").strip()
+	if st not in ("all", "unclassified"):
+		st = "all"
 	if not has_review_field:
-		show = "all"
-	context.show = show
+		st = "all"
+	context.st = st
 
 	search_term = (frappe.form_dict.get("q") or "").strip()
 	context.search_term = search_term
@@ -55,31 +57,19 @@ def get_context(context):
 		selected_group = "all"
 	context.selected_group = selected_group
 
-	filters = _build_filters(show, search_term, has_review_field, selected_group)
+	base_filters = _build_filters(search_term, selected_group)
 
-	total_count = frappe.db.count("Customer", filters)
-	context.total_count = total_count
-
-	rows = frappe.get_all(
-		"Customer",
-		fields=["name", "customer_name", "customer_group", "category_assigned_by_staff", "creation"]
-		if has_review_field
-		else ["name", "customer_name", "customer_group", "creation"],
-		filters=filters,
-		order_by="creation asc",
-		start=(page - 1) * PAGE_SIZE,
-		page_length=PAGE_SIZE,
+	rows, total_count, unclassified_count = _paged_partitioned_rows(
+		base_filters, has_review_field, st == "unclassified", page
 	)
+	context.total_count = total_count
+	context.unclassified_count = unclassified_count
 
 	names = [r.name for r in rows]
-	context.unreviewed_count = (
-		frappe.db.count("Customer", _build_filters("unreviewed", "", has_review_field, "all"))
-		if has_review_field
-		else 0
-	)
 	emails = _portal_emails(names)
 	stats = _invoice_stats(names)
 	recents = _recent_invoices(names)
+	changes = _last_category_changes(names)
 
 	customers = []
 	for r in rows:
@@ -93,7 +83,8 @@ def get_context(context):
 				"name": r.name,
 				"customer_name": r.customer_name or r.name,
 				"customer_group": r.customer_group,
-				"reviewed": bool(r.get("category_assigned_by_staff")),
+				"reviewed": True if not has_review_field else bool(r.get("category_assigned_by_staff")),
+				"last_change": changes.get(r.name) or {},
 				"email": emails.get(r.name, ""),
 				"created_display": frappe.utils.format_datetime(r.creation, "dd MMM yyyy"),
 				"invoice_count": int(st.get("invoice_count") or 0),
@@ -106,8 +97,7 @@ def get_context(context):
 				"invoices": recent,
 			}
 		)
-	context.customers = customers
-	context.customers_json = json.dumps(customers, ensure_ascii=False, default=str)
+	context.customers = [_jsonable(c) for c in customers]
 
 	context.page = page
 	context.has_prev = page > 1
@@ -119,18 +109,43 @@ def get_context(context):
 	return context
 
 
-def _build_filters(show, search_term, has_review_field, selected_group="all"):
-	"""فلاتر العملاء: المراجعة + الفئة + البحث — كلها AND عبر get_all.
+def _jsonable(value):
+	"""حوّل أي قيمة غير بدائية إلى نص قبل tojson — بلا |safe وبلا default.
+
+	tojson يفشل على Decimal/date/datetime (كانت تُمرَّر سابقًا عبر
+	json.dumps بـ default=str، وحذفه أسقط الحماية). القوائم/القواميس
+	تُعالَج بعمق؛ البدائيات (نص/رقم/منطقي/None) تمر كما هي.
+	"""
+	if isinstance(value, (datetime.datetime, datetime.date, datetime.time, Decimal)):
+		return str(value)
+	if isinstance(value, dict):
+		return {k: _jsonable(v) for k, v in value.items()}
+	if isinstance(value, (list, tuple)):
+		return [_jsonable(v) for v in value]
+	return value
+
+
+def _row_fields(has_review_field):
+	if has_review_field:
+		return [
+			"name",
+			"customer_name",
+			"customer_group",
+			"category_assigned_by_staff",
+			"creation",
+		]
+	return ["name", "customer_name", "customer_group", "creation"]
+
+
+def _build_filters(search_term, selected_group="all"):
+	"""فلاتر الأساس المشتركة: الفئة + البحث — كلها AND عبر get_all.
 
 	البحث يُحل أولًا لأسماء عملاء (نفس أسلوب _load_orders في orders.py:
 	استعلامات منفصلة ثم name IN (...)) حتى لا تختلط شروط OR الخاصة
-	ب	البحث مع شرط المراجعة. القائمة لا تعتمد أبدًا على customer_group
-	وحده لتحديد المراجعة — الفاصل هو category_assigned_by_staff فقط، وفلتر
-	الفئة هنا تصفية عرض اختيارية لا علاقة لها بحالة المراجعة.
+	بالبحث مع باقي الفلاتر. حالة التصنيف ليست هنا — تُطبَّق في التقسيم
+	أدناه لا في فلتر العرض.
 	"""
 	filters = {}
-	if show == "unreviewed" and has_review_field:
-		filters["category_assigned_by_staff"] = ["!=", 1]
 	if selected_group != "all":
 		filters["customer_group"] = selected_group
 	if search_term:
@@ -157,6 +172,87 @@ def _build_filters(show, search_term, has_review_field, selected_group="all"):
 		)
 		filters["name"] = ["in", sorted(matched)] if matched else ["in", ["__no_match__"]]
 	return filters
+
+
+def _fetch_rows(filters, order_by, start, length, has_review_field):
+	if length <= 0:
+		return []
+	return frappe.get_all(
+		"Customer",
+		fields=_row_fields(has_review_field),
+		filters=filters,
+		order_by=order_by,
+		start=start,
+		page_length=length,
+	)
+
+
+def _paged_partitioned_rows(base_filters, has_review_field, only_unclassified, page):
+	"""صفحة واحدة بلا أوضاع: غير المصنف (علم != 1) أولًا بالأحدث
+	تسجيلًا، ثم البقية أبجديًا — مع ترقيم صحيح عبر القائمتين.
+
+	تُرجع (rows, total, unclassified_total). بلا حقل مراجعة: قائمة
+	واحدة بالأحدث، والعداد صفر.
+	"""
+	start = (page - 1) * PAGE_SIZE
+	if not has_review_field:
+		total = frappe.db.count("Customer", base_filters)
+		return _fetch_rows(base_filters, "creation desc", start, PAGE_SIZE, False), total, 0
+	filters_a = dict(base_filters)
+	filters_a["category_assigned_by_staff"] = ["!=", 1]
+	total_a = frappe.db.count("Customer", filters_a)
+	if only_unclassified:
+		return (
+			_fetch_rows(filters_a, "creation desc", start, PAGE_SIZE, True),
+			total_a,
+			total_a,
+		)
+	filters_b = dict(base_filters)
+	filters_b["category_assigned_by_staff"] = 1
+	total_b = frappe.db.count("Customer", filters_b)
+	rows = []
+	if start < total_a:
+		rows += _fetch_rows(filters_a, "creation desc", start, min(PAGE_SIZE, total_a - start), True)
+	rest = PAGE_SIZE - len(rows)
+	if rest > 0:
+		rows += _fetch_rows(filters_b, "customer_name asc", max(0, start - total_a), rest, True)
+	return rows, total_a + total_b, total_a
+
+
+def _last_category_changes(names):
+	"""آخر تدقيق فئة لكل عميل في الصفحة — استعلام واحد بدقة البادئة.
+
+	تعليقات التدقيق تبدأ حصرًا بـ [فئة] (تغييرًا وتثبيتًا)، فالفلتر
+	like عليها يعيد تدقيق الفئة فقط — لا نصًا حرًا ولا أول مطابَق
+	صدفة. أول صف لكل عميل (الأحدث أولًا) هو الأحدث.
+	"""
+	if not names:
+		return {}
+	rows = frappe.get_all(
+		"Comment",
+		filters={
+			"reference_doctype": "Customer",
+			"reference_name": ["in", names],
+			"content": ["like", "[فئة]%"],
+		},
+		fields=["reference_name", "content", "creation"],
+		order_by="creation desc",
+		limit_page_length=100,
+	)
+	out = {}
+	for r in rows:
+		if r.reference_name in out:
+			continue
+		text = (r.content or "").strip()
+		if not text.startswith("[فئة]"):
+			continue
+		out[r.reference_name] = {
+			"text": text[len("[فئة]"):].strip()[:90],
+			"when": frappe.utils.format_datetime(r.creation, "dd MMM yyyy")
+			if r.creation
+			else "",
+		}
+	return out
 
 
 def _portal_emails(names):

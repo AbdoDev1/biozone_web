@@ -155,11 +155,12 @@
 </td>
 <td class="py-3 px-4 text-navy-text/60">{{ it.item_group|e }}</td>
 <td class="py-3 px-4">
-<input class="w-20 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" data-item-code="{{ it.item_code|e }}" id="discount-{{ it.item_code|e }}" max="100" min="0" step="0.01" type="number" value="{{ it.discount_percent|e }}">
+<input class="w-20 rounded-lg border border-surface-subtle px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" data-current="{{ it.discount_percent|e }}" data-item-code="{{ it.item_code|e }}" id="discount-{{ it.item_code|e }}" max="100" min="0" step="0.01" type="number" value="{{ it.discount_percent|e }}" oninput="handleDiscountInput(this)">
 </td>
 <td class="py-3 px-4">
 <button class="text-xs font-bold text-primary hover:underline" onclick="saveDiscount('{{ it.item_code|e }}')">حفظ</button>
 <span class="text-xs text-navy-text/40 mr-2 hidden" id="saved-{{ it.item_code|e }}">تم الحفظ ✓</span>
+<div class="text-xs text-alert-red mt-1 hidden" id="derror-{{ it.item_code|e }}"></div>
 </td>
 </tr>
 {% endfor %}
@@ -169,6 +170,17 @@
 </tbody>
 </table>
 </div>
+
+<!-- شريط الحفظ الجماعي للخصومات (الصفحة المعروضة فقط — الزر الفردي كما هو) -->
+<aside aria-label="شريط الحفظ الجماعي للخصومات" aria-live="polite" class="hidden bg-surface-container rounded-xl p-3.5 border border-primary/20 shadow-md sticky bottom-4 z-20 mt-4" id="bulk-discount-bar">
+<div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+<p class="text-sm font-bold text-navy-text">لديك <span class="text-primary font-black text-base" id="unsaved-discount-count">0</span> تعديل غير محفوظ</p>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-navy-text border border-surface-container hover:bg-surface-subtle transition-colors" id="discard-discounts-btn" type="button" onclick="handleDiscardDiscounts()">تراجع عن الكل</button>
+<button class="px-5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-primary hover:bg-primary-accent text-white transition-all shadow-sm" id="save-discounts-btn" type="button" onclick="handleSaveAllDiscounts()">حفظ الكل</button>
+</div>
+</div>
+</aside>
 
 <!-- Pagination -->
 <div class="flex items-center justify-between text-sm text-navy-text/60">
@@ -190,6 +202,137 @@
 {% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
 <script>
   const CSRF_TOKEN = {{ csrf_token|tojson }};
+  const DISC_GROUP = {{ selected_group|tojson if selected_group else 'null' }};
+  const discDirty = new Map();
+  let discSaving = false;
+
+  function discInput(code) {
+    return document.getElementById('discount-' + code);
+  }
+
+  function handleDiscountInput(input) {
+    const code = input.dataset.itemCode;
+    if (String(input.value) !== String(input.dataset.current)) {
+      discDirty.set(code, input.value);
+      input.classList.add('border-primary');
+    } else {
+      discDirty.delete(code);
+      input.classList.remove('border-primary');
+    }
+    hideDiscRowError(code);
+    updateBulkDiscountBar();
+  }
+
+  function updateBulkDiscountBar() {
+    const bar = document.getElementById('bulk-discount-bar');
+    const num = document.getElementById('unsaved-discount-count');
+    if (!bar || !num) return;
+    num.textContent = discDirty.size;
+    bar.classList.toggle('hidden', discDirty.size === 0);
+  }
+
+  function hideDiscRowError(code) {
+    const el = document.getElementById('derror-' + code);
+    if (el) { el.classList.add('hidden'); el.innerText = ''; }
+  }
+
+  function showDiscRowError(code, msg) {
+    const el = document.getElementById('derror-' + code);
+    if (el) { el.innerText = msg; el.classList.remove('hidden'); }
+  }
+
+  function applySavedDiscount(code, percent) {
+    discDirty.delete(code);
+    const input = discInput(code);
+    if (input) {
+      input.value = percent;
+      input.dataset.current = String(percent);
+      input.classList.remove('border-primary');
+    }
+    hideDiscRowError(code);
+    const savedLabel = document.getElementById('saved-' + code);
+    if (savedLabel) {
+      savedLabel.classList.remove('hidden');
+      setTimeout(() => savedLabel.classList.add('hidden'), 1500);
+    }
+  }
+
+  function handleDiscardDiscounts() {
+    discDirty.forEach(function (_value, code) {
+      const input = discInput(code);
+      if (!input) return;
+      input.value = input.dataset.current;
+      input.classList.remove('border-primary');
+      hideDiscRowError(code);
+    });
+    discDirty.clear();
+    updateBulkDiscountBar();
+  }
+
+  function discStatusError(status) {
+    if (status === 403) return 'لا تملك صلاحية الحفظ — سجّل الدخول بحساب موظف';
+    if (status === 400) return 'انتهت الجلسة — حدّث الصفحة وحاول مجددًا';
+    return 'حدث خطأ غير متوقع أثناء معالجة الطلب';
+  }
+
+  async function handleSaveAllDiscounts() {
+    if (discDirty.size === 0 || discSaving || !DISC_GROUP) return;
+    const updates = [];
+    discDirty.forEach(function (value, code) {
+      updates.push({ item_code: code, discount_percent: value });
+    });
+    discSaving = true;
+    const saveBtn = document.getElementById('save-discounts-btn');
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const res = await fetch('/api/method/biozone_web.api.staff_set_item_discount', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-CSRF-Token': CSRF_TOKEN,
+        },
+        body: JSON.stringify({ customer_group: DISC_GROUP, updates: updates }),
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (j) { throw new Error((j && j.message && j.message.error) || discStatusError(r.status)); },
+            function () { throw new Error(discStatusError(r.status)); });
+        }
+        return r.json();
+      }, function () { throw new Error('تعذر الاتصال بالسيرفر'); });
+      const msg = res.message;
+      if (!msg || msg.ok !== true || !Array.isArray(msg.results)) {
+        throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
+      }
+      let succeeded = 0;
+      let failed = 0;
+      msg.results.forEach(function (r) {
+        if (r.ok) {
+          succeeded += 1;
+          applySavedDiscount(r.item_code, r.discount_percent);
+        } else {
+          failed += 1;
+          showDiscRowError(r.item_code, r.error || 'تعذر الحفظ، حاول مجددًا');
+        }
+      });
+      updateBulkDiscountBar();
+      if (failed === 0) {
+        StaffUI.toast('نجاح', 'تم حفظ جميع الخصومات بنجاح', 'success');
+      } else if (succeeded > 0) {
+        StaffUI.toast('تنبيه', 'تم حفظ ' + succeeded + ' من ' + msg.results.length + ' — راجع الصفوف المعلّمة', 'error');
+      } else {
+        StaffUI.toast('خطأ', 'تعذر حفظ الخصومات، يرجى المحاولة مرة أخرى', 'error');
+      }
+    } catch (err) {
+      StaffUI.toast('خطأ', (err && err.message) || 'تعذر الاتصال بالسيرفر', 'error');
+    } finally {
+      discSaving = false;
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
+  window.addEventListener('beforeunload', function (e) {
+    if (discDirty.size > 0 || discSaving) e.preventDefault();
+  });
 
   function toggleGroup(name, disabled) {
     fetch('/api/method/biozone_web.api.staff_toggle_customer_group', {

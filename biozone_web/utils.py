@@ -581,7 +581,8 @@ def create_customer_for_user(user_email, full_name=None):
 	القيم مطابقة لمسار الإنشاء الكسول: customer_name من الاسم الكامل،
 	customer_type = Individual، customer_group = الفئة الافتراضية
 	(الجمهور حاليًا)، territory = الافتراضية، category_assigned_by_staff
-	= 0 (غير معيَّن إداريًا — يظهر في قائمة انتظار الموظف).
+	= 0 (قرار D4: العلم يعني فقط «موظف عيّن/ثبّت الفئة» — الإنشاء لا
+	يكتبه، والجديد مؤهل للطلب بقاعدة الأهلية بلا علم).
 
 	آمنة للتكرار: لو ربط موجود بالفعل تُرجع اسمه بلا إنشاء جديد (نفس
 	حماية التحقق البعدي من سباق التزامن المستخدمة في المسار الكسول).
@@ -607,6 +608,8 @@ def create_customer_for_user(user_email, full_name=None):
 		"territory": get_default_territory(),
 		"portal_users": [{"user": user_email}],
 	}
+	# العلم = 0 دائمًا عند الولادة (قرار D4) — الأهلية لا تعتمد عليه.
+	# الصفوف القائمة لا تُقرأ هنا أصلًا — الدالة تُنشئ فقط عند غياب الربط.
 	if customer_has_staff_review_field():
 		new_customer["staff_category_reviewed"] = 0
 	if customer_has_category_assigned_field():
@@ -735,45 +738,50 @@ def get_customer_price_group(customer=None):
 	return group
 
 
-def is_active_price_customer(customer=None):
-	"""هل العميل مؤهّل سعريًا (فئة مفعّلة غير عامة)؟"""
-	return get_customer_price_group(customer) != get_public_customer_group()
+def is_customer_order_eligible(customer=None):
+	"""هل الحساب مؤهّل لإنشاء الطلب؟ (قاعدة D2 — بلا أي علم)
+
+	يقبل أي عميل له ربط صالح وفئة ورقة (is_group=0) مفعّلة —
+	والجمهور مقبول صراحة. يرفض: بلا ربط، الفئة المعطلة، الفئة
+	المجمّعة (is_group=1)، الفئة المفقودة/الفارغة.
+
+	لا يقرأ category_assigned_by_staff إطلاقًا: العلم يعني فقط
+	«موظف عيّن/ثبّت فئة هذا العميل» ولا أثر له على الأهلية.
+	الفئة السعرية مرجعها get_customer_price_group (بلا fallback).
+	"""
+	if customer is None:
+		customer = find_customer_for_current_user()
+	if not customer:
+		return False
+	raw_group = frappe.db.get_value("Customer", customer, "customer_group")
+	if not raw_group:
+		return False
+	row = frappe.db.get_value(
+		"Customer Group", raw_group, ["is_group", "disabled"], as_dict=True
+	)
+	if not row or row.is_group or row.disabled:
+		return False
+	return True
 
 
 def get_storefront_price_context(customer=None):
 	"""سياق التسعير الكامل للطلب الحالي — تُشتق الفئة سيرفر-سايد دائمًا،
-	ولا يُقبل أي customer_group من العميل (قرار اختبار 7)."""
+	ولا يُقبل أي customer_group من العميل (قرار اختبار 7).
+
+	is_active هنا تعني أهلية الطلب (قاعدة D2 بلا علم) لا الفئة
+	السعرية. الفئة الممررة للأسعار لا تتغير.
+	"""
 	if customer is None:
 		customer = find_customer_for_current_user()
 
-	public_group = get_public_customer_group()
 	group = get_customer_price_group(customer)
 
 	return {
 		"customer": customer,
 		"customer_group": group,
-		"is_active": bool(group and group != public_group),
+		"is_active": is_customer_order_eligible(customer),
 		"is_guest": frappe.session.user == "Guest",
 	}
-
-
-def require_active_price_customer():
-	"""بوابة تأكيد الطلب (البند 5): ترفض أي حساب بلا فئة مفعّلة.
-
-	تستخدم find فقط (بلا إنشاء Customer) حتى لا تُنشأ صفوف يتيمة من
-	محاولات مرفوضة. تُرجع (customer, customer_group) المؤكدين للاستخدام
-	المباشر في Sales Order — بلا إعادة قراءة منفصلة.
-	"""
-	customer = find_customer_for_current_user()
-	group = get_customer_price_group(customer)
-
-	if group == get_public_customer_group():
-		frappe.throw(
-			_("يتعذّر تأكيد الطلب قبل تنشيط حسابك. يُرجى التواصل مع إدارة المتجر لتفعيل حسابك."),
-			frappe.PermissionError,
-		)
-
-	return customer, group
 
 
 # الحد الأدنى لقيمة الطلب على مستوى الفئة (قرار M1–M6 النهائي).

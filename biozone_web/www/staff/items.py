@@ -177,11 +177,22 @@ def get_context(context):
 
 	for it in items:
 		it["stock_qty"] = stock_map.get(it["item_code"]) or 0
-		it["price"] = price_map.get(it["item_code"])
+		# float صريح: price_list_rate وconversion_factor يصلان Decimal من
+		# القاعدة وtojson يفشل عليهما (نفس فئة عطل العملاء) — والقالب
+		# يمرر القاموس مباشرة في onclick.
+		price = price_map.get(it["item_code"])
+		it["price"] = float(price) if price is not None else None
 		it["discounts"] = discounts_map.get(it["item_code"], [])
 		it["barcodes"] = barcodes_map.get(it["item_code"], [])
 		it["display_override"] = (it.get("display_override") or "inherit").strip() or "inherit"
-		it["conversion"] = conv_map.get(it["item_code"])
+		conv = conv_map.get(it["item_code"])
+		if conv:
+			conv = {
+				"uom": conv.get("uom") or "",
+				"factor": float(conv.get("factor") or 0),
+				"min_qty": float(conv.get("min_qty") or 1),
+			}
+		it["conversion"] = conv
 		th = thumb_map.get(it["item_code"]) or {}
 		it["thumbnail"] = th.get("thumbnail") or ""
 		it["image"] = th.get("image") or ""

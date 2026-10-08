@@ -44,6 +44,9 @@ def get_context(context):
 		order_by="disabled asc, name asc",
 	)
 	context.public_group = get_public_customer_group()
+	# تُضبط دائمًا (None خارج تبويب الخصومات) حتى لا يكسر tojson في
+	# السكربت المشترك — كان سبب 500 على تبويب الفئات.
+	context.selected_group = None
 
 	if tab == "discounts":
 		_load_discounts_tab(context)

@@ -102,7 +102,7 @@ def create_signup_records(email, full_name, phone, pwd):
 
 	# Same lazy-path values and guard as the atomic signup path: the same
 	# Portal User link find_customer_for_current_user expects, the default
-	# category, staff_category_reviewed = 0 (shows in /staff/customers).
+	# category, flags = 0 (D4: unclassified at birth, still order-eligible).
 	# Deliberately before commit: any failure rolls the whole signup back
 	# with no orphan user without a customer. Idempotent (returns binding).
 	create_customer_for_user(email, full_name=full_name)

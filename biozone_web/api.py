@@ -327,12 +327,13 @@ def biozone_confirm_order(items):
 	يحدث في هذا المسار أصلًا — البوابة ترفض قبل الإنشاء — لكن الـflag
 	يبقى لازمًا لفحوصات Account الداخلية أثناء so.insert()).
 
-	البند 5 (عرض السعر حسب الفئة): (1) البوابة require_active_price_customer
-	ترفض الزائر (بالفحص فوق) وأي مسجّل بلا فئة مفعّلة — التأكيد للفئة
-	المفعّلة فقط. (2) الفئة المؤكدة تُمرَّر صراحة في customer_group وإلا
-	ملأها النظام بالافتراضي العام وضاعت خصومات الفئة. (3) أسعار الطلب
-	يحسبها محرك ERPNext من (الفئة، Standard Selling) — العميل يرسل
-	الأكواد والكميات فقط، فلا أثر لأي سعر يُعدَّل يدويًا في السلة.
+	البند 5 (عرض السعر حسب الفئة) + D2 (بلا علم): (1) الأهلية تقبل أي
+	ربط صالح بفئة ورقة مفعّلة — والجمهور مقبول؛ تُرفض بلا ربط أو فئة
+	معطلة/مجمّعة/مفقودة برسالة منسقة لكل حالة. (2) الفئة المؤكدة
+	تُمرَّر صراحة في customer_group وإلا ملأها النظام بالافتراضي العام
+	وضاعت خصومات الفئة. (3) أسعار الطلب يحسبها محرك ERPNext من
+	(الفئة، Standard Selling) — العميل يرسل الأكواد والكميات فقط، فلا
+	أثر لأي سعر يُعدَّل يدويًا في السلة.
 	"""
 	if frappe.session.user == "Guest":
 		frappe.throw(
@@ -347,8 +348,10 @@ def biozone_confirm_order(items):
 		frappe.throw(_("السلة فارغة"))
 
 	from biozone_web.utils import (
+		find_customer_for_current_user,
+		get_customer_price_group,
 		get_default_company,
-		require_active_price_customer,
+		is_customer_order_eligible,
 	)
 
 	so_items = []
@@ -394,12 +397,22 @@ def biozone_confirm_order(items):
 	frappe.flags.ignore_permissions = True
 
 	try:
-		# البند 5: تأكيد الطلب للفئة المفعّلة فقط — الزائر مرفوض بالفحص
-		# فوق، وهنا يُرفض أي مسجّل بلا فئة مفعّلة (الجمهور/بلا ربط/معطّلة)
-		# قبل أي كتابة. البوابة تستخدم find فقط (بلا إنشاء Customer) حتى
-		# لا تُنشأ صفوف يتيمة من محاولات مرفوضة، وتُرجع الفئة المؤكدة
-		# لتمريرها صراحة للطلب أدناه.
-		customer, customer_group = require_active_price_customer()
+		# D2: الأهلية بلا علم — الرفض التجاري يُرجع 200 + ok:false بنص
+		# منسق لكل حالة (نمط الحد الأدنى) فيعرضه المتجر حرفيًا، لا
+		# استثناء 403 عامًا. find فقط (بلا إنشاء Customer) حتى لا تُنشأ
+		# صفوف يتيمة من محاولات مرفوضة.
+		customer = find_customer_for_current_user()
+		if not customer:
+			return {
+				"ok": False,
+				"error": _("لا يوجد حساب عميل مرتبط بهذا المستخدم — تواصل مع إدارة المتجر."),
+			}
+		if not is_customer_order_eligible(customer):
+			return {
+				"ok": False,
+				"error": _("فئة حسابك غير مفعّلة حاليًا — تواصل مع إدارة المتجر."),
+			}
+		customer_group = get_customer_price_group(customer)
 
 		# عنوان الشحن (قرار Q3): يُضبط تلقائيًا من عنوان العميل المحفوظ —
 		# بلا أي إدخال من الطلب، وللعميل المؤكد من البوابة حصرًا. غيابه
@@ -801,6 +814,7 @@ def _set_customer_account_type(customer, customer_group):
 		frappe.throw(_("نوع الحساب المختار غير صالح"))
 
 	doc = frappe.get_doc("Customer", customer)
+	old_group = doc.customer_group
 
 	# كتابة غير مشروطة عند نجاح الفحوصات: أي استدعاء ناجح من الموظف —
 	# تغيير فئة، أو اعتماد "الجمهور" صراحة بإرسالها كقيمة — يُسجَّل
@@ -817,6 +831,26 @@ def _set_customer_account_type(customer, customer_group):
 	if customer_has_staff_review_field():
 		doc.staff_category_reviewed = 1
 	doc.save(ignore_permissions=True)
+
+	# D6: التدقيق في نفس معاملة التغيير (قديمة/جديدة/موظف — الوقت تلقائي
+	# في التعليق). فشل التوثيق يُلغي التغيير كله بخطأ واضح بدل حفظ
+	# بلا أثر. (الدفعي يستقل بكل صف: فشل صف يلفّ معامله وحده.)
+	# البادئة [فئة] تميّز تعليقات التدقيق لقراءتها الدقيقة لاحقًا، ونص
+	# التثبيت (قبل = بعد) مميز عن نص التغيير.
+	if (old_group or "") == (doc.customer_group or ""):
+		audit_text = _("[فئة] ثبّت {0} الفئة {1} (تثبيت بلا تغيير)").format(
+			frappe.session.user, doc.customer_group or "—"
+		)
+	else:
+		audit_text = _("[فئة] غيّر {0} فئة العميل من {1} إلى {2}").format(
+			frappe.session.user, old_group or "—", doc.customer_group or "—"
+		)
+	try:
+		doc.add_comment("Info", audit_text)
+	except Exception:
+		frappe.db.rollback()
+		frappe.clear_messages()
+		frappe.throw(_("تعذّر توثيق تغيير الفئة — لم يُحفظ التغيير، حاول مجددًا"))
 	frappe.db.commit()
 
 	return {
@@ -1657,9 +1691,10 @@ def staff_save_order_limit(customer_group=None, min_order_amount=None):
 
 @frappe.whitelist(methods=["POST"])
 def staff_set_item_discount(
-	item_code: str,
-	customer_group: str,
-	discount_percent: str | float,
+	item_code=None,
+	customer_group=None,
+	discount_percent=None,
+	updates=None,
 ):
 	"""يحدد/يحدّث/يعطّل خصم صنف واحد لفئة عميل واحدة، عبر Pricing Rule على
 	مستوى الكود (apply_on = 'Item Code')، بنسبة خصم مستقلة لكل زوج
@@ -1684,10 +1719,26 @@ def staff_set_item_discount(
 
 	تعطيل بدل حذف (زي باقي الشاشات في المشروع): تصفير النسبة بيعطّل
 	الـPricing Rule الموجودة بدل ما يمسحها، عشان نحتفظ بتاريخ القرار.
+
+	الدفعي (updates): نفس الغلاف يقبل قائمة [{item_code, discount_percent}]
+	بفئة مشتركة ويعيد استخدام النواة لكل صف باستقلالية (نمط دفعي العملاء).
 	"""
 	from biozone_web.utils import require_staff_access
 
 	require_staff_access()
+
+	if updates is not None:
+		return _set_item_discounts_batch(customer_group, updates)
+
+	return _set_item_discount(item_code, customer_group, discount_percent)
+
+
+def _set_item_discount(item_code, customer_group, discount_percent):
+	"""نواة الصف الواحد: نفس التحقق والكتابة للمسارين المفرد والدفعي —
+	بلا حارس (الحارس في الغلاف). تُرجع قاموس ok دائمًا للفشل المتوقع،
+	وتُبقي commit لكل صف (استقلالية الصفوف: فشل صف يلفّ معامله وحده
+	في الدفعي عبر الغلاف).
+	"""
 
 	if not frappe.db.exists("Item", item_code):
 		return {
@@ -1797,6 +1848,69 @@ def staff_set_item_discount(
 	}
 
 
+def _set_item_discounts_batch(customer_group, updates):
+	"""حفظ دفعي لخصومات أصناف فئة واحدة — نفس فلسفة دفعي العملاء.
+
+	يقبل قائمة عناصر [{item_code, discount_percent}] (أو نفسها كنص JSON)
+	والفئة مشتركة لكل الصفوف (نطاق الصفحة المعروضة). كل صف يمر عبر
+	نواة المفرد باستقلالية كاملة: نجاح جزئي مسموح، وفشل صف (تحقق أو
+	استثناء) يلفّ معامله وحده ولا يمنع الباقي. الصفر = تعطيل كالمفرد.
+	"""
+	if isinstance(updates, str):
+		updates = frappe.parse_json(updates)
+
+	if not isinstance(updates, (list, tuple)):
+		frappe.throw(_("صيغة الدفعة غير صالحة"))
+
+	if not updates:
+		return {"ok": True, "updated": 0, "failed": 0, "results": []}
+
+	results = []
+	for item in updates:
+		item = item or {}
+		code = (item.get("item_code") or "").strip()
+		percent = item.get("discount_percent")
+		if not code or percent is None or str(percent).strip() == "":
+			results.append(
+				{
+					"ok": False,
+					"item_code": code or None,
+					"error": _("بيانات الصف غير مكتملة"),
+				}
+			)
+			continue
+		try:
+			saved = _set_item_discount(code, customer_group, percent)
+			if saved.get("ok"):
+				results.append({"ok": True, "item_code": code, **saved})
+			else:
+				results.append(
+					{
+						"ok": False,
+						"item_code": code,
+						"error": saved.get("error") or _("تعذر حفظ هذا الصف"),
+					}
+				)
+		except Exception as e:
+			frappe.db.rollback()
+			frappe.clear_messages()
+			results.append(
+				{
+					"ok": False,
+					"item_code": code,
+					"error": str(e) or _("تعذر حفظ هذا الصف"),
+				}
+			)
+
+	updated = sum(1 for r in results if r.get("ok"))
+	return {
+		"ok": True,
+		"updated": updated,
+		"failed": len(results) - updated,
+		"results": results,
+	}
+
+
 # ---------------------------------------------------------------------------
 # المرحلة B9 — تجهيز الطلبات (فحص الباركود + الفاتورة + التسليم)
 #
@@ -1835,7 +1949,7 @@ def _b9_get_draft_order(order_name: str):
 
 
 def _b9_prep_payload(so) -> dict:
-	"""حمولة صفحة التجهيز: البنود + الباركودات + التقدم + الحالة."""
+	"""حمولة صفحة التجهيز: البنود + الباركودات + التقدم + الحالة + فئة العميل الحالية (قراءة فقط)."""
 	from biozone_web.b9_utils import get_item_barcodes, get_order_prep_state
 
 	state = get_order_prep_state(so)
@@ -1876,6 +1990,8 @@ def _b9_prep_payload(so) -> dict:
 		"needs_attention": state["needs_attention"],
 		"attention_note": state["attention_note"],
 		"items": items,
+		"live_customer_group": frappe.db.get_value("Customer", so.customer, "customer_group")
+		or "",
 	}
 
 

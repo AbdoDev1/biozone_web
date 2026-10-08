@@ -2,7 +2,6 @@ import frappe
 
 from biozone_web.services.addresses import build_brief_display, get_my_shipping_address
 from biozone_web.utils import (
-	customer_has_category_assigned_field,
 	find_customer_for_current_user,
 	get_header_context,
 	get_portal_users_for_customer,
@@ -12,7 +11,6 @@ from biozone_web.utils import (
 from biozone_web.www.my_orders import build_customer_invoices_list, build_customer_orders_list
 
 RECENT_ORDERS_LIMIT = 3
-UNASSIGNED_CATEGORY_LABEL = "سيتاح بعد تنشيط حسابك"
 # الهاتف اختياري فعليًا (السيرفر لا يشترطه) — الفراغ يُعرض شرطة (قرار B10).
 PHONE_EMPTY_DISPLAY = "-"
 # لا ميزة عناوين قائمة في المشروع — حالة محايدة ثابتة فقط (قرار B10).
@@ -36,19 +34,12 @@ def get_context(context):
 
 	if customer:
 		customer_name = frappe.db.get_value("Customer", customer, "customer_name") or customer
-		if customer_has_category_assigned_field():
-			assigned = frappe.utils.cint(
-				frappe.db.get_value("Customer", customer, "category_assigned_by_staff")
-			)
-		else:
-			assigned = 0
 		users = get_portal_users_for_customer(customer)
 		email = users[0] if users else frappe.session.user
 	else:
 		customer_name = (
 			frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 		)
-		assigned = 0
 		email = frappe.session.user
 
 	context.customer_name = customer_name
@@ -63,10 +54,8 @@ def get_context(context):
 	context.address_brief = build_brief_display(shipping)
 	context.address_phone = ((shipping or {}).get("phone") or "").strip()
 	context.address_empty_label = ADDRESS_NEUTRAL_LABEL
-	# قيد B10: لا يُعرض اسم الفئة الفعلي إطلاقًا — لا قبل التعيين الإداري
-	# ولا بعده. يظهر للعميل غير المعيَّن جملة محايدة واحدة بلا اسم فئة.
-	context.category_assigned = bool(assigned)
-	context.unassigned_label = UNASSIGNED_CATEGORY_LABEL
+	# قيد B10: لا يُعرض اسم الفئة الفعلي إطلاقًا. D1: لا مرحلة تنشيط —
+	# كل مسجل مؤهل للطلب، فلا ملصق انتظار هنا.
 
 	orders, orders_count = build_customer_orders_list()
 	context.orders_count = orders_count

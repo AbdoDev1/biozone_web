@@ -1,5 +1,3 @@
-import json
-
 import frappe
 from frappe import _
 
@@ -37,7 +35,12 @@ def _b9_prep_details(so):
 			got = (r.uom or "").strip()
 			if want and got and got != want:
 				continue
-			pub_map[r.item_code] = {"rate": r.price_list_rate, "uom": got or want}
+			# float صريح: price_list_rate يصل Decimal من القاعدة وtojson
+			# يفشل عليه (نفس فئة عطل العملاء) — والقالب يمرر القائمة مباشرة.
+			pub_map[r.item_code] = {
+				"rate": float(r.price_list_rate or 0),
+				"uom": got or want,
+			}
 	for idx, it in enumerate(so.items or [], start=1):
 		pub = pub_map.get(it.item_code) or {}
 		items.append(
@@ -57,7 +60,6 @@ def _b9_prep_details(so):
 				"confirmed_by": it.get("custom_confirmed_by") or "",
 			}
 		)
-	items_json = json.dumps(items, ensure_ascii=False, default=str)
 	# Phase-2 shipping (read-only هنا): القيمة الحالية + إجمالي الطلب.
 	from biozone_web.api import SHIPPING_ACCOUNT
 
@@ -66,7 +68,7 @@ def _b9_prep_details(so):
 		if (t.account_head or "").strip() == SHIPPING_ACCOUNT:
 			_shipping = float(t.get("tax_amount") or 0)
 			break
-	return items, items_json, _shipping, float(so.grand_total or 0)
+	return items, _shipping, float(so.grand_total or 0)
 
 
 def get_context(context):
@@ -92,13 +94,12 @@ def get_context(context):
 		# S1: الملغى يُعرض بتفاصيله للقراءة فقط — مقفل بلا أي إجراء
 		# (القالب يتجاهل كل الأزرار والسكربت في فرع error_state).
 		state = get_order_prep_state(so)
-		items, items_json, _shipping, grand_total = _b9_prep_details(so)
+		items, _shipping, grand_total = _b9_prep_details(so)
 		context.order_name = so.name
 		context.customer_name = so.customer_name
 		context.state = state["state"]
 		context.total = state["total"]
 		context.items = items
-		context.items_json = items_json
 		context.grand_total = grand_total
 		context.read_only = True
 		return render_state_page(
@@ -122,9 +123,12 @@ def get_context(context):
 	context.needs_attention = state["needs_attention"]
 	context.attention_note = state["attention_note"]
 
-	items, items_json, _shipping, grand_total = _b9_prep_details(so)
+	items, _shipping, grand_total = _b9_prep_details(so)
 	context.items = items
-	context.items_json = items_json
+	# فئة العميل الحالية للشارة (قراءة فقط).
+	context.live_customer_group = (
+		frappe.db.get_value("Customer", so.customer, "customer_group") or ""
+	)
 	# Phase-2 shipping (read-only هنا): القيمة الحالية + إجمالي الطلب.
 	context.shipping = _shipping
 	context.grand_total = grand_total

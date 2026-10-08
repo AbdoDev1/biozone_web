@@ -58,7 +58,6 @@
           تأكيد الطلب
         </button>
         <p class="hidden mt-3 text-sm text-error text-center" id="confirm-order-error"></p>
-        <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="activation-hint"></p>
         <p class="hidden mt-3 text-sm text-on-surface-variant text-center" id="cart-reprice-notice"></p>
         <p class="mt-4 flex items-center justify-center gap-1.5 text-xs text-on-surface-variant">
           <span class="material-symbols-outlined text-base">verified_user</span>
@@ -252,18 +251,6 @@
     return outcome;
   }
 
-  function showActivationHint(meta) {
-    const hintEl = document.getElementById('activation-hint');
-    if (!meta || meta.is_active) {
-      hintEl.classList.add('hidden');
-      return;
-    }
-    hintEl.textContent = meta.is_guest
-      ? 'يمكنك التصفح وملء السلة بحرية. تأكيد الطلب يتطلب تسجيل الدخول وتنشيط حسابك لدى إدارة المتجر.'
-      : 'يمكنك التصفح وملء السلة بحرية. تأكيد الطلب سيُتاح بعد تنشيط حسابك لدى إدارة المتجر.';
-    hintEl.classList.remove('hidden');
-  }
-
   document.getElementById('confirm-order-btn').addEventListener('click', async () => {
     const items = loadCart();
     const errorEl = document.getElementById('confirm-order-error');
@@ -348,7 +335,6 @@ cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
       noticeEl.textContent = 'أُزيلت ' + outcome.removedCount + ' أصناف من السلة لعدم توفر سعرها حاليًا.';
       noticeEl.classList.remove('hidden');
     }
-    showActivationHint(outcome.meta);
   });
 })();
 </script>

@@ -202,7 +202,7 @@
 
 <script>
 const CSRF_TOKEN = {{ csrf_token|tojson }};
-const ITEMS = {{ items_json|tojson }};
+const ITEMS = {{ picker_items|tojson }};
 let mpSelectedType = 'in';
 
 function switchTab(tab) {

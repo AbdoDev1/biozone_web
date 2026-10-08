@@ -1,5 +1,3 @@
-import json
-
 import frappe
 
 from biozone_web.utils import get_default_warehouse, get_header_context, require_staff_access
@@ -166,6 +164,6 @@ def get_context(context):
 				"units": sorted(units),
 			}
 		)
-	context.items_json = json.dumps(picker_items, ensure_ascii=False)
+	context.picker_items = picker_items
 
 	return context

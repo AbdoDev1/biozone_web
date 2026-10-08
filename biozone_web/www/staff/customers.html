@@ -74,7 +74,7 @@
 <!-- 3. شريط البحث والفلاتر -->
 <section aria-label="أدوات البحث والفلترة" class="bg-white rounded-2xl shadow-sm p-4 space-y-3.5 border border-surface-container">
 <form class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3" method="get" action="/staff/customers">
-<input name="show" type="hidden" value="{{ show|e }}">
+<input name="st" type="hidden" value="{{ st|e }}">
 <div class="relative flex-1">
 <label class="sr-only" for="customer-search-input">بحث بالاسم أو كود العميل</label>
 <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-navy-text/40 pointer-events-none text-xl">search</span>
@@ -94,33 +94,33 @@
 <span class="material-symbols-outlined text-lg">search</span>
 <span>بحث</span>
 </button>
-<a class="flex-1 lg:flex-none px-4 py-2.5 bg-white hover:bg-surface-subtle text-navy-text/70 text-sm font-bold rounded-xl border border-surface-container transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}">
+<a class="flex-1 lg:flex-none px-4 py-2.5 bg-white hover:bg-surface-subtle text-navy-text/70 text-sm font-bold rounded-xl border border-surface-container transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?st={{ st|e }}">
 <span class="material-symbols-outlined text-base">refresh</span>
 <span>إعادة ضبط</span>
 </a>
 </div>
 </form>
-<div aria-label="تصفية حالة المراجعة" class="flex items-center gap-2 pt-2.5 border-t border-surface-container flex-wrap">
-{% if show == 'unreviewed' %}
+<div aria-label="تصفية حالة التصنيف" class="flex items-center gap-2 pt-2.5 border-t border-surface-container flex-wrap">
+{% if st == 'unclassified' %}
 <span aria-current="true" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all">
-<span class="material-symbols-outlined text-base">pending_actions</span>
-<span>بانتظار المراجعة</span>
-<span aria-live="polite" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight" id="pending-count-badge">{{ unreviewed_count|e }}</span>
+<span class="material-symbols-outlined text-base">label_off</span>
+<span>لم تُصنَّف</span>
+<span aria-live="polite" class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight" id="unclassified-count-badge">{{ unclassified_count|e }}</span>
 </span>
 {% else %}
-<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=unreviewed&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
-<span class="material-symbols-outlined text-base text-navy-text/50">pending_actions</span>
-<span>بانتظار المراجعة</span>
-<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight">{{ unreviewed_count|e }}</span>
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?st=unclassified&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
+<span class="material-symbols-outlined text-base text-navy-text/50">label_off</span>
+<span>لم تُصنَّف</span>
+<span class="px-2 py-0.5 rounded-full text-xs font-extrabold bg-alert-bg text-alert-red tracking-tight">{{ unclassified_count|e }}</span>
 </a>
 {% endif %}
-{% if show == 'all' %}
+{% if st == 'all' %}
 <span aria-current="true" class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary text-white transition-all">
 <span class="material-symbols-outlined text-base">groups</span>
 <span>جميع العملاء</span>
 </span>
 {% else %}
-<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?show=all&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
+<a class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white hover:bg-surface-subtle text-navy-text border border-surface-container transition-all focus:outline-none focus:ring-2 focus:ring-primary/40" href="/staff/customers?st=all&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}">
 <span class="material-symbols-outlined text-base text-navy-text/50">groups</span>
 <span>جميع العملاء</span>
 </a>
@@ -136,6 +136,7 @@
 <tr class="bg-surface-subtle text-navy-text/60 text-xs font-bold border-b border-surface-container uppercase tracking-wider select-none">
 <th class="py-3.5 px-5 sticky-col-right sticky-shadow min-w-[240px]" scope="col">اسم العميل</th>
 <th class="py-3.5 px-5 min-w-[280px]" scope="col">الفئة</th>
+<th class="py-3.5 px-5 min-w-[200px]" scope="col">آخر تغيير للفئة</th>
 <th class="py-3.5 px-5" scope="col">المديونية</th>
 <th class="py-3.5 px-5 w-48" scope="col">آخر فاتورة</th>
 <th class="py-3.5 px-5" scope="col">إجراء</th>
@@ -164,23 +165,19 @@
 {% else %}
 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{{ c.customer_group|e }}</span>
 {% endif %}
-{% if show == 'all' %}
 {% if c.reviewed %}
-<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary" data-review-badge="{{ c.name|e }}">تمت المراجعة</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary" data-review-badge="{{ c.name|e }}">مُصنَّف</span>
 {% else %}
-<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text" data-review-badge="{{ c.name|e }}">بانتظار المراجعة</span>
-{% endif %}
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-text" data-review-badge="{{ c.name|e }}">لم تُصنَّف</span>
 {% endif %}
 </div>
 <div class="w-full max-w-[210px]">
-{% if show == 'unreviewed' %}
 <label for="select-cat-{{ loop.index }}" class="sr-only">تغيير فئة {{ c.customer_name|e }}</label>
 <select id="select-cat-{{ loop.index }}" data-current="{{ c.customer_group|e }}" data-customer="{{ c.name|e }}" onchange="handleCategoryChange(this)" class="w-full px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-xl border border-surface-container bg-white text-navy-text focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer">
 {% for g in groups %}
 <option value="{{ g.name|e }}" {% if g.name == c.customer_group %}selected{% endif %}>{{ g.name|e }}</option>
 {% endfor %}
 </select>
-{% endif %}
 <div class="hidden items-center gap-1 mt-1.5 text-alert-red text-xs font-bold" data-row-error="{{ c.name|e }}">
 <span class="material-symbols-outlined text-sm">error</span>
 <span data-row-error-text="{{ c.name|e }}"></span>
@@ -191,6 +188,14 @@
 </div>
 </div>
 </div>
+</td>
+<td class="py-4 px-5 align-middle">
+{% if c.last_change and c.last_change.text %}
+<div class="text-xs text-navy-text/80 leading-snug max-w-[220px]" title="{{ c.last_change.text|e }}">{{ c.last_change.text|e }}</div>
+<div class="text-[11px] text-navy-text/40 mt-0.5">{{ c.last_change.when|e }}</div>
+{% else %}
+<span class="text-navy-text/40 text-xs font-medium">—</span>
+{% endif %}
 </td>
 <td class="py-4 px-5 align-middle">
 <div class="font-bold text-navy-text">{{ c.outstanding_display|e }}</div>
@@ -208,10 +213,10 @@
 </td>
 <td class="py-4 px-5 align-middle whitespace-nowrap">
 <div class="flex flex-col items-start gap-1.5">
-{% if show == 'unreviewed' and c.customer_group == public_group %}
-<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-approve-btn="{{ c.name|e }}" onclick='approveAsPublic({{ c.name|tojson }})' type="button">
-<span class="material-symbols-outlined text-sm">verified</span>
-اعتماد كجمهور
+{% if not c.reviewed %}
+<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors" data-pin-btn="{{ c.name|e }}" onclick='pinCurrentGroup({{ c.name|tojson }})' type="button">
+<span class="material-symbols-outlined text-sm">push_pin</span>
+تثبيت الفئة الحالية
 </button>
 {% endif %}
 </div>
@@ -223,11 +228,11 @@
 </div>
 <div class="py-16 px-4 text-center border-t border-surface-container {% if customers %}hidden{% endif %}" id="no-results-container">
 {% if not customers %}
-{% if show == 'unreviewed' and not search_term and selected_group == 'all' %}
+{% if st == 'unclassified' and not search_term and selected_group == 'all' %}
 <div class="flex flex-col items-center justify-center text-navy-text/40 py-6">
 <span class="material-symbols-outlined text-5xl mb-2 text-primary/40">check_circle</span>
-<p class="text-base font-bold text-navy-text/80">لا يوجد عملاء بانتظار المراجعة</p>
-<p class="text-xs text-navy-text/50 mt-1">تمت مراجعة واعتماد جميع فئات العملاء بنجاح.</p>
+<p class="text-base font-bold text-navy-text/80">لا يوجد عملاء بلا تصنيف</p>
+<p class="text-xs text-navy-text/50 mt-1">جميع العملاء مصنَّفون بفئات مثبتة.</p>
 </div>
 {% else %}
 <div class="flex flex-col items-center justify-center text-navy-text/40 py-6">
@@ -240,8 +245,7 @@
 </div>
 </section>
 
-<!-- 5. شريط الحفظ الجماعي (قائمة الانتظار فقط) -->
-{% if show == 'unreviewed' %}
+<!-- 5. شريط الحفظ الجماعي (كل الأوضاع — فردي عبر القائمة وجماعي عبر الشريط) -->
 <aside aria-label="شريط الحفظ الجماعي للتعديلات" aria-live="polite" class="hidden bg-surface-container rounded-xl p-3.5 sm:p-4 border border-primary/20 shadow-md transition-all duration-200 z-20 sticky bottom-4" id="bulk-actions-bar">
 <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
 <div class="flex items-center gap-2.5 text-navy-text">
@@ -259,7 +263,6 @@
 </div>
 </div>
 </aside>
-{% endif %}
 
 <!-- 6. الترقيم -->
 <div aria-label="شريط الترقيم" class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 select-none">
@@ -268,14 +271,14 @@
 </div>
 <div class="flex items-center gap-2">
 {% if has_prev %}
-<a aria-label="الصفحة السابقة" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text/70 hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ prev_page|e }}">
+<a aria-label="الصفحة السابقة" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text/70 hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?st={{ st|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ prev_page|e }}">
 <span class="material-symbols-outlined text-base">chevron_right</span>
 <span>السابق</span>
 </a>
 {% endif %}
 <span class="text-xs font-bold text-navy-text/50 px-2">صفحة {{ page|e }} من {{ total_pages|e }}</span>
 {% if has_next %}
-<a aria-label="الصفحة التالية" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?show={{ show|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ next_page|e }}">
+<a aria-label="الصفحة التالية" class="px-4 py-2 bg-white rounded-lg border border-surface-container text-xs sm:text-sm font-medium text-navy-text hover:bg-surface-subtle transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary/30" href="/staff/customers?st={{ st|e }}&amp;q={{ search_term or '' }}&amp;group={{ selected_group|e }}&amp;page={{ next_page|e }}">
 <span>التالي</span>
 <span class="material-symbols-outlined text-base">chevron_left</span>
 </a>
@@ -339,13 +342,17 @@
 </div>
 <script>
   const CSRF_TOKEN = {{ csrf_token|tojson }};
-  const SHOW_MODE = {{ show|tojson }};
   const PUBLIC_GROUP = {{ public_group|tojson }};
-  const CUSTOMERS = {{ customers_json|tojson }};
+  const CUSTOMERS = {{ customers|tojson }};
   const CUSTOMER_MAP = {};
-  CUSTOMERS.forEach((c) => { CUSTOMER_MAP[c.name] = c; });
   const dirty = new Map();
   let isSaving = false;
+  // CUSTOMERS must be an array (single-pass tojson of the Python list).
+  // Guarded so a malformed payload can never kill the whole page script
+  // again (previous double-encoded string broke every interaction).
+  if (Array.isArray(CUSTOMERS)) {
+    CUSTOMERS.forEach((c) => { CUSTOMER_MAP[c.name] = c; });
+  }
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -503,10 +510,13 @@
         headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
         body: JSON.stringify({ updates: updates }),
       }).then(function (r) {
-        if (!r.ok) throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب');
+        if (!r.ok) {
+          return r.json().then(function (j) { throw serverStatusError(r.status, j); },
+            function () { throw serverStatusError(r.status, null); });
+        }
         return r.json().then(function (j) { return j; },
-          function () { throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب'); });
-      }, function () { throw new Error('حدث خطأ غير متوقع أثناء معالجة الطلب'); });
+          function () { throw new Error('تعذر قراءة رد الخادم'); });
+      }, function () { throw new Error('network-unreachable'); });
       const msg = res.message;
       if (!msg || msg.ok !== true || !Array.isArray(msg.results)) {
         throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
@@ -531,7 +541,7 @@
         showNotification('error', 'تعذر حفظ التعديلات، يرجى المحاولة مرة أخرى');
       }
     } catch (err) {
-      showNotification('error', (err && err.message) || 'حدث خطأ غير متوقع أثناء معالجة الطلب');
+      showNotification('error', describeRequestError(err));
     } finally {
       isSaving = false;
       saveBtn.disabled = false;
@@ -542,35 +552,86 @@
     }
   }
 
-  async function approveAsPublic(name) {
+  function extractServerMessage(j) {
+    // نص الخادم العربي أولًا: message.error المنسق، ثم _server_messages
+    // (417/ValidationError) بعد تجريد الوسوم — لا HTML خام ولا traceback.
+    try {
+      const m = j && j.message;
+      if (m && typeof m.error === 'string' && m.error) return m.error;
+      if (typeof m === 'string' && m && m.indexOf('Traceback') === -1) return m;
+      const sm = j && j._server_messages;
+      if (sm) {
+        const arr = JSON.parse(sm);
+        if (arr && arr[0] && arr[0][0]) {
+          const t = String(arr[0][0]).replace(/<[^>]*>/g, '').trim();
+          if (t) return t;
+        }
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  function serverStatusError(status, j) {
+    // رسالة الخادم الحرفية أولًا (منها «تعذّر توثيق تغيير الفئة»)، ثم
+    // عامة مميزة حسب الحالة — لا نص إنجليزي للمستخدم أبدًا.
+    const curated = extractServerMessage(j);
+    if (curated) return new Error(curated);
+    if (status === 403) return new Error('لا تملك صلاحية الحفظ — سجّل الدخول بحساب موظف');
+    if (status === 400) return new Error('انتهت الجلسة — حدّث الصفحة وحاول مجددًا');
+    if (status === 404) return new Error('العنوان غير موجود — حدّث الصفحة وحاول مجددًا');
+    if (status === 500) return new Error('عطل في الخادم — حاول مجددًا بعد قليل');
+    return new Error('حدث خطأ غير متوقع أثناء معالجة الطلب');
+  }
+
+  function describeRequestError(err) {
+    // تصنيف سبب الفشل لرسالة عربية مميزة: شبكة، صلاحية، جلسة، أو نص الخادم.
+    if (!err) return 'حدث خطأ غير متوقع أثناء معالجة الطلب';
+    if (err.message === 'network-unreachable' || err instanceof TypeError) {
+      return 'تعذر الاتصال بالخادم — تحقق من الاتصال وحاول مجددًا';
+    }
+    if (err.status === 403) return 'لا تملك صلاحية الحفظ — سجّل الدخول بحساب موظف';
+    if (err.status === 400) return 'انتهت الجلسة — حدّث الصفحة وحاول مجددًا';
+    return err.message || 'حدث خطأ غير متوقع أثناء معالجة الطلب';
+  }
+
+  async function pinCurrentGroup(name) {
+    // تثبيت الفئة الحالية لصف واحد: يستدعي مسار التعديل بالفئة الحالية
+    // نفسها فيرفع العلم ويزيل شارة لم تُصنَّف دون تغيير الفئة — مع تدقيق.
     if (!name || isSaving) return;
-    const btn = document.querySelector('[data-approve-btn="' + name + '"]');
+    const select = selectEl(name);
+    if (!select) return;
+    const group = select.dataset.current;
+    const btn = document.querySelector('[data-pin-btn="' + name + '"]');
     if (btn) btn.disabled = true;
     try {
       const res = await fetch('/api/method/biozone_web.api.staff_set_customer_account_type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': CSRF_TOKEN },
-        body: JSON.stringify({ customer: name, customer_group: PUBLIC_GROUP }),
+        body: JSON.stringify({ customer: name, customer_group: group }),
       }).then(function (r) {
-        if (!r.ok) throw new Error('تعذر الحفظ، حاول مجددًا');
+        if (!r.ok) {
+          return r.json().then(function (j) { throw serverStatusError(r.status, j); },
+            function () { throw serverStatusError(r.status, null); });
+        }
         return r.json().then(function (j) { return j; },
-          function () { throw new Error('تعذر الحفظ، حاول مجددًا'); });
-      }, function () { throw new Error('تعذر الحفظ، حاول مجددًا'); });
+          function () { throw new Error('تعذر قراءة رد الخادم'); });
+      }, function () { throw new Error('network-unreachable'); });
       const msg = res.message;
       if (!msg || !msg.customer) {
         throw new Error((msg && msg.error) || 'حدث خطأ أثناء الحفظ');
       }
       applySavedRow(msg.customer, msg.customer_group);
       updateBulkBar();
-      showNotification('success', 'تم اعتماد العميل ضمن فئة الجمهور');
+      showNotification('success', 'تم تثبيت الفئة الحالية بنجاح');
     } catch (err) {
-      showRowError(name, (err && err.message) || 'تعذر الحفظ، حاول مجددًا');
+      showRowError(name, describeRequestError(err));
     } finally {
       if (btn) btn.disabled = false;
     }
   }
 
   function applySavedRow(name, group) {
+    const wasUnclassified = !!(CUSTOMER_MAP[name] && !CUSTOMER_MAP[name].reviewed);
     dirty.delete(name);
     const select = selectEl(name);
     if (select) {
@@ -591,7 +652,7 @@
       const badge = badgeWrap.querySelector('span');
       if (badge) {
         badge.textContent = group;
-        const isPublic = group === 'الجمهور';
+        const isPublic = PUBLIC_GROUP && group === PUBLIC_GROUP;
         badge.className = isPublic
           ? 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-navy-text/5 text-navy-text/60 border border-navy-text/10'
           : 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20';
@@ -607,49 +668,21 @@
       }
       const reviewBadge = badgeWrap.querySelector('[data-review-badge]');
       if (reviewBadge) {
-        reviewBadge.textContent = 'تمت المراجعة';
+        reviewBadge.textContent = 'مُصنَّف';
         reviewBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary';
       }
     }
-    if (SHOW_MODE === 'unreviewed') {
-      const row = rowEl(name);
-      if (row) {
-        row.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-        setTimeout(function () {
-          row.remove();
-          decrementCounters();
-          maybeShowPendingEmpty();
-        }, 300);
-      }
-    }
+    const pinBtn = document.querySelector('[data-pin-btn="' + name + '"]');
+    if (pinBtn) pinBtn.remove();
+    if (wasUnclassified) decrementUnclassified();
   }
 
-  function decrementCounters() {
-    const badge = document.getElementById('pending-count-badge');
+  function decrementUnclassified() {
+    const badge = document.getElementById('unclassified-count-badge');
     if (badge) {
       const n = Math.max(parseInt(badge.textContent, 10) - 1, 0);
       badge.textContent = n;
       if (n === 0) badge.classList.add('opacity-40');
-    }
-    const total = document.getElementById('pagination-total-text');
-    if (total) {
-      const m = total.textContent.match(/(\d+)/);
-      if (m) total.textContent = total.textContent.replace(/(\d+)/, Math.max(parseInt(m[1], 10) - 1, 0));
-    }
-  }
-
-  function maybeShowPendingEmpty() {
-    const tbody = document.getElementById('customers-table-body');
-    if (tbody && tbody.querySelectorAll('tr[data-row]').length === 0) {
-      const box = document.getElementById('no-results-container');
-      if (box) {
-        box.classList.remove('hidden');
-        box.innerHTML = '<div class="flex flex-col items-center justify-center text-navy-text/40 py-6">'
-          + '<span class="material-symbols-outlined text-5xl mb-2 text-primary/40">check_circle</span>'
-          + '<p class="text-base font-bold text-navy-text/80">لا يوجد عملاء بانتظار المراجعة</p>'
-          + '<p class="text-xs text-navy-text/50 mt-1">تمت مراجعة واعتماد جميع فئات العملاء بنجاح.</p>'
-          + '</div>';
-      }
     }
   }
 
@@ -725,6 +758,9 @@
     document.getElementById('drawer-backdrop').addEventListener('click', closeCustomerDrawer);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') closeCustomerDrawer();
+    });
+    window.addEventListener('beforeunload', function (e) {
+      if (dirty.size > 0 || isSaving) e.preventDefault();
     });
     updateBulkBar();
   });
