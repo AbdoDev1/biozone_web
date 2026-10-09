@@ -104,6 +104,33 @@ def get_item_barcodes(item_code: str) -> list[str]:
 	return [r.barcode for r in rows if r.barcode]
 
 
+def get_items_barcodes(item_codes: list) -> dict:
+	"""باركودات عدة أصناف دفعة واحدة — استعلام واحد بدل N (بديل N+1).
+
+	يُرجع قاموس {item_code: [barcodes]} بنفس محتوى وترتيب ما كانت
+	تُرجعه حلقة get_item_barcodes لكل صنف على حدة (نفس الصفوف، نفس
+	الترتيب النسبي)؛ الأصناف بلا باركود تُرجع قائمة فارغة. القائمة
+	الفارغة تُرجع {} بلا أي استعلام. شكل الاستجابة مطابق — بلا أي
+	تغيير في الواجهة.
+	"""
+	seen = []
+	for code in item_codes or []:
+		if code not in seen:
+			seen.append(code)
+	result = {code: [] for code in seen}
+	query = [code for code in seen if code]
+	if query:
+		rows = frappe.get_all(
+			"Item Barcode",
+			filters={"parent": ["in", query], "parenttype": "Item"},
+			fields=["parent", "barcode"],
+		)
+		for r in rows:
+			if r.barcode and r.parent in result:
+				result[r.parent].append(r.barcode)
+	return result
+
+
 def get_customer_balances(customer: str, company: str, current_invoice: str | None = None) -> dict:
 	"""الحساب السابق والحالي للفاتورة المطبوعة (§7) — من دفتر الأستاذ الفعلي.
 

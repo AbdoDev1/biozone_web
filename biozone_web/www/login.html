@@ -223,6 +223,25 @@
             }
         }
 
+        // دمج سلة الزائر في مفتاح الحساب قبل المغادرة (قرار السلة المحلية —
+        // المتصفح الحالي فقط): جمع كميات السطر المتطابق، ثم تفريغ مفتاح الزائر.
+        var BZ_GUEST_KEY = 'biozone_cart_items';
+        function bzMergeGuestInto(user) {
+            try {
+                var akey = 'biozone_cart_items:' + String(user || '').trim().toLowerCase();
+                var guest = JSON.parse(localStorage.getItem(BZ_GUEST_KEY)) || [];
+                if (!guest.length) return;
+                var acc = JSON.parse(localStorage.getItem(akey)) || [];
+                guest.forEach(function (g) {
+                    var ex = acc.find(function (it) { return it.item_code === g.item_code && (it.uom || '') === (g.uom || ''); });
+                    if (ex) { ex.quantity = (ex.quantity || 0) + (g.quantity || 0); }
+                    else { acc.push(g); }
+                });
+                localStorage.setItem(akey, JSON.stringify(acc));
+                localStorage.removeItem(BZ_GUEST_KEY);
+            } catch (e) {}
+        }
+
         async function callApi(method, payload) {
             const res = await fetch(`/api/method/biozone_web.api.${method}`, {
                 method: 'POST',
@@ -250,6 +269,7 @@
                     pwd: document.getElementById('login-password').value,
                     remember_me: document.getElementById('login-remember').checked ? 1 : 0
                 });
+                try { bzMergeGuestInto(document.getElementById('login-email').value); } catch (e) {}
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
                 loginBtn.disabled = false;
@@ -269,6 +289,7 @@
                     phone: document.getElementById('signup-phone').value,
                     pwd: document.getElementById('signup-password').value
                 });
+                try { bzMergeGuestInto(document.getElementById('signup-email').value); } catch (e) {}
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
                 signupBtn.disabled = false;

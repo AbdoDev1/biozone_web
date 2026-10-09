@@ -9,7 +9,9 @@
   </div>
 </div>
 <script>
-  const CART_STORAGE_KEY = 'biozone_cart_items';
+  // مفتاح السلة النشط يحسمه الهيدر المشترك (site_header): مفتاح الحساب
+  // للداخل، والمشترك للزائر — يُقرأ هنا بعد تحميل الهيدر دائمًا.
+  const CART_STORAGE_KEY = window.BZ_CART_KEY || 'biozone_cart_items';
 
   function addToCart(itemCode, itemName, itemGroup, price, buttonEl, uom) {
     let items = [];

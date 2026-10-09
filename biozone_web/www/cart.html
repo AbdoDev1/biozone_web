@@ -18,6 +18,10 @@
   <div class="mb-lg flex items-center gap-3">
     <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface">سلة المشتريات</h1>
     <span class="hidden rounded-full bg-surface-container px-3 py-1 text-sm font-semibold text-on-surface-variant" id="cart-item-count-badge"></span>
+    <button class="hidden items-center gap-1.5 rounded-full border border-outline-variant px-4 py-1.5 text-sm font-bold text-error transition-colors hover:bg-error/10" id="clear-cart-btn" type="button">
+      <span class="material-symbols-outlined text-lg">delete_sweep</span>
+      إفراغ السلة
+    </button>
   </div>
 
   <!-- Empty state -->
@@ -66,6 +70,18 @@
       </div>
     </aside>
   </div>
+
+  <!-- مودال تأكيد إفراغ السلة -->
+  <div class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 p-4" id="clear-cart-modal">
+    <div class="w-full max-w-sm rounded-xl bg-surface-container-lowest p-5 shadow-2xl space-y-4">
+      <h3 class="text-base font-bold text-on-surface">إفراغ السلة</h3>
+      <p class="text-sm leading-6 text-on-surface-variant">هل تريد حذف كل الأصناف من السلة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+      <div class="flex items-center justify-end gap-2">
+        <button class="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors" id="clear-cart-cancel" type="button">تراجع</button>
+        <button class="px-4 py-2 rounded-full bg-error text-on-error text-sm font-bold hover:opacity-90 transition-opacity" id="clear-cart-confirm" type="button">تأكيد الإفراغ</button>
+      </div>
+    </div>
+  </div>
 </main>
 
 {% include "biozone_web/templates/includes/site_footer.html" %}
@@ -108,7 +124,8 @@
 <script>
 (function () {
   const CSRF_TOKEN = {{ csrf_token|tojson }};
-  const CART_KEY = 'biozone_cart_items';
+  // مفتاح السلة النشط يحسمه الهيدر المشترك: مفتاح الحساب للداخل والمشترك للزائر.
+  const CART_KEY = window.BZ_CART_KEY || 'biozone_cart_items';
   // Helper hint only: whether the last reprice saw a guest session.
   // Never the sole basis for messaging; HTTP status decides.
   let cartIsGuest = false;
@@ -138,6 +155,7 @@
     const contentEl = document.getElementById('cart-content');
     const listEl = document.getElementById('cart-items-list');
     const badgeEl = document.getElementById('cart-item-count-badge');
+    const clearBtn = document.getElementById('clear-cart-btn');
 
     const totalUnits = items.reduce((sum, it) => sum + it.quantity, 0);
 
@@ -147,6 +165,8 @@
       contentEl.classList.add('hidden');
       contentEl.classList.remove('grid');
       badgeEl.classList.add('hidden');
+      clearBtn.classList.add('hidden');
+      clearBtn.classList.remove('flex');
       return;
     }
 
@@ -156,6 +176,8 @@
     contentEl.classList.add('grid');
     badgeEl.classList.remove('hidden');
     badgeEl.textContent = items.length + ' منتجات';
+    clearBtn.classList.remove('hidden');
+    clearBtn.classList.add('flex');
 
     const template = document.getElementById('cart-item-template');
     listEl.innerHTML = '';
@@ -202,6 +224,31 @@
     saveCart(items);
     render();
   }
+
+  function openClearCart() {
+    const m = document.getElementById('clear-cart-modal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+  }
+
+  function closeClearCart() {
+    const m = document.getElementById('clear-cart-modal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+  }
+
+  function confirmClearCart() {
+    // تفريغ محلي فقط (نفس مفتاح السلة) — بلا مساس بمسح الخروج أو التأكيد.
+    // idempotent: التكرار على سلة فارغة أثره صفر. التبويبات الأخرى تلتقط
+    // الحدث عبر مستمع storage القائم (render + الشارة + steppers).
+    saveCart([]);
+    render();
+    closeClearCart();
+  }
+
+  document.getElementById('clear-cart-btn').addEventListener('click', openClearCart);
+  document.getElementById('clear-cart-cancel').addEventListener('click', closeClearCart);
+  document.getElementById('clear-cart-confirm').addEventListener('click', confirmClearCart);
 
   // البند 5: أسعار السلة تُعاد حسابها من السيرفر عند كل فتح للصفحة حسب
   // فئة الطالب الحالية (زائر/غير مفعّل → الجمهور، مفعّل → فئته) — أسعار
@@ -320,6 +367,16 @@
   });
 
   render();
+  // إشعار دمج سلة الزائر (قرار السلة المحلية): الهيدر دمجها في مفتاح
+  // الحساب عند التحميل — نعرض التنبيه هنا إن لم تشغله إعادة التسعير.
+  // render() أعلاه قرأ المفتاح النشط بعد الدمج فالأرقام صحيحة.
+  if (window.BZ_CART_MERGED) {
+    var _mn = document.getElementById('cart-reprice-notice');
+    if (_mn && _mn.classList.contains('hidden')) {
+      _mn.textContent = 'دُمجت سلة تصفحك السابقة في سلة حسابك.';
+      _mn.classList.remove('hidden');
+    }
+  }
   // البند 1: إذا تغيّرت السلة من تبويب آخر (كتالوج/سلة ثانية/تصفير بعد
   // طلب)، أعد العرض فورًا بلا reload.
   window.addEventListener('storage', function (e) {

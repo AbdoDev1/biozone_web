@@ -1950,9 +1950,11 @@ def _b9_get_draft_order(order_name: str):
 
 def _b9_prep_payload(so) -> dict:
 	"""حمولة صفحة التجهيز: البنود + الباركودات + التقدم + الحالة + فئة العميل الحالية (قراءة فقط)."""
-	from biozone_web.b9_utils import get_item_barcodes, get_order_prep_state
+	from biozone_web.b9_utils import get_items_barcodes, get_order_prep_state
 
 	state = get_order_prep_state(so)
+	# الباركودات دفعة واحدة (استعلام واحد) — نفس شكل الاستجابة حرفيًا.
+	barcodes_map = get_items_barcodes([it.item_code for it in (so.items or [])])
 	items = []
 	for it in so.items or []:
 		items.append(
@@ -1960,7 +1962,7 @@ def _b9_prep_payload(so) -> dict:
 				"name": it.name,
 				"item_code": it.item_code,
 				"item_name": it.item_name,
-				"barcodes": get_item_barcodes(it.item_code),
+				"barcodes": barcodes_map.get(it.item_code, []),
 				"qty": float(it.qty or 0),
 				"uom": it.uom,
 				"rate": float(it.rate or 0),
@@ -1993,6 +1995,40 @@ def _b9_prep_payload(so) -> dict:
 		"live_customer_group": frappe.db.get_value("Customer", so.customer, "customer_group")
 		or "",
 	}
+
+
+def _b9_slim_payload(so, row=None, removed=None) -> dict:
+	"""حمولة نحيفة: الصف المتأثر + العدادات فقط — بلا إعادة جلب ولا باركودات.
+
+	لمساري تعديل الكمية والحذف فقط (الشكوى: بطء التأكيد)؛ مسارا تأكيد
+	الباركود/اليدوي يبقيان على الحمولة الكاملة فيلتقطان تعديلات موظف
+	آخر على نفس الطلب. العرض يحدّث الصف والعدادات محليًا (فرع slim
+	في refreshFromPayload) — أي تعديل متزامن من موظف آخر لا يظهر إلا
+	عند تحميل كامل/تأكيد لاحق (موثق، بلا تغيير).
+	"""
+	from biozone_web.b9_utils import get_order_prep_state
+
+	state = get_order_prep_state(so)
+	out = {
+		"ok": True,
+		"slim": True,
+		"state": state["state"],
+		"total": state["total"],
+		"confirmed": state["confirmed"],
+		"percent": state["percent"],
+		"progress_text": state["progress_text"],
+	}
+	if removed is not None:
+		out["removed"] = removed
+	if row is not None:
+		out["row"] = {
+			"name": row.name,
+			"qty": float(row.qty or 0),
+			"uom": row.uom,
+			"confirmed": bool(frappe.utils.cint(row.get("custom_confirmed"))),
+			"confirmed_by": row.get("custom_confirmed_by") or "",
+		}
+	return out
 
 
 def _b9_log(so, text: str):
@@ -2150,7 +2186,7 @@ def staff_update_item_qty(order_name: str, so_detail: str, new_qty: str | float)
 	staff = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 	_b9_log(so, _("عدّل {0} كمية {1} من {2} إلى {3}").format(staff, row.item_code, old_qty, new_qty))
 	frappe.db.commit()
-	return _b9_prep_payload(frappe.get_doc("Sales Order", so.name))
+	return _b9_slim_payload(so, row=row)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -2173,7 +2209,7 @@ def staff_delete_item(order_name: str, so_detail: str):
 	staff = frappe.db.get_value("User", frappe.session.user, "full_name") or frappe.session.user
 	_b9_log(so, _("حذف {0} الصنف {1} من الطلب").format(staff, removed.item_code))
 	frappe.db.commit()
-	return _b9_prep_payload(frappe.get_doc("Sales Order", so.name))
+	return _b9_slim_payload(so, removed=removed.name)
 
 
 @frappe.whitelist(methods=["POST"])

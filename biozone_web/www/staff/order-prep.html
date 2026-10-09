@@ -316,8 +316,59 @@ function saveShipping(clear) {
     });
 }
 
+// فرع الحمولة النحيفة (تعديل كمية/حذف فقط): يحدّث الصف والعدادات محليًا.
+// منطق رسم الصف أدناه مطابق لكتلة refreshFromPayload (توأم مقصود — أي
+// تغيير في أحدهما يُنسخ في الآخر)؛ المسار الكامل بلا مساس.
+function updateRowSlim(it) {
+    const statusCell = document.getElementById('status-' + it.name);
+    const row = document.getElementById('row-' + it.name);
+    const qtyEl = document.getElementById('qty-' + it.name);
+    if (qtyEl) qtyEl.innerText = it.qty + ' ' + (it.uom || '');
+    if (!statusCell || !row) return;
+    if (it.confirmed) {
+      row.classList.remove('bg-amber-50/30');
+      const by = (it.confirmed_by || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      statusCell.innerHTML = '<div class="flex flex-col items-center gap-0.5">'
+        + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-300"><span class="material-symbols-outlined text-[14px]">check_circle</span>تم التأكيد</span>'
+        + '<span class="text-[10px] text-navy-text/50">' + by + '</span></div>';
+    } else {
+      row.classList.add('bg-amber-50/30');
+      const rowName = (it.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      statusCell.innerHTML = '<div class="flex flex-col items-center gap-1.5">'
+        + '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-navy-text/60 text-[11px] font-bold"><span class="material-symbols-outlined text-[14px]">hourglass_empty</span>لم يُفحص بعد</span>'
+        + '<button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" data-confirm-row="' + rowName + '" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button></div>';
+    }
+}
+
+function refreshSlim(p) {
+  if (p.removed) {
+    ITEMS = ITEMS.filter((x) => x.name !== p.removed);
+    const tr = document.getElementById('row-' + p.removed);
+    if (tr) tr.remove();
+  } else if (p.row) {
+    const ex = ITEMS.find((x) => x.name === p.row.name);
+    if (ex) { ex.qty = p.row.qty; ex.uom = p.row.uom; }
+    updateRowSlim(p.row);
+  }
+  document.getElementById('metricRatioText').innerText = p.progress_text;
+  document.getElementById('metricPercentText').innerText = p.percent + '%';
+  document.getElementById('progressBar').style.width = p.percent + '%';
+  document.getElementById('itemsCountLabel').innerText = p.total + ' عناصر';
+  const btn = document.getElementById('btnFinalConfirmation');
+  if (p.confirmed === p.total && p.total > 0) {
+    btn.disabled = false;
+    btn.className = "px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all bg-primary hover:bg-primary-accent text-white shadow-md cursor-pointer";
+  } else {
+    btn.disabled = true;
+    btn.className = "px-6 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all bg-surface-container text-navy-text/50 opacity-60 cursor-not-allowed";
+  }
+  const input = document.getElementById('barcodeInput');
+  if (input) input.focus();
+}
+
 function refreshFromPayload(p) {
   if (!p || !p.ok) return;
+  if (p.slim) { refreshSlim(p); return; }
   ITEMS = p.items || ITEMS;
   document.getElementById('metricRatioText').innerText = p.progress_text;
   document.getElementById('metricPercentText').innerText = p.percent + '%';

@@ -356,6 +356,9 @@ def get_header_context():
 
 	- is_logged_in: any authenticated user
 	- user_full_name: shown in the header instead of the account icon
+	- store_user: session id for the per-account local cart key
+	  ("Guest" when logged out — the shared guest key is used then).
+	  Email only, never secrets (قرار السلة المحلية).
 	- notif_unread_count: customer bell counter — Website Users only and
 	  only when the notifications flag is on. Guests, staff and flag-off
 	  cost zero notification queries.
@@ -394,6 +397,7 @@ def get_header_context():
 	return {
 		"is_logged_in": is_logged_in,
 		"user_full_name": user_full_name,
+		"store_user": user if is_logged_in else "Guest",
 		"notif_unread_count": notif_unread_count,
 		"sb_new_orders": sb_new_orders,
 		"sb_unreviewed": sb_unreviewed,

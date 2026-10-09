@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-from biozone_web.b9_utils import get_item_barcodes, get_order_prep_state
+from biozone_web.b9_utils import get_items_barcodes, get_order_prep_state
 from biozone_web.utils import (
 	get_csrf_token_safe,
 	get_header_context,
@@ -41,6 +41,8 @@ def _b9_prep_details(so):
 				"rate": float(r.price_list_rate or 0),
 				"uom": got or want,
 			}
+	# الباركودات دفعة واحدة (استعلام واحد) — نفس شكل الاستجابة حرفيًا.
+	_b9_barcodes_map = get_items_barcodes([it.item_code for it in (so.items or [])])
 	for idx, it in enumerate(so.items or [], start=1):
 		pub = pub_map.get(it.item_code) or {}
 		items.append(
@@ -49,7 +51,7 @@ def _b9_prep_details(so):
 				"name": it.name,
 				"item_code": it.item_code,
 				"item_name": it.item_name,
-				"barcodes": get_item_barcodes(it.item_code),
+				"barcodes": _b9_barcodes_map.get(it.item_code, []),
 				"qty": float(it.qty or 0),
 				"uom": it.uom or "",
 				"rate": float(it.rate or 0),
