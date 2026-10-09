@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/assets/biozone_web/css/app.247a063e.css">
 <style>
 body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fc; color: #0b1c30; -webkit-font-smoothing: antialiased; }
-.resizable-table { table-layout: fixed; width: 100%; min-width: 1220px; border-collapse: separate; border-spacing: 0; }
+.resizable-table { table-layout: fixed; width: 100%; min-width: 1130px; border-collapse: separate; border-spacing: 0; }
 .resizable-th { position: relative; background-color: #f1f5fd; border-bottom: 2px solid #d3e4fe; }
 .resizer { position: absolute; top: 0; left: 0; width: 10px; bottom: 0; cursor: col-resize; user-select: none; z-index: 20; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .resizer::after { content: ''; width: 3px; height: 60%; background-color: #cbd5e1; border-radius: 2px; transition: all 0.15s ease-in-out; }
@@ -124,7 +124,6 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <th class="resizable-th py-3.5 px-4 text-center" data-column="quantity" style="width:160px;min-width:130px;"><div class="flex flex-col items-center"><span>الكمية المطلوبة</span><span class="text-[10px] text-navy-text/50 font-normal">(معلومة عرض فقط)</span></div><div class="resizer"></div></th>
 <th class="resizable-th py-3.5 px-4 text-center" data-column="price" style="width:150px;min-width:125px;"><div class="flex flex-col items-center"><span>السعر</span><span class="text-[10px] text-navy-text/50 font-normal">(وحدة العميل / المرجع)</span></div><div class="resizer"></div></th>
 <th class="resizable-th py-3.5 px-4 text-center" data-column="status" style="width:180px;min-width:140px;"><span>الحالة</span><div class="resizer"></div></th>
-<th class="py-3.5 px-4 text-center" style="width:90px;min-width:75px;"><span>حذف</span></th>
 </tr>
 </thead>
 <tbody id="itemsTableBody">
@@ -132,9 +131,12 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name|e }}">
 <td class="py-3 px-3 text-center text-navy-text/50 font-mono">{{ it.idx|e }}</td>
 <td class="py-3 px-4">
-<div class="flex flex-col">
+<div class="flex items-start justify-between gap-2">
+<div class="flex flex-col min-w-0">
 <a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/items?code={{ it.item_code|e }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد"><span>{{ it.item_name|e }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
 <span class="text-[10px] text-primary font-mono mt-0.5">كود الصنف: {{ it.item_code|e }}</span>
+</div>
+<button aria-label="حذف الصنف {{ it.item_name|e }} من الطلب" class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy-text/40 transition-colors hover:bg-alert-bg/40 hover:text-alert-red" onclick="openDeleteItemModal('{{ it.name|e }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button>
 </div>
 </td>
 <td class="py-3 px-4">
@@ -172,9 +174,6 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <button class="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-surface-subtle border border-surface-container rounded-lg text-primary font-bold text-[11px] transition-colors shadow-sm" onclick="confirmManualDirect('{{ it.name|e }}')" type="button"><span class="material-symbols-outlined text-[14px]">verified_user</span>تأكيد</button>
 </div>
 {% endif %}
-</td>
-<td class="py-3 px-4 text-center">
-<button class="p-1.5 text-navy-text/40 hover:text-alert-red hover:bg-alert-bg/40 rounded-lg transition-colors" onclick="openDeleteItemModal('{{ it.name|e }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[18px]">delete</span></button>
 </td>
 </tr>
 {% endfor %}
