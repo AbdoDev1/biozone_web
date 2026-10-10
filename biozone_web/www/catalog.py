@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 import frappe
 
 from biozone_web.utils import (
@@ -177,6 +180,119 @@ def search_items_with_validation(term, category=None, page=1, page_size=PAGE_SIZ
     return rows, total, None
 
 
+# اقتراح التصحيح «هل تقصد؟» (v1): كلمة واحدة فقط، بعد صفر نتائج عادية.
+# بلا إثراء أسعار، واستعلام واحد لأسماء الأصناف، وبلا مساس بالبحث الحالي.
+SUGGEST_MIN_LENGTH = 4
+SUGGEST_MAX_COUNT = 3
+SUGGEST_MAX_DISTANCE = 1
+
+
+def fold_for_distance(text):
+    """طيّ معياري للمقارنة فقط (لا يمس المخزن): همزات→ا، ة→ه، ى→ي،
+    تشكيل/تطويل محذوف، لاتيني صغير."""
+
+    s = unicodedata.normalize("NFC", text or "")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = s.replace("ـ", "")
+    s = "".join("ا" if ch in _ALEF_HAMZAS else ch for ch in s)
+    s = s.replace("ة", "ه").replace("ى", "ي")
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    return s
+
+
+def levenshtein(a, b, limit=1):
+    """مسافة تحرير بسقف مبكر (كافٍ لحد v1) — خالصة بلا DB."""
+    if a == b:
+        return 0
+    if abs(len(a) - len(b)) > limit:
+        return limit + 1
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        row_min = i
+        for j, cb in enumerate(b, 1):
+            cost = prev[j - 1] + (ca != cb)
+            cur.append(min(prev[j] + 1, cur[-1] + 1, cost))
+            if cur[-1] < row_min:
+                row_min = cur[-1]
+        prev = cur
+        if row_min > limit:
+            return limit + 1
+    return prev[-1]
+
+
+def _is_letters_only(text):
+    """حروف عربية/لاتينية فقط بعد حذف التشكيل — قرار: اللاتينية مسموحة.
+
+    الأرقام (ولو عربية) والرموز والشرطات والتطويل مرفوضة. تُستخدم
+    للاستعلام وللكلمة المرشحة على حد سواء (إهمال كامل بلا تنظيف جزئي).
+    """
+
+    s = "".join(ch for ch in unicodedata.normalize("NFC", text or "") if not unicodedata.combining(ch))
+    return bool(s) and all(ch.isalpha() and ch != "ـ" for ch in s)
+
+
+def _tokenize(name):
+    """تقسيم الاسم على الفراغات وعلامات الترقيم الشائعة — اللاحقة
+    العربية والتشكيل لا يُحذفان من الرمز المعروض (الفاصل فقط)."""
+
+    return [
+        t for t in re.split(r"[\s،؛:\-_/()«»\"'.!؟?,;\[\]+&%*]+", name or "") if t
+    ]
+
+
+def rank_suggestions(folded_q, words):
+    """ترتيب خالص: مفردات {مطوي: خام} تُبنى مرة واحدة — كل كلمة فريدة تُطوى مرة.
+
+    العرض لكل مفتاح: الأقصر ثم الأبجدية الأولى. الترتيب: (مسافة، مفتاح، عرض).
+    """
+    vocab = {}
+    checked = set()
+    for w in words or []:
+        if w in checked:
+            continue
+        checked.add(w)
+        if len(w) < SUGGEST_MIN_LENGTH:
+            continue
+        if not _is_letters_only(w):
+            continue
+        vocab.setdefault(fold_for_distance(w), set()).add(w)
+    ranked = []
+    for fw, raws in vocab.items():
+        if fw == folded_q:
+            continue
+        d = levenshtein(folded_q, fw, SUGGEST_MAX_DISTANCE)
+        if d <= SUGGEST_MAX_DISTANCE:
+            display = sorted(raws, key=lambda r: (len(r), r))[0]
+            ranked.append((d, fw, display))
+    ranked.sort(key=lambda t: (t[0], t[1], t[2]))
+    return [display for _, _, display in ranked[:SUGGEST_MAX_COUNT]]
+
+
+def suggest_corrections(term, category=None):
+    """حتى 3 كلمات فريدة مرتبة — [] عند أي شرط مفقود (حروف/طول/كلمة واحدة)."""
+    term = (term or "").strip()
+    if not term or len(term) < SUGGEST_MIN_LENGTH:
+        return []
+    if len(term.split()) != 1:
+        return []
+    if not _is_letters_only(term):
+        return []
+    folded_q = fold_for_distance(term)
+    if len(folded_q) < SUGGEST_MIN_LENGTH:
+        return []
+    where = "disabled = 0"
+    params = {}
+    if category:
+        where += " and item_group = %(category)s"
+        params["category"] = category
+    names = frappe.db.sql(
+        "select distinct item_name from `tabItem` where " + where, params
+    )
+    words = [w for (name,) in names for w in _tokenize(name)]
+    return rank_suggestions(folded_q, words)
+
+
 def get_context(context):
     redirect_staff_away_from_store()
 
@@ -205,6 +321,17 @@ def get_context(context):
     total_pages = max((total_count + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(page, total_pages)
 
+    # اقتراح التصحيح: فقط عند صفر نتائج عادية وبلا خطأ طول — لا يغيّر
+    # الاستعلام ولا النتائج ولا العدّ ولا الأسعار. أي عطل فيه يُسجَّل
+    # ويُتجاهل حتى لا يكسر الصفحة أبدًا.
+    did_you_mean = []
+    if total_count == 0 and search_error is None and search_term:
+        try:
+            did_you_mean = suggest_corrections(search_term, selected_category or None)
+        except Exception:
+            frappe.log_error(title="Biozone suggest failed", message=frappe.get_traceback())
+            did_you_mean = []
+
     # البند 5: السعر النهائي حسب فئة الطالب (سيرفر-سايد عبر محرك ERPNext)،
     # لا السعر الأساسي الخام — الزائر/غير المفعّل يرى سعر الجمهور، والمفعّل
     # يرى سعر فئته فقط. الأصناف بلا سعر أساسي تبقى price=None (زر معطّل).
@@ -231,6 +358,7 @@ def get_context(context):
     context.selected_category = selected_category
     context.search_term = search_term
     context.search_error = search_error
+    context.did_you_mean = did_you_mean
     context.total_count_ar = _to_arabic_digits(total_count)
     context.page = page
     context.has_prev = page > 1
