@@ -26,6 +26,9 @@
     <span class="text-base text-secondary whitespace-nowrap">{{ total_count_ar|e }} صنف</span>
   </div>
 
+  {% if search_error %}
+  <p class="mb-lg text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" role="alert">{{ search_error|e }}</p>
+  {% endif %}
   {% if search_term %}
   <div class="mb-lg flex items-center gap-sm text-sm text-on-surface-variant">
     <span>نتائج البحث عن "<span class="font-bold text-on-surface">{{ search_term|e }}</span>"</span>
