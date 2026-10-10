@@ -45,7 +45,7 @@
       <div>
         <span class="text-sm text-primary font-bold">{{ item.item_group|e }}</span>
         <h1 class="text-2xl md:text-4xl font-bold text-on-surface leading-tight mt-1">{{ item.item_name|e }}</h1>
-        <div class="text-xs text-on-surface-variant mt-1">كود الصنف: {{ item.item_code|e }}{% if item.brand %} | العلامة: {{ item.brand|e }}{% endif %}</div>
+        {% if item.brand %}<div class="text-xs text-on-surface-variant mt-1">العلامة: {{ item.brand|e }}</div>{% endif %}
       </div>
       <div class="flex items-center gap-2">
         {% if item.price %}
