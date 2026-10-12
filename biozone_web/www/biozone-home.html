@@ -85,10 +85,18 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
         {% for item in featured_items %}
         <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col">
-          <div class="relative w-full bg-surface-container-low flex items-center justify-center overflow-hidden aspect-[4/3]">
+          <div class="relative w-full bg-surface-container-lowest flex items-center justify-center overflow-hidden aspect-[4/3]">
             <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name|e }}">
             {% if item.thumbnail %}
+            {% if item.card and item.card2x %}
+            <img src="{{ item.card|e }}" srcset="{{ item.card|e }} 1x, {{ item.card2x|e }} 2x" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+            {% elif item.card %}
+            <img src="{{ item.card|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+            {% elif item.medium %}
+            <img src="{{ item.thumbnail|e }}" srcset="{{ item.thumbnail|e }} 1x, {{ item.medium|e }} 2x" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+            {% else %}
             <img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+            {% endif %}
             {% else %}
             <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
             {% endif %}
@@ -97,7 +105,7 @@
           <div class="p-3 flex flex-col flex-grow">
             <span class="text-xs text-primary mb-0.5">{{ item.item_group|e }}</span>
             <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name|e }}</a>
-            <div class="mt-auto pt-2">
+            <div class="pt-2">
               {% if item.price %}
               <span class="font-bold text-primary text-lg">{{ "%.2f"|format(item.price) }} ج.م</span>
               {% else %}
@@ -105,7 +113,7 @@
               {% endif %}
             </div>
             <div
-              class="mt-2 catalog-cart-control"
+              class="mt-auto pt-2 catalog-cart-control"
               data-item-code="{{ item.item_code|e }}"
               data-item-name="{{ item.item_name|e }}"
               data-item-group="{{ item.item_group|e }}"
@@ -113,12 +121,13 @@
               data-item-image="{{ item.thumbnail or '' }}"
             >
               <button
+                aria-label="أضف للسلة"
                 class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
                 {% if not item.price %}disabled{% endif %}
                 type="button"
               >
                 <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                أضف للسلة
+                <span class="hidden sm:inline">أضف للسلة</span>
               </button>
               <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
                 <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">

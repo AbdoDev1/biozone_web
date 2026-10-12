@@ -1,7 +1,6 @@
 import frappe
 
 from biozone_web.utils import (
-    get_effective_item_prices,
     get_header_context,
     redirect_staff_away_from_store,
 )
@@ -39,17 +38,12 @@ def get_context(context):
         order_by="creation asc",
         limit_page_length=4,
     )
-    item_codes = [i["item_code"] for i in items]
-    # البند 5: نفس تسعير الفئة المستخدم في /catalog (سيرفر-سايد).
-    effective = get_effective_item_prices(item_codes)
-    for item in items:
-        item["price"] = effective.get(item["item_code"], {}).get("price")
-    # المصغرات دفعة واحدة (نفس نمط /catalog — بلا N+1).
-    from biozone_web.services.item_images import resolve_item_thumbnails
+    # Same enrichment as /catalog + /item (single source of truth): server-side
+    # category pricing, display-unit conversion, and the full image-derivative
+    # set (image/thumbnail/medium/card/card2x). Keeps the featured cards
+    # visually and commercially identical to the catalog cards.
+    from biozone_web.services.store_items import enrich_store_items
 
-    thumb_map = resolve_item_thumbnails(item_codes)
-    for item in items:
-        item["thumbnail"] = (thumb_map.get(item["item_code"]) or {}).get("thumbnail") or ""
-    context.featured_items = items
+    context.featured_items = enrich_store_items(items)
 
     return context

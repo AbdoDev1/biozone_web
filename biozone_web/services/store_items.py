@@ -19,7 +19,7 @@ Top-level imports are cycle-safe: ``utils`` and ``units`` and
 ``services.item_images`` import only ``frappe``/stdlib at module level.
 """
 
-from biozone_web.services.item_images import resolve_item_thumbnails
+from biozone_web.services.item_images import derived_url, medium_url_for, resolve_item_thumbnails
 from biozone_web.units import money2, resolve_items_display
 from biozone_web.utils import get_customer_price_group, get_effective_item_prices
 
@@ -59,6 +59,10 @@ def enrich_store_items(items, customer_group=None):
         price = (effective.get(code) or {}).get("price")
         row["price"] = money2(price * factor) if price is not None else None
         row["display_uom"] = d.get("uom") or ""
+        row["image"] = (thumb_map.get(code) or {}).get("image") or ""
         row["thumbnail"] = (thumb_map.get(code) or {}).get("thumbnail") or ""
+        row["medium"] = medium_url_for(row["image"])
+        row["card"] = derived_url(row["image"], "card")
+        row["card2x"] = derived_url(row["image"], "card2x") if row["card"] else ""
         enriched.append(row)
     return enriched

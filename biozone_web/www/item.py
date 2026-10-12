@@ -24,7 +24,7 @@ def get_context(context):
 
     rows = frappe.get_all(
         "Item",
-        fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "description"],
+        fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "description", "image"],
         filters={"item_code": code, "disabled": 0},
         limit_page_length=1,
     )
