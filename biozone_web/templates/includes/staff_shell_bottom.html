@@ -85,6 +85,83 @@
       window.matchMedia('(min-width: 1024px)').addEventListener('change', syncSidebarAria);
     }
 </script>
+<script>
+/* Staff-shell safety net (all staff pages, no per-page edits).
+   (1) A native POST navigation to a page URL can never succeed on staff
+       pages (no POST handlers) and wipes the UI on error — block it and
+       show a message. Never converts, never re-sends. GET passes through.
+   (2) API fetch failures carrying an EXPLICIT session/CSRF signal
+       (`session_expired` flag or `CSRFTokenError`) raise the shared bell
+       banner — never a bare 403/400, never silent, never retried. */
+(function () {
+  function isApiUrl(u) { return (u || "").indexOf("/api/") !== -1; }
+  function showShellMsg(text) {
+    try {
+      var bar = document.getElementById("bz-shell-msg");
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "bz-shell-msg";
+        bar.setAttribute("role", "alert");
+        bar.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;background:#1f2937;color:#fff;padding:10px 16px;border-radius:10px;font-weight:bold;max-width:90vw;text-align:center;";
+        document.body.appendChild(bar);
+      }
+      bar.textContent = text;
+      bar.style.display = "";
+      clearTimeout(bar._t);
+      bar._t = setTimeout(function () { bar.style.display = "none"; }, 6000);
+    } catch (e) {}
+  }
+  document.addEventListener("submit", function (ev) {
+    try {
+      var f = ev.target;
+      if (!f || f.tagName !== "FORM") return;
+      if ((f.method || "get").toLowerCase() !== "post") return;
+      var a = document.createElement("a");
+      a.href = f.action || window.location.href;
+      if (isApiUrl(a.pathname + a.search)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      showShellMsg("تعذّر إرسال النموذج — حدّث الصفحة وحاول مجددًا، وإن تكرر سجّل الدخول مجددًا");
+    } catch (e) {}
+  }, true);
+  function fireSessionDead() {
+    try {
+      if (typeof window.bzOnSessionDead === "function") { window.bzOnSessionDead(); return; }
+    } catch (e) {}
+    try {
+      if (typeof CustomEvent === "function") { document.dispatchEvent(new CustomEvent("bz-session-expired")); }
+    } catch (e2) {}
+  }
+  function looksSessionDead(data) {
+    if (!data || typeof data !== "object") return false;
+    if (data.session_expired) return true;
+    if (data.exc_type === "CSRFTokenError") return true;
+    return false;
+  }
+  if (!window.fetch || window.fetch.__bzWrapped) return;
+  var rawFetch = window.fetch;
+  window.fetch = function (url, opts) {
+    var p;
+    try { p = rawFetch.apply(this, arguments); }
+    catch (e) { throw e; }
+    try {
+      var method = ((opts && opts.method) || "GET").toUpperCase();
+      var u = typeof url === "string" ? url : (url && url.url) || "";
+      if (method !== "POST" || !isApiUrl(u)) return p;
+      p.then(function (res) {
+        if (!res || res.ok) return;
+        try {
+          res.clone().json().then(function (data) {
+            if (looksSessionDead(data)) fireSessionDead();
+          }, function () {});
+        } catch (e) {}
+      }, function () {});
+    } catch (e2) {}
+    return p;
+  };
+  window.fetch.__bzWrapped = true;
+})();
+</script>
 {# Unified staff toast (Phase 2): loaded once per shell page. Defines
    StaffUI.toast / staffToast + error map only — no auto-render, no call
    sites changed. Pages keep their own toast code untouched for now. #}
