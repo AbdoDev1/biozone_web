@@ -738,6 +738,18 @@ function setItemImagePreview(url) {
   }
 }
 
+// On dead session, freeze all write buttons so no save/upload can fire
+// after expiry. The banner itself is rendered by the shared bell partial.
+document.addEventListener('bz-session-expired', function () {
+  ['item-image-upload-btn', 'item-image-delete-btn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) b.disabled = true;
+  });
+  const save = document.querySelector("button[onclick='saveItemPanel()']");
+  if (save) save.disabled = true;
+  showItemImageMsg('انتهت الجلسة؛ سجّل الدخول مجددًا قبل أي تعديل', false);
+});
+
 function showItemImageMsg(text, ok) {
   const msg = document.getElementById('item-image-msg');
   msg.textContent = text;
