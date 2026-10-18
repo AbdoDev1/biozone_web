@@ -8,8 +8,13 @@ from biozone_web.utils import (
     redirect_staff_away_from_store,
 )
 
-# Home product rails: the top real category + one curated personal-care
-# collection (several care Item Groups merged into a single rail).
+# Home sections come from Biozone Home Settings (owner-managed rows: group +
+# optional display label + "show products" flag + order) — rename/delete-safe,
+# no code change needed to swap sections. When the settings table is empty the
+# home falls back to the legacy dynamic behavior: top real categories by active
+# item count, plus a top-category rail and a curated personal-care collection.
+SETTINGS_PARENT = "Biozone Home Settings"
+SECTION_DOCTYPE = "Biozone Home Section"
 PERFUME_GROUP = "عطور"
 CARE_GROUPS = [
     "شامبو",
@@ -58,6 +63,81 @@ def _rail_items(filters, limit=RAIL_SIZE, diversify=False, candidates=60):
     return picked
 
 
+def _settings_rows():
+    """Owner-typed section rows in display order (read as plain table data:
+    the storefront runs as Guest and this content is public by design)."""
+    return frappe.db.get_all(
+        SECTION_DOCTYPE,
+        filters={"parent": SETTINGS_PARENT, "parenttype": SETTINGS_PARENT},
+        fields=["item_group", "label", "show_products", "sort_order"],
+        order_by="sort_order asc, idx asc",
+    )
+
+
+def _existing_groups():
+    return set(frappe.db.get_all("Item Group", pluck="name"))
+
+
+def _display_label(row):
+    return (row.get("label") or "").strip() or row["item_group"]
+
+
+def build_tiles(rows, existing_groups):
+    """Tiles from settings rows; rows pointing at deleted groups are dropped."""
+    tiles = []
+    for row in rows or []:
+        group = (row.get("item_group") or "").strip()
+        if not group or group not in existing_groups:
+            continue
+        tiles.append(
+            {
+                "item_group": group,
+                "label": _display_label(row),
+                "url": "/catalog?category=" + quote(group, safe=""),
+            }
+        )
+    return tiles
+
+
+def build_rail_defs(rows, existing_groups):
+    """Rail definitions (group/title/url) for rows flagged "show products"."""
+    defs = []
+    for row in rows or []:
+        group = (row.get("item_group") or "").strip()
+        if not group or group not in existing_groups or not row.get("show_products"):
+            continue
+        defs.append(
+            {
+                "group": group,
+                "title": _display_label(row),
+                "url": "/catalog?category=" + quote(group, safe=""),
+            }
+        )
+    return defs
+
+
+def _fallback_tiles():
+    """Legacy dynamic tiles: top real item groups by active item count."""
+    return [
+        {
+            "item_group": r.item_group,
+            "label": r.item_group,
+            "url": "/catalog?category=" + quote(r.item_group, safe=""),
+        }
+        for r in frappe.db.sql(
+            """
+            select item_group, count(*) as item_count
+            from `tabItem`
+            where disabled = 0
+            group by item_group
+            order by item_count desc
+            limit 4
+            """,
+            as_dict=True,
+        )
+    ]
+
+
 def get_context(context):
     redirect_staff_away_from_store()
 
@@ -65,20 +145,43 @@ def get_context(context):
     context.no_cache = 1
     context.update(get_header_context())
 
-    # Top categories: real item groups, ranked by how many active items
-    # they contain. Dynamic on purpose — avoids hardcoding category names
-    # that could drift from the actual Item Group data.
-    context.top_categories = frappe.db.sql(
-        """
-        select item_group, count(*) as item_count
-        from `tabItem`
-        where disabled = 0
-        group by item_group
-        order by item_count desc
-        limit 4
-        """,
-        as_dict=True,
-    )
+    from biozone_web.services.store_items import enrich_store_items
+
+    rows = _settings_rows()
+    existing = _existing_groups()
+
+    if rows:
+        context.top_categories = build_tiles(rows, existing)
+        context.home_rails = [
+            {
+                "title": d["title"],
+                "url": d["url"],
+                "products": enrich_store_items(
+                    _rail_items({"disabled": 0, "item_group": d["group"]})
+                ),
+            }
+            for d in build_rail_defs(rows, existing)
+        ]
+    else:
+        context.top_categories = _fallback_tiles()
+        context.home_rails = [
+            {
+                "title": PERFUME_GROUP,
+                "url": "/catalog?category=" + quote(PERFUME_GROUP),
+                "products": enrich_store_items(
+                    _rail_items({"disabled": 0, "item_group": PERFUME_GROUP})
+                ),
+            },
+            {
+                "title": "العناية الشخصية",
+                "url": "/catalog",
+                "products": enrich_store_items(
+                    _rail_items(
+                        {"disabled": 0, "item_group": ["in", CARE_GROUPS]}, diversify=True
+                    )
+                ),
+            },
+        ]
 
     # Product brands: real ERPNext `Brand` values, ranked by how many active
     # items carry them. Dynamic on purpose — the home never hardcodes a brand
@@ -99,30 +202,5 @@ def get_context(context):
     )
     for brand in context.top_brands:
         brand["logo_url"] = brand_logo_url(brand.brand)
-
-    # Two product rails replacing the old single "featured" strip: one real
-    # top category + one curated care collection. Both reuse the exact same
-    # enrichment as /catalog (server-side pricing + image derivatives), so the
-    # cards stay commercially and visually identical to the catalog.
-    from biozone_web.services.store_items import enrich_store_items
-
-    context.home_rails = [
-        {
-            "title": PERFUME_GROUP,
-            "url": "/catalog?category=" + quote(PERFUME_GROUP),
-            "products": enrich_store_items(
-                _rail_items({"disabled": 0, "item_group": PERFUME_GROUP})
-            ),
-        },
-        {
-            "title": "العناية الشخصية",
-            "url": "/catalog",
-            "products": enrich_store_items(
-                _rail_items(
-                    {"disabled": 0, "item_group": ["in", CARE_GROUPS]}, diversify=True
-                )
-            ),
-        },
-    ]
 
     return context

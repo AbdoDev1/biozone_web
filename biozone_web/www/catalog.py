@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from urllib.parse import quote
 
 import frappe
 
@@ -121,6 +122,16 @@ def _pages_window(page, total_pages):
     ]
 
 
+def _as_filter_list(value):
+    """مدخل فلتر (نص واحد أو قائمة) → قائمة قيم غير فارغة.
+
+    النص المفرد يبقى مقبولًا كما هو (توافق خلفي مع الاستدعاءات القديمة).
+    """
+    if isinstance(value, str):
+        return [value] if value else []
+    return [v for v in (value or []) if v]
+
+
 def _search_where(term, category, brand=None):
     """WHERE + params للعدّ والصفحة معًا (تطابق حرفي مضمون).
 
@@ -128,16 +139,27 @@ def _search_where(term, category, brand=None):
     - بدائل أ/ا وة/ه وى/ي OR — بلا دمج سجلات وبلا تغيير بيانات.
     - اسم البراند ضمن البحث (مثال: «nivea» يجد أصناف نيفيا) بشرط حرفي واحد.
     - باركود مطابق تمامًا (=) مع بقاء فلاتر الفئة/البراند والتعطيل.
+    - فلاتر الفئة/البراند تقبل قيمة واحدة أو قيمًا متعددة (in — بلا حد).
     """
     term = (term or "").strip()
     where = "disabled = 0"
     params = {}
-    if category:
-        where += " and item_group = %(category)s"
-        params["category"] = category
-    if brand:
-        where += " and brand = %(brand)s"
-        params["brand"] = brand
+    cats = _as_filter_list(category)
+    if cats:
+        placeholders = []
+        for i, c in enumerate(cats):
+            key = "category%d" % i
+            placeholders.append("%%(%s)s" % key)
+            params[key] = c
+        where += " and item_group in (" + ", ".join(placeholders) + ")"
+    brands = _as_filter_list(brand)
+    if brands:
+        placeholders = []
+        for i, b in enumerate(brands):
+            key = "brand%d" % i
+            placeholders.append("%%(%s)s" % key)
+            params[key] = b
+        where += " and brand in (" + ", ".join(placeholders) + ")"
     lit = None
     if term:
         variants = build_search_variants(term)
@@ -308,12 +330,22 @@ def suggest_corrections(term, category=None, brand=None):
         return []
     where = "disabled = 0"
     params = {}
-    if category:
-        where += " and item_group = %(category)s"
-        params["category"] = category
-    if brand:
-        where += " and brand = %(brand)s"
-        params["brand"] = brand
+    cats = _as_filter_list(category)
+    if cats:
+        placeholders = []
+        for i, c in enumerate(cats):
+            key = "scategory%d" % i
+            placeholders.append("%%(%s)s" % key)
+            params[key] = c
+        where += " and item_group in (" + ", ".join(placeholders) + ")"
+    brands = _as_filter_list(brand)
+    if brands:
+        placeholders = []
+        for i, b in enumerate(brands):
+            key = "sbrand%d" % i
+            placeholders.append("%%(%s)s" % key)
+            params[key] = b
+        where += " and brand in (" + ", ".join(placeholders) + ")"
     names = frappe.db.sql(
         "select distinct item_name from `tabItem` where " + where, params
     )
@@ -331,6 +363,36 @@ def normalize_filter(value, allowed):
     return value if value in set(allowed or ()) else ""
 
 
+def normalize_filters(values, allowed):
+    """قائمة فلاتر مطبَّعة: غير الموجود فعليًا والمكرر والفارغ يُسقط، والترتيب محفوظ."""
+    allowed_set = set(allowed or ())
+    seen, out = set(), []
+    for v in values or ():
+        v = (v or "").strip()
+        if v and v in allowed_set and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+def _filter_values(key):
+    """قيم فلتر متعددة من الرابط (?category=A&category=B) بالترتيب.
+
+    الرجوع لقيمة واحدة من form_dict عند غياب الطلب (توافق الاختبارات
+    وأي سياق بلا request). القيم الفارغة تُسقط.
+    """
+    request = getattr(frappe.local, "request", None)
+    args = getattr(request, "args", None)
+    values = []
+    if args is not None and hasattr(args, "getlist"):
+        values = args.getlist(key)
+    if not values:
+        single = frappe.form_dict.get(key)
+        if single:
+            values = [single]
+    return [v.strip() for v in values if v and v.strip()]
+
+
 def get_context(context):
     redirect_staff_away_from_store()
 
@@ -342,8 +404,8 @@ def get_context(context):
     context.update(get_header_context())
 
     search_term = (frappe.form_dict.get("q") or "").strip()
-    raw_category = (frappe.form_dict.get("category") or "").strip()
-    raw_brand = (frappe.form_dict.get("brand") or "").strip()
+    raw_categories = _filter_values("category")
+    raw_brands = _filter_values("brand")
 
     # قوائم الفلترة: القسم من Item Group الفعلية، والبراند من Brand الفعلية
     # (أصناف نشطة فقط) — بلا قائمة مخزّنة ولا قيم مثبتة في القالب.
@@ -368,8 +430,57 @@ def get_context(context):
         )
         if d.brand
     ]
-    selected_category = normalize_filter(raw_category, categories)
-    selected_brand = normalize_filter(raw_brand, brands)
+    selected_categories = normalize_filters(raw_categories, categories)
+    selected_brands = normalize_filters(raw_brands, brands)
+
+    # شرائح الفلاتر النشطة + مقاطع الـquerystring: تُبنى في الخلفية (مصدر
+    # واحد للقالب والترقيم و«هل تقصد؟») — كل شريحة تحذف قيمتها وحدها
+    # وتحفظ البحث وباقي القيم.
+    def _qs(prefix, values):
+        return "&".join("%s=%s" % (prefix, quote(v, safe="")) for v in values)
+
+    q_qs = "q=" + quote(search_term, safe="") if search_term else ""
+    cat_qs = _qs("category", selected_categories)
+    brand_qs = _qs("brand", selected_brands)
+    filters_qs = "&".join(p for p in (q_qs, cat_qs, brand_qs) if p)
+    qs_without_q = "&".join(p for p in (cat_qs, brand_qs) if p)
+
+    def _remove_url(rest):
+        rest = [p for p in rest if p]
+        return "/catalog?" + "&".join(rest) if rest else "/catalog"
+
+    active_chips = []
+    if search_term:
+        active_chips.append(
+            {
+                "kind": "q",
+                "aria": "إزالة فلتر البحث",
+                "label": search_term,
+                "url": _remove_url([cat_qs, brand_qs]),
+            }
+        )
+    for c in selected_categories:
+        active_chips.append(
+            {
+                "kind": "category",
+                "aria": "إزالة فلتر القسم",
+                "label": c,
+                "url": _remove_url(
+                    [q_qs, _qs("category", [x for x in selected_categories if x != c]), brand_qs]
+                ),
+            }
+        )
+    for b in selected_brands:
+        active_chips.append(
+            {
+                "kind": "brand",
+                "aria": "إزالة فلتر البراند",
+                "label": b,
+                "url": _remove_url(
+                    [q_qs, cat_qs, _qs("brand", [x for x in selected_brands if x != b])]
+                ),
+            }
+        )
 
     try:
         page = int(frappe.form_dict.get("page") or 1)
@@ -384,7 +495,7 @@ def get_context(context):
         search_error = err
     else:
         items, total_count = search_items(
-            search_term, selected_category or None, page, PAGE_SIZE, selected_brand or None
+            search_term, selected_categories or None, page, PAGE_SIZE, selected_brands or None
         )
     total_pages = max((total_count + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(page, total_pages)
@@ -395,7 +506,7 @@ def get_context(context):
     did_you_mean = []
     if total_count == 0 and search_error is None and search_term:
         try:
-            did_you_mean = suggest_corrections(search_term, selected_category or None, selected_brand or None)
+            did_you_mean = suggest_corrections(search_term, selected_categories or None, selected_brands or None)
         except Exception:
             frappe.log_error(title="Biozone suggest failed", message=frappe.get_traceback())
             did_you_mean = []
@@ -410,11 +521,10 @@ def get_context(context):
     items = enrich_store_items(items)
     context.items = items
 
-    # عنوان الصفحة وعدّادها يتبعان الفلتر المطبَّق (البراند/التصنيف المفلتر أولًا).
-    if selected_brand:
-        scope_title = selected_brand
-    elif selected_category:
-        scope_title = selected_category
+    # العنوان ثابت: عبارة عامة عند وجود فلتر/بحث — الأسماء في الشرائح فقط
+    # (لا تكرار بصري بخط كبير)، و«كل المنتجات» في الحالة الافتراضية.
+    if selected_brands or selected_categories or search_term:
+        scope_title = "نتائج الفلتر أو البحث"
     else:
         scope_title = "كل المنتجات"
     result_count_text = "%s صنف" % _to_arabic_digits(total_count)
@@ -422,8 +532,13 @@ def get_context(context):
     context.items = items
     context.categories = categories
     context.brands = brands
-    context.selected_category = selected_category
-    context.selected_brand = selected_brand
+    context.selected_categories = selected_categories
+    context.selected_brands = selected_brands
+    context.active_chips = active_chips
+    context.filters_qs = filters_qs
+    context.qs_without_q = qs_without_q
+    context.sel_categories_count_ar = _to_arabic_digits(len(selected_categories))
+    context.sel_brands_count_ar = _to_arabic_digits(len(selected_brands))
     context.search_term = search_term
     context.search_error = search_error
     context.did_you_mean = did_you_mean
@@ -437,7 +552,9 @@ def get_context(context):
     context.next_page = page + 1
     # شريط الفلاتر والترقيم الجديدان (new_design): العدّاد الظاهر، نطاق
     # العرض الحالي، نافذة أرقام الصفحات، وعدّ الفلاتر النشطة للكبسولة.
-    context.active_filters_count = int(bool(search_term)) + int(bool(selected_category)) + int(bool(selected_brand))
+    context.active_filters_count = (
+        int(bool(search_term)) + len(selected_categories) + len(selected_brands)
+    )
     context.active_filters_count_ar = _to_arabic_digits(context.active_filters_count)
     context.shown_count_ar = _to_arabic_digits(len(items))
     range_start = (page - 1) * PAGE_SIZE + 1 if total_count else 0

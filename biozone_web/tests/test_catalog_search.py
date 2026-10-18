@@ -385,6 +385,20 @@ class TestFilterNormalization(unittest.TestCase):
         self.assertEqual(catalog.normalize_filter("عطور", []), "")
         self.assertEqual(catalog.normalize_filter("عطور", None), "")
 
+    def test_multi_kept_dropped_dedup_order(self):
+        allowed = ["عطور", "شامبو", "أبل"]
+        self.assertEqual(
+            catalog.normalize_filters(
+                [" شامبو ", "غير-موجود", "عطور", "شامبو", "", None], allowed
+            ),
+            ["شامبو", "عطور"],
+        )
+
+    def test_multi_empty_inputs(self):
+        self.assertEqual(catalog.normalize_filters(None, ["عطور"]), [])
+        self.assertEqual(catalog.normalize_filters([], ["عطور"]), [])
+        self.assertEqual(catalog.normalize_filters(["عطور"], None), [])
+
     def test_toolbar_template_contract(self):
         import os
         p = os.path.join(os.path.dirname(catalog.__file__), "catalog.html")
@@ -401,7 +415,7 @@ class TestFilterNormalization(unittest.TestCase):
         self.assertNotIn("الفلاتر النشطة", html)
         self.assertIn('id="active-filters-container"', html)
         self.assertNotIn('name="scope"', html)
-        # اختيار واحد لكل مجموعة (الخلفية تقبل قيمة واحدة لكل فلتر)
+        # اختيار متعدد بلا حد لكل مجموعة (الخلفية تقبل قائمة قيم — in)
         self.assertIn('data-filter-group="category"', html)
         self.assertIn('data-filter-group="brand"', html)
         # لا فلتر سعر في الواجهة: لا فلتر سعر في الخلفية أصلًا
@@ -583,3 +597,43 @@ class TestCatalogQueryBudget(FrappeTestCase):
         n20 = self._count(lambda: enrich_store_items(codes))
         slope = (n20 - n5) / float(len(codes) - 5)
         self.assertLessEqual(slope, 8.0)
+
+
+class TestMultiSelectFilters(FrappeTestCase):
+    """الفلتر المتعدد (قسم/براند): in بمجموعة القيم — اتحاد بلا فقد/تكرار،
+    والنص المفرد القديم يبقى يعمل (توافق خلفي مع الاستدعاءات السابقة)."""
+
+    def test_multi_category_union_matches_individuals(self):
+        rows = frappe.db.sql(
+            "select item_group, count(*) c from `tabItem` where disabled=0 "
+            "group by item_group order by c desc limit 2",
+            as_dict=True,
+        )
+        if len(rows) < 2:
+            self.skipTest("need two item groups with items")
+        a, b = rows[0].item_group, rows[1].item_group
+        total_a = catalog.search_items("", a, 1, 1)[1]
+        total_b = catalog.search_items("", b, 1, 1)[1]
+        _, total_multi = catalog.search_items("", [a, b], 1, 1)
+        self.assertEqual(total_multi, total_a + total_b)
+
+    def test_multi_brand_union_matches_individuals(self):
+        brands = frappe.get_all("Brand", pluck="name", order_by="name asc", limit=2)
+        if len(brands) < 2:
+            self.skipTest("need two brands")
+        a, b = brands
+        total_a = catalog.search_items("", None, 1, 1, a)[1]
+        total_b = catalog.search_items("", None, 1, 1, b)[1]
+        total_multi = catalog.search_items("", None, 1, 1, [a, b])[1]
+        self.assertEqual(total_multi, total_a + total_b)
+
+    def test_multi_unknown_values_yield_empty(self):
+        rows, total = catalog.search_items("", ["غير-موجود-أ", "غير-موجود-ب"], 1, 10)
+        self.assertEqual(rows, [])
+        self.assertEqual(total, 0)
+
+    def test_suggest_corrections_multi_no_crash(self):
+        out = catalog.suggest_corrections(
+            "زيوت", category=["غير-موجود"], brand=["غير-موجود"]
+        )
+        self.assertIsInstance(out, list)

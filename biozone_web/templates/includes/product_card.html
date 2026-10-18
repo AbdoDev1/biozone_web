@@ -82,13 +82,13 @@
 </div>
 {% endmacro %}
 
-{% macro product_card(item, lazy=false) %}
+{% macro product_card(item, lazy=false, image_height='h-36') %}
 <article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col justify-between overflow-hidden relative group h-full transition-all duration-[250ms] hover:-translate-y-[3px]">
   <div class="p-4 pb-0 flex items-center justify-between z-10">
     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
   </div>
   <div class="px-6 py-4 flex items-center justify-center min-h-[200px] bg-slate-50/50">
-    <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-36" aria-label="{{ item.item_name|e }}">
+    <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full {{ image_height }}" aria-label="{{ item.item_name|e }}">
       {{ product_image(item, lazy) }}
     </a>
   </div>
@@ -117,7 +117,7 @@
 {% macro product_card_list(item, lazy=false) %}
 <article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 gap-4 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
   <div class="flex items-center gap-5 w-full sm:w-auto sm:flex-1 min-w-0">
-    <div class="w-24 h-24 sm:w-40 sm:h-40 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-center shrink-0 p-2">
+    <div class="w-24 h-24 sm:w-52 sm:h-52 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-center shrink-0 p-2">
       <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-full" aria-label="{{ item.item_name|e }}">
         {{ product_image(item, lazy) }}
       </a>
