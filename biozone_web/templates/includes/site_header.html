@@ -27,7 +27,7 @@
     html { overflow-y: auto; scrollbar-gutter: stable; }
   }
 </style>
-<header class="sticky top-0 z-50 w-full shadow-sm bg-surface">
+<header class="sticky top-0 z-50 w-full shadow-sm bg-surface border-b border-outline-variant">
   <div class="flex justify-between items-center w-full px-md py-sm max-w-container-max mx-auto h-[72px]">
     <div class="flex-shrink-0">
       <a href="/biozone-home" class="text-2xl font-bold text-primary tracking-tight">Biozone</a>
@@ -36,22 +36,26 @@
       <a href="/biozone-home" class="pb-1 transition-colors {% if active_page == 'home' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-primary{% endif %}">الرئيسية</a>
       <a href="/catalog" class="pb-1 transition-colors {% if active_page == 'catalog' %}text-primary border-b-2 border-primary{% else %}text-on-surface-variant hover:text-primary{% endif %}">المتجر</a>
     </nav>
-    <form method="get" action="/catalog" class="flex-grow max-w-2xl mx-lg hidden md:flex items-stretch gap-2">
-      {% if categories %}
-      <select name="category" onchange="this.form.submit()" class="bg-surface-container rounded-full border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-bold outline-none px-4 max-w-[160px] truncate">
-        <option value="">الكل</option>
-        {% for cat in categories %}
-        <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
-        {% endfor %}
-      </select>
-      {% endif %}
+    {# شريط البحث الموحّد (كل الصفحات ما عدا /catalog): حقل واحد بلا قوائم
+       مبهمة. صفحة الكتالوج تمرّر hide_header_search=True لأن شريط الفلترة
+       هناك هو حقل البحث الوحيد الظاهر (Option C)؛ /item يبقي البحث لأن
+       active_page="catalog" فيه لتمييز التنقل فقط.
+       على غير /catalog يُحافظ على فلترَي القسم/البراند عبر حقول مخفية. #}
+    {% if not hide_header_search %}
+    <form method="get" action="/catalog" class="flex-grow max-w-2xl mx-lg hidden md:flex items-center gap-2">
+      {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category|e }}">{% endif %}
+      {% if selected_brand %}<input type="hidden" name="brand" value="{{ selected_brand|e }}">{% endif %}
       <div class="relative flex-grow">
-        <input class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary transition-all text-base outline-none" placeholder="ابحث عن منتج..." type="text" name="q" value="{{ search_term or '' }}">
-        <button type="submit" class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary">
-          <span class="material-symbols-outlined">search</span>
+        <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full pl-12 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% else %}class="w-full pl-4 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% endif %} enterkeyhint="search" name="q" placeholder="ابحث عن منتج، صنف، أو براند..." type="text" value="{{ search_term or '' }}">
+        <button type="submit" aria-label="بحث" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary">
+          <span class="material-symbols-outlined text-lg">search</span>
         </button>
+        {% if search_term %}
+        <a aria-label="مسح البحث" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
+        {% endif %}
       </div>
     </form>
+    {% endif %}
     <div class="flex items-center gap-sm">
       {% if is_logged_in %}
         <a href="/account" title="حسابي" class="hidden md:inline text-sm font-bold text-on-surface-variant hover:text-primary transition-colors">{{ user_full_name }}</a>
@@ -84,23 +88,23 @@
   </div>
 </header>
 {# بحث الموبايل: فورم الديسكتوب hidden على الشاشات الصغيرة بلا بديل —
-   صف مدمج بنفس GET والبارامترات (q/category) يظهر تحت الشريط فقط هناك. #}
+   صف مدمج بنفس GET والبارامترات (q/category/brand) يظهر تحت الشريط فقط
+   هناك، ومخفٍ على /catalog مع نظيره (Option C). #}
+{% if not hide_header_search %}
 <form method="get" action="/catalog" class="md:hidden flex items-stretch gap-2 px-4 py-2 bg-surface border-b border-outline-variant">
-  {% if categories %}
-  <select name="category" onchange="this.form.submit()" class="bg-surface-container rounded-full border border-outline-variant text-sm font-bold outline-none px-3 max-w-[120px] truncate">
-    <option value="">الكل</option>
-    {% for cat in categories %}
-    <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
-    {% endfor %}
-  </select>
-  {% endif %}
+  {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category|e }}">{% endif %}
+  {% if selected_brand %}<input type="hidden" name="brand" value="{{ selected_brand|e }}">{% endif %}
   <div class="relative flex-grow">
-    <input class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-full border border-outline-variant text-base outline-none" placeholder="ابحث عن منتج..." type="text" name="q" value="{{ search_term or '' }}">
-    <button type="submit" aria-label="بحث" class="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-      <span class="material-symbols-outlined">search</span>
+    <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full pl-12 pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% else %}class="w-full pl-4 pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% endif %} enterkeyhint="search" placeholder="ابحث عن منتج، صنف، أو براند..." type="text" name="q" value="{{ search_term or '' }}">
+    <button type="submit" aria-label="بحث" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+      <span class="material-symbols-outlined text-lg">search</span>
     </button>
+    {% if search_term %}
+    <a aria-label="مسح البحث" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
+    {% endif %}
   </div>
 </form>
+{% endif %}
 <script>
   // مفاتيح السلة المحلية (قرار السلة المحلية — المتصفح الحالي وملفه فقط):
   // الزائر على المفتاح المشترك القديم، وكل حساب على مفتاح مستقل ببريده.

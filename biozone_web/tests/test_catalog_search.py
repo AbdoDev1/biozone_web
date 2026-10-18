@@ -366,3 +366,220 @@ class TestCatalogSearchDB(FrappeTestCase):
         html = open(p, encoding="utf-8").read()
         self.assertIn("{{ search_term|e }}", html)
         self.assertIn("{{ search_error|e }}", html)
+
+
+class TestFilterNormalization(unittest.TestCase):
+    """normalize_filter: قيمة فلتر غير موجودة فعليًا تُسقط (لا فلتر وهمي)."""
+
+    def test_known_value_kept_stripped(self):
+        self.assertEqual(catalog.normalize_filter(" عطور ", ["عطور", "أبل"]), "عطور")
+
+    def test_unknown_value_dropped(self):
+        self.assertEqual(catalog.normalize_filter("غير-موجود", ["عطور"]), "")
+
+    def test_empty_and_none_dropped(self):
+        self.assertEqual(catalog.normalize_filter("", ["عطور"]), "")
+        self.assertEqual(catalog.normalize_filter(None, ["عطور"]), "")
+
+    def test_empty_allowed_drops_everything(self):
+        self.assertEqual(catalog.normalize_filter("عطور", []), "")
+        self.assertEqual(catalog.normalize_filter("عطور", None), "")
+
+    def test_toolbar_template_contract(self):
+        import os
+        p = os.path.join(os.path.dirname(catalog.__file__), "catalog.html")
+        html = open(p, encoding="utf-8").read()
+        # اعتماد تصميم الفلتر: لوحة جانبية (GET) بحقول مخفية تحفظ البحث/المحدد،
+        # والشرائح داخل سطر العنوان («مسح الفلاتر») بلا شريط منفصل، وعدد النتائج
+        # في زر التطبيق من العدّاد المطبَّق المطبوع أصلًا في نفس الطلب.
+        self.assertIn('name="q"', html)
+        self.assertIn('name="category"', html)
+        self.assertIn('name="brand"', html)
+        self.assertIn("تطبيق الفلاتر ({{ total_count_ar }} نتائج)", html)
+        self.assertIn("تصفية المنتجات", html)
+        self.assertIn("مسح الفلاتر", html)
+        self.assertNotIn("الفلاتر النشطة", html)
+        self.assertIn('id="active-filters-container"', html)
+        self.assertNotIn('name="scope"', html)
+        # اختيار واحد لكل مجموعة (الخلفية تقبل قيمة واحدة لكل فلتر)
+        self.assertIn('data-filter-group="category"', html)
+        self.assertIn('data-filter-group="brand"', html)
+        # لا فلتر سعر في الواجهة: لا فلتر سعر في الخلفية أصلًا
+        self.assertNotIn('name="price"', html)
+
+
+class TestBrandSearchAndFilter(FrappeTestCase):
+    """بحث اسم البراند (nivea يجد أصناف Nivea) + فلتر البراند الفعلي."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        group = frappe.db.get_value("Item Group", {"is_group": 0}, "name")
+        assert group, "no leaf item group on dev"
+        cls.group = group
+        cls.brand = frappe.db.get_value("Brand", {}, "name", order_by="name asc")
+        assert cls.brand, "no brand on dev"
+        cls.other_brand = frappe.db.get_value(
+            "Brand", {"name": ["!=", cls.brand]}, "name", order_by="name asc"
+        )
+        assert cls.other_brand, "need a second brand on dev"
+        cls.codes = []
+        defs = [
+            ("ZZT-9001", _tname("براندية"), cls.brand, 0),
+            ("ZZT-9002", _tname("براند معطل"), cls.brand, 1),
+            ("ZZT-9003", _tname("براند آخر"), cls.other_brand, 0),
+        ]
+        for code, name, brand, disabled in defs:
+            if frappe.db.exists("Item", code):
+                frappe.delete_doc("Item", code, force=True)
+            doc = frappe.get_doc({
+                "doctype": "Item",
+                "item_code": code,
+                "item_name": name,
+                "item_group": group,
+                "stock_uom": "Nos",
+                "brand": brand,
+                "disabled": disabled,
+            })
+            doc.insert(ignore_permissions=True)
+            cls.codes.append(code)
+        frappe.db.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        for code in cls.codes:
+            if frappe.db.exists("Item", code):
+                frappe.delete_doc("Item", code, force=True)
+        frappe.db.commit()
+        super().tearDownClass()
+
+    def _codes(self, term, **kw):
+        rows, total = catalog.search_items(term, page=1, page_size=500, **kw)
+        return {r["item_code"] for r in rows}, total
+
+    def test_search_by_brand_name_lowercase(self):
+        codes, total = self._codes(self.brand.lower())
+        self.assertIn("ZZT-9001", codes)
+        self.assertGreaterEqual(total, 1)
+
+    def test_disabled_brand_fixture_hidden(self):
+        codes, _ = self._codes(self.brand.lower())
+        self.assertNotIn("ZZT-9002", codes)
+
+    def test_other_brand_item_not_matched(self):
+        codes, _ = self._codes(self.brand.lower())
+        self.assertNotIn("ZZT-9003", codes)
+
+    def test_brand_filter_exact_group(self):
+        rows, total = catalog.search_items("", brand=self.brand, page=1, page_size=500)
+        expect = frappe.db.count("Item", {"disabled": 0, "brand": self.brand})
+        self.assertEqual(total, expect)
+        self.assertTrue(all(r["item_code"] != "ZZT-9002" for r in rows))
+        self.assertTrue(all(r["item_code"] != "ZZT-9003" for r in rows))
+
+    def test_brand_filter_combined_with_category(self):
+        codes, _ = self._codes("ZZT", category=self.group, brand=self.brand)
+        self.assertIn("ZZT-9001", codes)
+        self.assertNotIn("ZZT-9002", codes)
+        self.assertNotIn("ZZT-9003", codes)
+
+    def test_brand_filter_respects_search_term(self):
+        codes, _ = self._codes("براند معطل", brand=self.brand)
+        self.assertNotIn("ZZT-9002", codes)
+
+
+class TestHeaderSearchVisibility(unittest.TestCase):
+    """بحث الهيدر: العلم hide_header_search ما زال يحكم ظهور النسختين في
+    الهيدر المشترك، لكن /catalog لم يعد يمرّره (new_design: البحث ظاهر
+    في الكتالوج كما في التصميم — عكس Option C السابقة)."""
+
+    PARTIAL = "biozone_web/templates/includes/site_header.html"
+
+    def _render(self, ctx):
+        return frappe.render_template(self.PARTIAL, ctx)
+
+    def test_flag_still_hides_both_responsive_variants(self):
+        html = self._render(
+            {"active_page": "catalog", "hide_header_search": True, "store_user": "Guest"}
+        )
+        self.assertEqual(html.count('name="q"'), 0)
+        # الهيكل المشترك يبقى كاملًا: شعار + تنقل + سلة
+        self.assertIn(">Biozone</a>", html)
+        self.assertIn('href="/cart"', html)
+        self.assertIn('href="/biozone-home"', html)
+
+    def test_other_pages_keep_desktop_and_mobile_variants(self):
+        html = self._render({"active_page": "home", "store_user": "Guest"})
+        self.assertEqual(html.count('name="q"'), 2)
+        self.assertIn("hidden md:flex", html)  # نسخة الديسكتوب
+        self.assertIn("md:hidden", html)  # صف الموبايل
+
+    def test_item_page_keeps_search_despite_shared_active_page(self):
+        # /item يشارك active_page="catalog" لأجل تمييز «المتجر» في التنقل،
+        # لكنه لا يمرّر العلم — فبحث الهيدر يبقى ظاهرًا هناك.
+        html = self._render({"active_page": "catalog", "store_user": "Guest"})
+        self.assertEqual(html.count('name="q"'), 2)
+
+    def test_catalog_context_keeps_header_search(self):
+        from unittest.mock import patch
+
+        ctx = frappe._dict()
+        with patch("biozone_web.www.catalog.redirect_staff_away_from_store"), patch.object(
+            frappe.local, "form_dict", frappe._dict({"q": "", "category": "", "brand": ""}), create=True
+        ):
+            out = catalog.get_context(ctx)
+        self.assertFalse(out.get("hide_header_search"))
+        self.assertEqual(out.get("active_page"), "catalog")
+
+
+class TestCatalogQueryBudget(FrappeTestCase):
+    """حدود نمو الاستعلامات — قياس فعلي على بيانات dev، لا رقم كلي هش.
+
+    المقيس (2026-10، dev): البحث 2 استعلامات ثابتة (عدّ + صفحة LIMIT)
+    مهما كبر حجم الصفحة أو تعدّدت الفلاتر؛ الإثراء 5 أصناف=44 و20=90
+    (ميل ~3.1 استعلام/صنف من محرك ERPNext للتسعير) — فالحد هنا نمو
+    محدود بميل مسقوف، لا انفجار N+1.
+    """
+
+    @staticmethod
+    def _count(fn):
+        from unittest.mock import patch
+
+        seen = []
+        orig = frappe.db.sql
+
+        def counting(query, *a, **k):
+            seen.append(str(query or ""))
+            return orig(query, *a, **k)
+
+        with patch.object(frappe.db, "sql", counting):
+            fn()
+        return len(seen)
+
+    def test_search_queries_independent_of_page_size_and_filters(self):
+        n10 = self._count(lambda: catalog.search_items("", None, 1, 10))
+        n50 = self._count(lambda: catalog.search_items("", None, 1, 50))
+        self.assertLessEqual(n50 - n10, 2)
+        self.assertLessEqual(n10, 4)
+        group = frappe.db.get_value("Item Group", {"is_group": 0}, "name")
+        brand = frappe.db.get_value("Item", {"brand": ["is", "set"]}, "brand")
+        nc = self._count(lambda: catalog.search_items("", group, 1, 20))
+        self.assertLessEqual(nc, 4)
+        if brand:
+            ncb = self._count(lambda: catalog.search_items("نور", group, 1, 20, brand))
+            self.assertLessEqual(ncb, 4)
+
+    def test_enrich_growth_bounded_per_item(self):
+        from biozone_web.services.store_items import enrich_store_items
+
+        rows = catalog.search_items("", None, 1, 20)[0]
+        if len(rows) < 10:
+            self.skipTest("need >=10 live items for a representative measure")
+        codes = [
+            {"item_code": r["item_code"], "item_name": "", "item_group": ""}
+            for r in rows
+        ]
+        n5 = self._count(lambda: enrich_store_items(codes[:5]))
+        n20 = self._count(lambda: enrich_store_items(codes))
+        slope = (n20 - n5) / float(len(codes) - 5)
+        self.assertLessEqual(slope, 8.0)

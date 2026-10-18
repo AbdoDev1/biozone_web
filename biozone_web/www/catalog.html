@@ -5,8 +5,9 @@
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - المتجر</title>
-<link rel="stylesheet" href="/assets/biozone_web/css/app.247a063e.css">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning&display=block" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.cedc6f8e.css">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
@@ -14,121 +15,264 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 </head>
-<body class="bg-surface text-on-surface">
+<body class="bg-appBg text-on-surface">
 
 {% include "biozone_web/templates/includes/site_header.html" %}
 
+{% from "biozone_web/templates/includes/product_card.html" import product_card, product_card_list %}
 
 <!-- Main Content -->
 <main class="max-w-container-max mx-auto px-md py-lg min-h-screen">
-  <div class="flex justify-between items-end mb-lg border-b border-surface-variant pb-2">
-    <h1 class="text-2xl md:text-4xl font-bold text-on-surface">{{ (selected_category|e) if selected_category else "كل المنتجات" }}</h1>
-    <span class="text-base text-secondary whitespace-nowrap">{{ total_count_ar|e }} صنف</span>
-  </div>
+  {# روابط الفلاتر الحالية: تُبنى مقدّمًا لتُستخدم في الشرائح والترقيم
+     و«هل تقصد؟» — أي رابط إزالة يحذف فلترًا واحدًا ويحفظ البقية. #}
+  {% set q_qs = ('q=' ~ (search_term|urlencode)) if search_term else '' %}
+  {% set cat_qs = ('category=' ~ (selected_category|urlencode)) if selected_category else '' %}
+  {% set brand_qs = ('brand=' ~ (selected_brand|urlencode)) if selected_brand else '' %}
+  {% set all_qs = [q_qs, cat_qs, brand_qs] | select | join('&') %}
+  {% set without_q = [cat_qs, brand_qs] | select | join('&') %}
+  {% set without_cat = [q_qs, brand_qs] | select | join('&') %}
+  {% set without_brand = [q_qs, cat_qs] | select | join('&') %}
+  {# سطر العنوان (اعتماد تصميم الفلتر): الشرائح النشطة داخل السطر نفسه —
+     البراند بخلفية أولية، القسم بخلفية محايدة، «مسح الفلاتر» نصي، بلا شريط منفصل. #}
+  <section class="mb-lg flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center flex-wrap gap-2.5" id="active-filters-container">
+      <h1 class="text-2xl font-bold text-on-surface">{{ scope_title|e }}</h1>
+      <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ result_count_text|e }}</span>
+      {% if search_term %}
+      <a aria-label="إزالة فلتر البحث" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20" href="/catalog{% if without_q %}?{{ without_q }}{% endif %}"><span>{{ search_term|e }}</span><span class="material-symbols-outlined text-[14px]">close</span></a>
+      {% endif %}
+      {% if selected_category %}
+      <a aria-label="إزالة فلتر القسم" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200" href="/catalog{% if without_cat %}?{{ without_cat }}{% endif %}"><span>{{ selected_category|e }}</span><span class="material-symbols-outlined text-[14px]">close</span></a>
+      {% endif %}
+      {% if selected_brand %}
+      <a aria-label="إزالة فلتر البراند" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20" href="/catalog{% if without_brand %}?{{ without_brand }}{% endif %}"><span>{{ selected_brand|e }}</span><span class="material-symbols-outlined text-[14px]">close</span></a>
+      {% endif %}
+      {% if active_filters_count %}
+      <a class="text-xs font-medium text-rose-500 hover:text-rose-700 hover:underline px-1.5 py-1 transition-colors" href="/catalog">مسح الفلاتر</a>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2.5 self-end sm:self-auto">
+      <button type="button" id="open-filters-btn" aria-controls="filter-drawer" aria-expanded="false" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-primary hover:text-primary shadow-subtle transition-all cursor-pointer">
+        <span class="material-symbols-outlined text-base text-primary">tune</span>
+        <span>الفلاتر</span>
+        {% if active_filters_count %}
+        <span class="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] flex items-center justify-center font-bold">{{ active_filters_count_ar }}</span>
+        {% endif %}
+      </button>
+      <div class="flex items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5">
+        <button type="button" id="view-grid-btn" title="عرض شبكي" aria-pressed="true" class="w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center">
+          <span class="material-symbols-outlined text-base">grid_view</span>
+        </button>
+        <button type="button" id="view-list-btn" title="عرض قائمة" aria-pressed="false" class="w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors">
+          <span class="material-symbols-outlined text-base">view_list</span>
+        </button>
+      </div>
+    </div>
+  </section>
 
   {% if search_error %}
   <p class="mb-lg text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" role="alert">{{ search_error|e }}</p>
   {% endif %}
-  {% if search_term %}
-  <div class="mb-lg flex items-center gap-sm text-sm text-on-surface-variant">
-    <span>نتائج البحث عن "<span class="font-bold text-on-surface">{{ search_term|e }}</span>"</span>
-    <a href="/catalog{% if selected_category %}?category={{ selected_category|urlencode }}{% endif %}" class="text-primary font-bold hover:underline">مسح البحث</a>
-  </div>
-  {% endif %}
 
   {% if items %}
-  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-md md:gap-lg">
+  <div id="catalog-grid-view" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
     {% for item in items %}
-    <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 flex flex-col">
-      <div class="relative w-full bg-surface-container-lowest flex items-center justify-center overflow-hidden aspect-[4/3]">
-        <a href="/item?code={{ item.item_code|urlencode }}" class="absolute inset-0 flex items-center justify-center" aria-label="{{ item.item_name|e }}">
-        {% if item.thumbnail %}
-        {% if item.card and item.card2x %}
-        <img src="{{ item.card|e }}" srcset="{{ item.card|e }} 1x, {{ item.card2x|e }} 2x" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-        {% elif item.card %}
-        <img src="{{ item.card|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-        {% elif item.medium %}
-        <img src="{{ item.thumbnail|e }}" srcset="{{ item.thumbnail|e }} 1x, {{ item.medium|e }} 2x" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-        {% else %}
-        <img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" {% if loop.index > 4 %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-        {% endif %}
-        {% else %}
-        <span class="text-4xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
-        {% endif %}
-        </a>
-      </div>
-      <div class="flex flex-col flex-grow p-3 pt-2">
-        <span class="text-xs text-primary mb-0 block">{{ item.item_group|e }}</span>
-        <a href="/item?code={{ item.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-0.5 line-clamp-2 min-h-[48px] hover:text-primary">{{ item.item_name|e }}</a>
-        <div class="pt-1 flex items-center justify-between">
-          {% if item.price %}
-          <span class="font-bold text-primary text-xl">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ item.display_uom|e }}</span>{% endif %}</span>
-          {% else %}
-          <span class="text-sm text-outline">السعر غير متاح</span>
-          {% endif %}
-        </div>
-        <div
-          class="mt-auto pt-2 catalog-cart-control"
-          data-item-code="{{ item.item_code|e }}"
-          data-item-name="{{ item.item_name|e }}"
-          data-item-group="{{ item.item_group|e }}"
-          data-item-price="{{ item.price or 0 }}"
-          data-item-uom="{{ item.display_uom or '' }}"
-          data-item-image="{{ item.thumbnail or '' }}"
-        >
-          <button
-            aria-label="أضف للسلة"
-            class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
-            {% if not item.price %}disabled{% endif %}
-            type="button"
-          >
-            <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-            <span class="hidden sm:inline">أضف للسلة</span>
-          </button>
-          <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
-            <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
-              <span class="material-symbols-outlined text-xl">add</span>
-            </button>
-            <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
-            <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
-              <span class="material-symbols-outlined text-xl">remove</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </article>
+    {{ product_card(item, lazy=(loop.index > 4)) }}
+    {% endfor %}
+  </div>
+  {# نسخة القائمة مصدَّرة مع الشبكة (تبديل فوري بلا reload) — مخفية افتراضيًا؛
+     images مخفية بـdisplay:none لا تُحمَّل (lazy) فلا كلفة شبكة مضاعفة. #}
+  <div id="catalog-list-view" class="hidden flex-col gap-4 max-w-4xl w-full mx-auto">
+    {% for item in items %}
+    {{ product_card_list(item, lazy=(loop.index > 3)) }}
     {% endfor %}
   </div>
   {% else %}
   <div class="text-center py-xl text-on-surface-variant">
-    {% if search_term %}لا توجد نتائج لـ"{{ search_term|e }}"{% else %}لا توجد أصناف{% endif %}
+    {% if search_term %}لا توجد منتجات مطابقة لـ"{{ search_term|e }}"{% if selected_category or selected_brand %} ضمن الفلاتر الحالية{% endif %}{% else %}لا توجد أصناف{% if selected_category or selected_brand %} في الفلاتر الحالية{% endif %}{% endif %}
+    {% if search_term or selected_category or selected_brand %}
+    <p class="mt-md"><a class="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors" href="/catalog">مسح الفلاتر<span class="material-symbols-outlined text-[16px]">cancel</span></a></p>
+    {% endif %}
     {% if did_you_mean and not items %}
     <p class="mt-md text-base font-bold text-on-surface">هل تقصد؟</p>
     <div class="mt-sm flex flex-wrap items-center justify-center gap-sm">
       {% for sug in did_you_mean %}
-      <a href="/catalog?q={{ sug|urlencode }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}" class="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors">{{ sug|e }}</a>
+      <a href="/catalog?q={{ sug|urlencode }}{% if without_q %}&{{ without_q }}{% endif %}" class="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors">{{ sug|e }}</a>
       {% endfor %}
     </div>
     {% endif %}
   </div>
   {% endif %}
 
-  <!-- Pagination -->
-  <div class="mt-xl flex justify-center items-center gap-md pb-xl">
-    {% if has_prev %}
-    <a href="/catalog?page={{ prev_page|e }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}{% if search_term %}&q={{ search_term|urlencode }}{% endif %}" class="px-6 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container transition-all">السابق</a>
-    {% endif %}
-    <span class="text-sm text-secondary">صفحة {{ page|e }}</span>
-    {% if has_next %}
-    <a href="/catalog?page={{ next_page|e }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}{% if search_term %}&q={{ search_term|urlencode }}{% endif %}" class="px-8 py-3 rounded-full border border-outline text-primary font-bold hover:bg-surface-container hover:border-primary transition-all flex items-center gap-2">
-      التالي
-      <span class="material-symbols-outlined text-[20px]">expand_more</span>
-    </a>
-    {% endif %}
-  </div>
+  {% if items %}
+  <!-- الترقيم (new_design): نطاق العرض + أرقام صفحات + سهمان -->
+  <nav class="mt-lg pt-6 pb-2 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="text-xs text-slate-500">عرض <span class="font-bold text-slate-800">{{ range_start_ar }}</span> - <span class="font-bold text-slate-800">{{ range_end_ar }}</span> من إجمالي <span class="font-bold text-slate-800">{{ total_count_ar }}</span> منتج</div>
+    <div class="flex items-center gap-1.5">
+      {% if has_prev %}
+      <a aria-label="السابق" href="/catalog?page={{ prev_page|e }}{% if all_qs %}&{{ all_qs }}{% endif %}" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-base">chevron_right</span></a>
+      {% else %}
+      <button type="button" disabled aria-label="السابق" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-400 flex items-center justify-center disabled:opacity-40"><span class="material-symbols-outlined text-base">chevron_right</span></button>
+      {% endif %}
+      {% for p in pages_window %}
+      {% if p.value is none %}
+      <span class="px-1 text-slate-400 text-xs">...</span>
+      {% elif p.value == page %}
+      <span aria-current="page" class="w-8 h-8 rounded-lg bg-primary text-white font-bold text-xs flex items-center justify-center">{{ p.label }}</span>
+      {% else %}
+      <a href="/catalog?page={{ p.value }}{% if all_qs %}&{{ all_qs }}{% endif %}" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-semibold text-xs flex items-center justify-center transition-colors">{{ p.label }}</a>
+      {% endif %}
+      {% endfor %}
+      {% if has_next %}
+      <a aria-label="التالي" href="/catalog?page={{ next_page|e }}{% if all_qs %}&{{ all_qs }}{% endif %}" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-base">chevron_left</span></a>
+      {% else %}
+      <button type="button" disabled aria-label="التالي" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-400 flex items-center justify-center disabled:opacity-40"><span class="material-symbols-outlined text-base">chevron_left</span></button>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 </main>
 
 {% include "biozone_web/templates/includes/site_footer.html" %}
 {% include "biozone_web/templates/includes/cart_helpers.html" %}
+
+{# لوحة الفلاتر (اعتماد تصميم الفلتر): شريحة جانبية — قسم/براند باختيار واحد
+   لكل مجموعة (الخلفية تدعم قيمة واحدة)، و«تطبيق» يرسل GET مع حفظ البحث.
+   عدد النتائج في زر التطبيق من العدّاد المطبَّق المحسوب أصلًا في نفس الطلب
+   (صفر استعلامات إضافية — لا معاينة حيّة). بلا فلتر سعر: قرار المالك نهائيًا. #}
+<div class="fixed inset-0 z-50 hidden" id="filter-drawer">
+  <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" id="filter-drawer-backdrop"></div>
+  <aside class="absolute inset-y-0 right-0 max-w-sm w-full bg-white shadow-2xl flex flex-col justify-between z-10">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-base">tune</span>
+        <h2 class="text-base font-bold text-slate-900">تصفية المنتجات</h2>
+      </div>
+      <button type="button" id="close-filters-btn" aria-label="إغلاق" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-base">close</span></button>
+    </div>
+    <form method="get" action="/catalog" id="filters-drawer-form" class="flex-1 min-h-0 flex flex-col justify-between">
+      {% if search_term %}<input type="hidden" name="q" value="{{ search_term|e }}">{% endif %}
+      <input type="hidden" name="category" value="{{ selected_category|e }}" id="drawer-category-input">
+      <input type="hidden" name="brand" value="{{ selected_brand|e }}" id="drawer-brand-input">
+      <div class="p-5 space-y-6 overflow-y-auto flex-1 text-right">
+        <div>
+          <h3 class="text-xs font-bold text-slate-900 mb-3 flex items-center justify-between"><span>القسم / الفئة</span><span class="text-[10px] text-slate-400 font-normal" id="category-count">محدد: {% if selected_category %}١{% else %}٠{% endif %}</span></h3>
+          <div class="space-y-2 text-xs">
+            {% for cat in categories %}
+            <label class="flex items-center gap-2.5 text-slate-700 cursor-pointer"><input type="checkbox" class="w-4 h-4 accent-primary rounded border-slate-300" data-filter-group="category" value="{{ cat|e }}" {% if selected_category == cat %}checked{% endif %}><span class="font-medium">{{ cat|e }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="h-[1px] bg-slate-100"></div>
+        <div>
+          <h3 class="text-xs font-bold text-slate-900 mb-3 flex items-center justify-between"><span>العلامة التجارية</span><span class="text-[10px] text-slate-400 font-normal" id="brand-count">محدد: {% if selected_brand %}١{% else %}٠{% endif %}</span></h3>
+          <div class="space-y-2 text-xs">
+            {% for b in brands %}
+            <label class="flex items-center gap-2.5 text-slate-700 cursor-pointer"><input type="checkbox" class="w-4 h-4 accent-primary rounded border-slate-300" data-filter-group="brand" value="{{ b|e }}" {% if selected_brand == b %}checked{% endif %}><span class="font-medium">{{ b|e }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center gap-2">
+        <button type="submit" class="flex-1 py-2.5 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary-hover transition-colors shadow-sm">تطبيق الفلاتر ({{ total_count_ar }} نتائج)</button>
+        <button type="button" id="cancel-filters-btn" class="px-4 py-2.5 border border-slate-200 text-slate-600 text-xs font-medium rounded-xl hover:bg-slate-100 transition-colors">إلغاء</button>
+      </div>
+    </form>
+  </aside>
+</div>
+
+<script>
+  (function () {
+    // تبديل العرض شبكة/قائمة: النسختان مصدَّرتان، والتفضيل محلي فقط،
+    // وعند التبديل تُعاد مزامنة كل عدّادات السلة الظاهرة (steppers).
+    var VIEW_KEY = 'biozone_catalog_view';
+    var grid = document.getElementById('catalog-grid-view');
+    var list = document.getElementById('catalog-list-view');
+    var gridBtn = document.getElementById('view-grid-btn');
+    var listBtn = document.getElementById('view-list-btn');
+    function paintView(listOn) {
+      if (grid) grid.classList.toggle('hidden', listOn);
+      if (list) {
+        list.classList.toggle('hidden', !listOn);
+        list.classList.toggle('flex', listOn);
+      }
+      if (gridBtn) {
+        gridBtn.className = listOn
+          ? 'w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors'
+          : 'w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center';
+        gridBtn.setAttribute('aria-pressed', String(!listOn));
+      }
+      if (listBtn) {
+        listBtn.className = listOn
+          ? 'w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center'
+          : 'w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors';
+        listBtn.setAttribute('aria-pressed', String(listOn));
+      }
+      if (window.refreshAllCatalogControls) window.refreshAllCatalogControls();
+    }
+    if (grid && list && gridBtn && listBtn) {
+      var saved = 'grid';
+      try { saved = localStorage.getItem(VIEW_KEY) || 'grid'; } catch (e) {}
+      paintView(saved === 'list');
+      gridBtn.addEventListener('click', function () { paintView(false); try { localStorage.setItem(VIEW_KEY, 'grid'); } catch (e) {} });
+      listBtn.addEventListener('click', function () { paintView(true); try { localStorage.setItem(VIEW_KEY, 'list'); } catch (e) {} });
+    }
+
+    // لوحة الفلاتر: فتح/إغلاق + اختيار واحد لكل مجموعة (الخلفية قيمة واحدة).
+    // المطبَّق (applied) يُحفظ جانبًا: الحقول المخفية تُحدَّث عند «تطبيق» فقط،
+    // و«إلغاء» يعيد التحديد المطبَّق ويهمّل أي تغيير معلّق.
+    var drawer = document.getElementById('filter-drawer');
+    if (!drawer) return;
+    var openBtn = document.getElementById('open-filters-btn');
+    var closeBtn = document.getElementById('close-filters-btn');
+    var cancelBtn = document.getElementById('cancel-filters-btn');
+    var form = document.getElementById('filters-drawer-form');
+    var backdrop = document.getElementById('filter-drawer-backdrop');
+    var hidden = { category: document.getElementById('drawer-category-input'), brand: document.getElementById('drawer-brand-input') };
+    var counts = { category: document.getElementById('category-count'), brand: document.getElementById('brand-count') };
+    function groups() { return ['category', 'brand']; }
+    function boxes(group) { return drawer.querySelectorAll('input[data-filter-group="' + group + '"]'); }
+    function pendingValue(group) {
+      var cbs = boxes(group);
+      for (var i = 0; i < cbs.length; i++) { if (cbs[i].checked) return cbs[i].value; }
+      return '';
+    }
+    function setCount(group) {
+      if (counts[group]) counts[group].textContent = 'محدد: ' + (pendingValue(group) ? '١' : '٠');
+    }
+    function open() { drawer.classList.remove('hidden'); if (openBtn) openBtn.setAttribute('aria-expanded', 'true'); }
+    function close() { drawer.classList.add('hidden'); if (openBtn) openBtn.setAttribute('aria-expanded', 'false'); }
+    groups().forEach(function (group) {
+      boxes(group).forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          if (this.checked) {
+            boxes(group).forEach(function (other) { if (other !== cb) other.checked = false; });
+          }
+          setCount(group);
+        });
+      });
+    });
+    if (form) form.addEventListener('submit', function () {
+      groups().forEach(function (group) {
+        if (!hidden[group]) return;
+        var val = pendingValue(group);
+        hidden[group].value = val;
+        hidden[group].disabled = !val;  // لا بارامتر فارغ في الرابط
+      });
+    });
+    if (openBtn) openBtn.addEventListener('click', open);
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (cancelBtn) cancelBtn.addEventListener('click', function () {
+      groups().forEach(function (group) {
+        var applied = hidden[group] ? (hidden[group].getAttribute('value') || '') : '';
+        // القيمة المطبَّقة محفوظة في سمة value الأصلية (الحقل نفسه يُحدَّث عند التطبيق فقط)
+        boxes(group).forEach(function (cb) { cb.checked = cb.value === applied; });
+        setCount(group);
+      });
+      close();
+    });
+    if (backdrop) backdrop.addEventListener('click', close);
+  })();
+</script>
 
 </body></html>

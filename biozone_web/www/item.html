@@ -5,162 +5,102 @@
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - {{ item.item_name if item else "الصنف غير متاح" }}</title>
-<link rel="stylesheet" href="/assets/biozone_web/css/app.247a063e.css">
+<link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.cedc6f8e.css">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
 </style>
 </head>
-<body class="bg-surface text-on-surface flex flex-col min-h-screen">
+<body class="bg-appBg text-on-surface flex flex-col min-h-screen">
 
 {% include "biozone_web/templates/includes/site_header.html" %}
 
-<main class="flex-grow max-w-container-max mx-auto px-md py-lg w-full">
-  <!-- Breadcrumbs: home / store / group / item (all real links) -->
-  <nav class="flex flex-wrap items-center gap-1 text-sm text-on-surface-variant mb-lg" aria-label="مسار التنقل">
-    <a href="/biozone-home" class="hover:text-primary">الرئيسية</a>
+{% from "biozone_web/templates/includes/product_card.html" import product_card, cart_control, detail_image %}
+{% from "biozone_web/templates/includes/trust_strip.html" import trust_strip %}
+
+<main class="flex-grow max-w-container-max mx-auto px-md py-md w-full">
+  <!-- Breadcrumbs: home / store / group / item (all real links) — kept visually lighter than the product content -->
+  <nav class="flex flex-wrap items-center gap-1 text-sm text-on-surface-variant mb-md max-w-6xl mx-auto w-full" aria-label="مسار التنقل">
+    <a href="/biozone-home" class="hover:text-primary inline-flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">home</span>الرئيسية</a>
     <span>/</span>
     <a href="/catalog" class="hover:text-primary">المتجر</a>
     {% if item %}
     <span>/</span>
     <a href="/catalog?category={{ item.item_group|e }}" class="hover:text-primary">{{ item.item_group|e }}</a>
     <span>/</span>
-    <span class="text-on-surface font-bold">{{ item.item_name|e }}</span>
+    <span class="text-on-surface-variant font-medium">{{ item.item_name|e }}</span>
     {% endif %}
   </nav>
 
   {% if item %}
-  <!-- Item detail card: image + commercial data, same tokens as catalog cards -->
-  <section class="bg-surface-container-lowest border border-surface-variant rounded-xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-lg p-lg">
-    <div class="relative w-full max-w-md mx-auto bg-surface-container-lowest flex items-center justify-center overflow-hidden rounded-xl aspect-[4/3]">
-      {% if item.image or item.thumbnail %}
-      <img src="{{ (item.image or item.thumbnail)|e }}" alt="{{ item.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-      {% else %}
-      <span class="text-6xl font-bold text-outline-variant">{{ item.item_name[0] }}</span>
-      {% endif %}
-      <span class="absolute top-2 right-2 text-[11px] font-bold text-primary bg-surface/90 rounded-full px-2 py-0.5">{{ item.item_group|e }}</span>
-    </div>
-    <div class="flex flex-col gap-md">
-      <div>
-        <span class="text-sm text-primary font-bold">{{ item.item_group|e }}</span>
-        <h1 class="text-2xl md:text-4xl font-bold text-on-surface leading-tight mt-1">{{ item.item_name|e }}</h1>
-        {% if item.brand %}<div class="text-xs text-on-surface-variant mt-1">العلامة: {{ item.brand|e }}</div>{% endif %}
-      </div>
-      <div class="flex items-center gap-2">
+  <!-- Item detail: balanced width-capped card, close columns — image on the
+       right, info on the left (RTL). Vertically centered on desktop; on
+       mobile the image comes first (order-*) then the purchase info. -->
+  <section class="max-w-6xl mx-auto bg-surface-container-lowest border border-borderSubtle shadow-sm rounded-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-lg md:items-center p-lg">
+    <div class="order-2 flex flex-col gap-md">
+      <h1 class="text-2xl md:text-3xl font-bold text-on-surface leading-tight">{{ item.item_name|e }}</h1>
+      <!-- Price block (styled card) -->
+      <div class="rounded-2xl border border-primary/15 bg-gradient-to-l from-primary-light/60 via-surface-container-lowest to-transparent p-4">
         {% if item.price %}
-        <span class="font-bold text-primary text-3xl">{{ "%.2f"|format(item.price) }} ج.م{% if item.display_uom %} <span class="text-sm font-medium text-slate-500">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+        <div class="flex items-baseline gap-2">
+          <span class="font-extrabold text-primary text-3xl sm:text-4xl">{{ "%.2f"|format(item.price) }}</span>
+          <span class="text-base font-bold text-on-surface">ج.م{% if item.display_uom %} <span class="text-sm font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+        </div>
         {% else %}
         <span class="text-base text-outline">السعر غير متاح</span>
         {% endif %}
       </div>
-      {% if item.description %}
-      <p class="text-sm text-on-surface-variant leading-relaxed">{{ item.description|e }}</p>
-      {% endif %}
-      <div
-        class="mt-2 catalog-cart-control max-w-md"
-        data-item-code="{{ item.item_code|e }}"
-        data-item-name="{{ item.item_name|e }}"
-        data-item-group="{{ item.item_group|e }}"
-        data-item-price="{{ item.price or 0 }}"
-        data-item-uom="{{ item.display_uom or '' }}"
-        data-item-image="{{ item.thumbnail or '' }}"
-      >
-        <button
-          aria-label="أضف للسلة"
-          class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
-          {% if not item.price %}disabled{% endif %}
-          type="button"
-        >
-          <span class="material-symbols-outlined text-[20px]">add_shopping_cart</span>
-          أضف للسلة
-        </button>
-        <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
-          <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
-            <span class="material-symbols-outlined text-xl">add</span>
-          </button>
-          <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
-          <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
-            <span class="material-symbols-outlined text-xl">remove</span>
-          </button>
-        </div>
+      <!-- Cart control: width-filling button inside the info column (hooks unchanged) -->
+      <div>
+        {{ cart_control(item, compact=true) }}
       </div>
+      {% if item.brand or item.description %}
+      <div class="border-t border-borderSubtle pt-md">
+        {% if item.brand %}<div class="text-sm text-on-surface-variant">العلامة: {{ item.brand|e }}</div>{% endif %}
+        {% if item.description %}<p class="text-sm text-on-surface-variant leading-relaxed{% if item.brand %} mt-1{% endif %}">{{ item.description|e }}</p>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="order-1 relative w-full bg-white rounded-xl flex items-center justify-center overflow-hidden aspect-[4/3] p-6 md:p-10">
+      {% if item.image or item.thumbnail %}
+      {{ detail_image(item) }}
+      {% else %}
+      <img src="/assets/biozone_web/images/product-placeholder.svg" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async">
+      {% endif %}
     </div>
   </section>
 
-  <!-- Compact trust row: same short Arabic labels as the homepage strip -->
-  <section class="grid grid-cols-3 gap-sm py-lg text-center">
-    <div class="flex flex-col items-center gap-1 p-2">
-      <span class="material-symbols-outlined text-primary text-3xl">local_shipping</span>
-      <span class="text-xs font-bold text-on-surface">توصيل سريع</span>
-    </div>
-    <div class="flex flex-col items-center gap-1 p-2">
-      <span class="material-symbols-outlined text-primary text-3xl">verified</span>
-      <span class="text-xs font-bold text-on-surface">منتجات أصلية</span>
-    </div>
-    <div class="flex flex-col items-center gap-1 p-2">
-      <span class="material-symbols-outlined text-primary text-3xl">support_agent</span>
-      <span class="text-xs font-bold text-on-surface">دعم سريع</span>
-    </div>
+  <!-- Trust row: shared compact strip (same design as the homepage) — phrases kept verbatim -->
+  {% set trust_items = [
+    {"icon": "local_shipping", "title": "توصيل سريع"},
+    {"icon": "verified", "title": "منتجات أصلية"},
+    {"icon": "support_agent", "title": "دعم سريع"},
+  ] %}
+  <section class="py-md max-w-6xl mx-auto w-full">
+    {{ trust_strip(trust_items, "compact") }}
   </section>
 
   <!-- Similar products: same item_group fallback until staff-picked field lands -->
   {% if similar_items %}
-  <section class="py-xl">
-    <div class="flex justify-between items-center mb-lg">
-      <h2 class="text-2xl font-bold text-on-surface">منتجات مشابهة</h2>
-      <a href="/catalog?category={{ item.item_group|e }}" class="text-primary font-bold hover:underline">المزيد من {{ item.item_group|e }}</a>
+  <section class="py-lg">
+    <div class="flex items-start sm:items-center justify-between gap-3 mb-lg">
+      <div>
+        <h2 class="text-2xl font-bold text-on-surface flex items-center gap-2">
+          <span class="w-2.5 h-6 bg-primary rounded-full inline-block"></span>
+          منتجات مشابهة
+        </h2>
+        <p class="text-xs text-on-surface-variant mt-1">أصناف أخرى من نفس القسم</p>
+      </div>
+      <a href="/catalog?category={{ item.item_group|e }}" class="text-primary font-bold hover:underline shrink-0 inline-flex items-center gap-1 group">
+        <span>المزيد من {{ item.item_group|e }}</span>
+        <span class="material-symbols-outlined text-[18px] group-hover:-translate-x-1 transition-transform">chevron_left</span>
+      </a>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
       {% for sim in similar_items %}
-      <article class="bg-surface-container-lowest rounded-xl border border-surface-variant overflow-hidden shadow-[0_4px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col">
-        <a href="/item?code={{ sim.item_code|urlencode }}" class="relative w-full bg-surface-container-lowest flex items-center justify-center overflow-hidden aspect-[4/3]">
-          {% if sim.thumbnail %}
-          <img src="{{ sim.thumbnail|e }}" alt="{{ sim.item_name|e }}" class="absolute inset-0 h-full w-full object-contain" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
-          {% else %}
-          <span class="text-4xl font-bold text-outline-variant">{{ sim.item_name[0] }}</span>
-          {% endif %}
-        </a>
-        <div class="flex flex-col flex-grow p-3">
-          <span class="text-xs text-primary mb-0.5 block">{{ sim.item_group|e }}</span>
-          <a href="/item?code={{ sim.item_code|urlencode }}" class="font-bold text-on-surface leading-tight mb-1 line-clamp-2 min-h-[48px] hover:text-primary">{{ sim.item_name|e }}</a>
-          <div class="pt-2 flex items-center justify-between">
-            {% if sim.price %}
-            <span class="font-bold text-primary text-lg">{{ "%.2f"|format(sim.price) }} ج.م{% if sim.display_uom %} <span class="text-xs font-medium text-slate-500">/ {{ sim.display_uom|e }}</span>{% endif %}</span>
-            {% else %}
-            <span class="text-sm text-outline">السعر غير متاح</span>
-            {% endif %}
-          </div>
-          <div
-            class="mt-auto pt-2 catalog-cart-control"
-            data-item-code="{{ sim.item_code|e }}"
-            data-item-name="{{ sim.item_name|e }}"
-            data-item-group="{{ sim.item_group|e }}"
-            data-item-price="{{ sim.price or 0 }}"
-            data-item-uom="{{ sim.display_uom or '' }}"
-            data-item-image="{{ sim.thumbnail or '' }}"
-          >
-            <button
-              aria-label="أضف للسلة"
-              class="w-full bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg transition-colors flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
-              {% if not sim.price %}disabled{% endif %}
-              type="button"
-            >
-              <span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-              <span class="hidden sm:inline">أضف للسلة</span>
-            </button>
-            <div class="hidden items-center justify-between rounded-full bg-surface-container-low ring-1 ring-inset ring-outline-variant/60 catalog-stepper">
-              <button aria-label="زيادة الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-primary bg-primary hover:bg-primary-container transition-colors catalog-increment" type="button">
-                <span class="material-symbols-outlined text-xl">add</span>
-              </button>
-              <span class="min-w-8 text-center text-sm font-bold catalog-qty">0</span>
-              <button aria-label="إنقاص الكمية" class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-surface-container-high catalog-decrement" type="button">
-                <span class="material-symbols-outlined text-xl">remove</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </article>
+      {{ product_card(sim, lazy=true) }}
       {% endfor %}
     </div>
   </section>

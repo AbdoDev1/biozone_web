@@ -37,7 +37,8 @@ R3  the scrollbar-stability rule lives in the shared partial only       (rule 6)
 R4  every >=3-field GET form declares base + two breakpoints            (rules 4, 10)
 R5  the header's explicit geometry markers are pinned                   (rule 7)
 R6  no negative margins/offsets used as compensation in /account        (rule 5)
-R7  documented exemptions stay explicit (or the check fails)         (rules 8, 9)
+R7  the cart-hook markup lives only in the shared product card partial
+R8  documented exemptions stay explicit (or the check fails)         (rules 8, 9)
 
 Limitation, stated plainly: this is a STATIC check over template sources. Rules
 3, 5 and 6 also have a runtime counterpart that measures real layout --
@@ -92,6 +93,12 @@ COPY_SENTINELS = [
 	"sticky top-0 z-50 w-full shadow-sm bg-surface",
 	"justify-between items-center max-w-container-max mx-auto border-t",
 ]
+
+# Cart-hook markup (class + data attrs consumed by cart_helpers.html JS) must
+# come from the shared product card partial only: three hand-copied card
+# variants is exactly the duplication debt this check exists to prevent.
+CARD_HOOK_CLASS = "catalog-cart-control"
+CARD_PARTIAL = "biozone_web/templates/includes/product_card.html"
 
 # Negative margins / horizontal offsets used as alignment compensation are
 # forbidden (they were explicitly ruled out as a fix for the header shift).
@@ -260,6 +267,26 @@ def check_no_negative_offsets(app_root):
 				)
 	return problems
 	return keys
+def check_card_hook_single_source(app_root):
+	"""R7: the cart hook markup lives only in the shared product card partial."""
+	problems = []
+	partial = app_root / CARD_PARTIAL
+	if CARD_HOOK_CLASS not in partial.read_text(encoding="utf-8"):
+		problems.append(
+			f"{CARD_PARTIAL}: missing the `{CARD_HOOK_CLASS}` hook markup — the partial "
+			f"is the single source for every storefront product card"
+		)
+	for path in sorted((app_root / "biozone_web/www").rglob("*.html")):
+		text = path.read_text(encoding="utf-8")
+		if CARD_HOOK_CLASS in text:
+			line = next(i for i, ln in enumerate(text.splitlines(), 1) if CARD_HOOK_CLASS in ln)
+			problems.append(
+				f"{rel(path, app_root)}:{line}: hand-copied product-card cart hook markup "
+				f"(`{CARD_HOOK_CLASS}`) — import product_card.html instead"
+			)
+	return problems
+
+
 def main(argv=None):
 	ap = argparse.ArgumentParser(description="Shared partials static guard.")
 	ap.add_argument("--app-root", default=None, help="biozone_web app dir (default: parent of scripts/)")
@@ -283,6 +310,7 @@ def main(argv=None):
 		("R4 multi-field forms declare 3 layouts", check_multifield_forms(app_root)),
 		("R5 header geometry markers pinned", check_header_geometry_pinned(app_root)),
 		("R6 no negative margins/offsets in /account", check_no_negative_offsets(app_root)),
+		("R7 product-card cart hook single source", check_card_hook_single_source(app_root)),
 	]
 
 	failures = 0

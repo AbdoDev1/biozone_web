@@ -102,12 +102,32 @@ def _to_arabic_digits(number):
     return str(number).translate(ARABIC_DIGITS)
 
 
-def _search_where(term, category):
+def _pages_window(page, total_pages):
+    """نافذة أرقام الترقيم: [1 2 3 … N] حسب الموضع، والفجوة عنصر بلا قيمة.
+
+    العرض عربي الأرقام (عرف الموقع)؛ القيمة في href إنجليزية دائمًا.
+    """
+    if total_pages <= 7:
+        seq = list(range(1, total_pages + 1))
+    elif page <= 3:
+        seq = [1, 2, 3, None, total_pages]
+    elif page >= total_pages - 2:
+        seq = [1, None, total_pages - 2, total_pages - 1, total_pages]
+    else:
+        seq = [1, None, page - 1, page, page + 1, None, total_pages]
+    return [
+        {"value": p, "label": _to_arabic_digits(p)} if p is not None else {"value": None, "label": None}
+        for p in seq
+    ]
+
+
+def _search_where(term, category, brand=None):
     """WHERE + params للعدّ والصفحة معًا (تطابق حرفي مضمون).
 
     - LIKE مهرّب صريح — المحارف الخاصة حروف عادية.
     - بدائل أ/ا وة/ه وى/ي OR — بلا دمج سجلات وبلا تغيير بيانات.
-    - باركود مطابق تمامًا (=) مع بقاء فلاتر الفئة والتعطيل.
+    - اسم البراند ضمن البحث (مثال: «nivea» يجد أصناف نيفيا) بشرط حرفي واحد.
+    - باركود مطابق تمامًا (=) مع بقاء فلاتر الفئة/البراند والتعطيل.
     """
     term = (term or "").strip()
     where = "disabled = 0"
@@ -115,6 +135,9 @@ def _search_where(term, category):
     if category:
         where += " and item_group = %(category)s"
         params["category"] = category
+    if brand:
+        where += " and brand = %(brand)s"
+        params["brand"] = brand
     lit = None
     if term:
         variants = build_search_variants(term)
@@ -126,6 +149,8 @@ def _search_where(term, category):
                 "or item_code like %%(t%d)s escape '\\\\')" % (i, i)
             )
             params["t%d" % i] = "%%%s%%" % ev
+        ors.append("brand like %(tbrand)s escape '\\\\'")
+        params["tbrand"] = "%%%s%%" % escape_like(term)
         ors.append("item_code in (select parent from `tabItem Barcode` where barcode = %(exact)s)")
         params["exact"] = term
         where += " and (" + " or ".join(ors) + ")"
@@ -143,14 +168,14 @@ def _search_order(lit):
     )
 
 
-def search_items(term, category=None, page=1, page_size=PAGE_SIZE):
+def search_items(term, category=None, page=1, page_size=PAGE_SIZE, brand=None):
     """صفوف + إجمالي بترتيب حتمي (الحرفي أولًا ثم اسم ثم كود — بلا تكرار)."""
     term = (term or "").strip()
     try:
         page = max(int(page or 1), 1)
     except (TypeError, ValueError):
         page = 1
-    where, params, lit = _search_where(term, category)
+    where, params, lit = _search_where(term, category, brand)
     order_params = dict(params)
     order = _search_order(lit)
     if lit is not None:
@@ -170,13 +195,13 @@ def search_items(term, category=None, page=1, page_size=PAGE_SIZE):
     )
 
 
-def search_items_with_validation(term, category=None, page=1, page_size=PAGE_SIZE):
+def search_items_with_validation(term, category=None, page=1, page_size=PAGE_SIZE, brand=None):
     """(صفوف, إجمالي, رسالة): الطويل يُرفض بلا أي استعلام بحث."""
     term = (term or "").strip()
     ok, err = validate_search_term(term)
     if not ok:
         return [], 0, err
-    rows, total = search_items(term, category, page, page_size)
+    rows, total = search_items(term, category, page, page_size, brand)
     return rows, total, None
 
 
@@ -269,7 +294,7 @@ def rank_suggestions(folded_q, words):
     return [display for _, _, display in ranked[:SUGGEST_MAX_COUNT]]
 
 
-def suggest_corrections(term, category=None):
+def suggest_corrections(term, category=None, brand=None):
     """حتى 3 كلمات فريدة مرتبة — [] عند أي شرط مفقود (حروف/طول/كلمة واحدة)."""
     term = (term or "").strip()
     if not term or len(term) < SUGGEST_MIN_LENGTH:
@@ -286,6 +311,9 @@ def suggest_corrections(term, category=None):
     if category:
         where += " and item_group = %(category)s"
         params["category"] = category
+    if brand:
+        where += " and brand = %(brand)s"
+        params["brand"] = brand
     names = frappe.db.sql(
         "select distinct item_name from `tabItem` where " + where, params
     )
@@ -293,15 +321,55 @@ def suggest_corrections(term, category=None):
     return rank_suggestions(folded_q, words)
 
 
+def normalize_filter(value, allowed):
+    """الفلتر كما وصل أو "" — أي قيمة غير موجودة فعليًا تُسقط.
+
+    الغاية: ألّا تعرض الواجهة فلترًا وهميًا ولا عدًّا لا يطابق الحالة
+    المطبَّقة؛ الرابط قد يحمل قيمة قديمة/خاطئة فتُهمل بهدوء.
+    """
+    value = (value or "").strip()
+    return value if value in set(allowed or ()) else ""
+
+
 def get_context(context):
     redirect_staff_away_from_store()
 
     context.no_cache = 1
     context.active_page = "catalog"
+    # تصميم new_design: بحث الهيدر هو شريط البحث الوحيد في /catalog (عكس
+    # Option C السابقة) — لا حقل بحث مدمج في منطقة الفلاتر بعد اليوم.
+    context.hide_header_search = False
     context.update(get_header_context())
 
     search_term = (frappe.form_dict.get("q") or "").strip()
-    selected_category = (frappe.form_dict.get("category") or "").strip()
+    raw_category = (frappe.form_dict.get("category") or "").strip()
+    raw_brand = (frappe.form_dict.get("brand") or "").strip()
+
+    # قوائم الفلترة: القسم من Item Group الفعلية، والبراند من Brand الفعلية
+    # (أصناف نشطة فقط) — بلا قائمة مخزّنة ولا قيم مثبتة في القالب.
+    categories = [
+        d.item_group
+        for d in frappe.get_all(
+            "Item",
+            fields=["item_group"],
+            filters={"disabled": 0},
+            group_by="item_group",
+            order_by="item_group asc",
+        )
+    ]
+    brands = [
+        d.brand
+        for d in frappe.get_all(
+            "Item",
+            fields=["brand"],
+            filters={"disabled": 0},
+            group_by="brand",
+            order_by="brand asc",
+        )
+        if d.brand
+    ]
+    selected_category = normalize_filter(raw_category, categories)
+    selected_brand = normalize_filter(raw_brand, brands)
 
     try:
         page = int(frappe.form_dict.get("page") or 1)
@@ -310,13 +378,13 @@ def get_context(context):
     page = max(page, 1)
 
     search_error = None
+    items, total_count = [], 0
     ok, err = validate_search_term(search_term)
     if not ok:
         search_error = err
-        items, total_count = [], 0
     else:
         items, total_count = search_items(
-            search_term, selected_category or None, page, PAGE_SIZE
+            search_term, selected_category or None, page, PAGE_SIZE, selected_brand or None
         )
     total_pages = max((total_count + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(page, total_pages)
@@ -327,7 +395,7 @@ def get_context(context):
     did_you_mean = []
     if total_count == 0 and search_error is None and search_term:
         try:
-            did_you_mean = suggest_corrections(search_term, selected_category or None)
+            did_you_mean = suggest_corrections(search_term, selected_category or None, selected_brand or None)
         except Exception:
             frappe.log_error(title="Biozone suggest failed", message=frappe.get_traceback())
             did_you_mean = []
@@ -341,29 +409,41 @@ def get_context(context):
 
     items = enrich_store_items(items)
     context.items = items
-    # Category chip list: every distinct item_group that has active items.
-    categories = [
-        d.item_group
-        for d in frappe.get_all(
-            "Item",
-            fields=["item_group"],
-            filters={"disabled": 0},
-            group_by="item_group",
-            order_by="item_group asc",
-        )
-    ]
+
+    # عنوان الصفحة وعدّادها يتبعان الفلتر المطبَّق (البراند/التصنيف المفلتر أولًا).
+    if selected_brand:
+        scope_title = selected_brand
+    elif selected_category:
+        scope_title = selected_category
+    else:
+        scope_title = "كل المنتجات"
+    result_count_text = "%s صنف" % _to_arabic_digits(total_count)
 
     context.items = items
     context.categories = categories
+    context.brands = brands
     context.selected_category = selected_category
+    context.selected_brand = selected_brand
     context.search_term = search_term
     context.search_error = search_error
     context.did_you_mean = did_you_mean
     context.total_count_ar = _to_arabic_digits(total_count)
+    context.scope_title = scope_title
+    context.result_count_text = result_count_text
     context.page = page
     context.has_prev = page > 1
     context.has_next = page < total_pages
     context.prev_page = page - 1
     context.next_page = page + 1
+    # شريط الفلاتر والترقيم الجديدان (new_design): العدّاد الظاهر، نطاق
+    # العرض الحالي، نافذة أرقام الصفحات، وعدّ الفلاتر النشطة للكبسولة.
+    context.active_filters_count = int(bool(search_term)) + int(bool(selected_category)) + int(bool(selected_brand))
+    context.active_filters_count_ar = _to_arabic_digits(context.active_filters_count)
+    context.shown_count_ar = _to_arabic_digits(len(items))
+    range_start = (page - 1) * PAGE_SIZE + 1 if total_count else 0
+    range_end = min(page * PAGE_SIZE, total_count)
+    context.range_start_ar = _to_arabic_digits(range_start)
+    context.range_end_ar = _to_arabic_digits(range_end)
+    context.pages_window = _pages_window(page, total_pages)
 
     return context

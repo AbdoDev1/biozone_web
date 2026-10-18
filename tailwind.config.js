@@ -11,7 +11,7 @@ module.exports = {
         "alert-bg": "#ffdad6",
         "alert-red": "#ba1a1a",
         "amber-text": "#92400e",
-        "appBg": "#f8fafd",
+        "appBg": "#f1f5f9",
         "background": "#f8f9ff",
         "borderSubtle": "#e2e8f0",
         "darkNavy": "#0b1c30",
@@ -110,7 +110,8 @@ module.exports = {
         "xl": "0.75rem",
       },
       boxShadow: {
-        "card": '0 4px 6px -1px rgba(11, 28, 48, 0.03), 0 2px 4px -2px rgba(11, 28, 48, 0.03)',
+        "card": '0 2px 8px -2px rgba(0, 92, 85, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03)',
+        "card-hover": '0 12px 24px -6px rgba(0, 92, 85, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.04)',
         "drawer": '-8px 0 25px -5px rgba(11, 28, 48, 0.1), -2px 0 10px -6px rgba(11, 28, 48, 0.05)',
         "subtle": '0 1px 3px 0 rgba(11, 28, 48, 0.04), 0 1px 2px -1px rgba(11, 28, 48, 0.04)',
       }

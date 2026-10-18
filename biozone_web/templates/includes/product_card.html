@@ -1,0 +1,147 @@
+{# Shared storefront product card + cart control — single source used by:
+   - /catalog results grid          (product_card, lazy after the 4th card)
+   - /catalog results list view     (product_card_list, lazy after the 3rd)
+   - /biozone-home product rails    (product_card)
+   - /item similar products         (product_card, always lazy)
+   - /item main purchase block      (cart_control)
+
+   Cart hooks are pinned by cart_helpers.html JS and must stay literal:
+   catalog-cart-control / catalog-add-btn / catalog-stepper / catalog-qty /
+   catalog-increment / catalog-decrement + data-item-* attributes. #}
+
+{% macro product_image(item, lazy=false) -%}
+{%- if item.thumbnail -%}
+{%- if item.card and item.card2x -%}
+<img src="{{ item.card|e }}" srcset="{{ item.card|e }} 1x, {{ item.card2x|e }} 2x" alt="{{ item.item_name|e }}" class="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105" {% if lazy %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{%- elif item.card -%}
+<img src="{{ item.card|e }}" alt="{{ item.item_name|e }}" class="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105" {% if lazy %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{%- elif item.medium -%}
+<img src="{{ item.thumbnail|e }}" srcset="{{ item.thumbnail|e }} 1x, {{ item.medium|e }} 2x" alt="{{ item.item_name|e }}" class="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105" {% if lazy %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{%- else -%}
+<img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105" {% if lazy %}loading="lazy" {% endif %}decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{%- endif -%}
+{%- else -%}
+<img src="/assets/biozone_web/images/product-placeholder.svg" alt="{{ item.item_name|e }}" class="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105" {% if lazy %}loading="lazy" {% endif %}decoding="async">
+{%- endif -%}
+{%- endmacro %}
+
+{% macro detail_image(item) %}
+{% if item.card2x %}
+<img src="{{ item.card2x|e }}" srcset="{{ item.card|e }} 300w, {{ item.card2x|e }} 600w" sizes="(min-width: 768px) 448px, 320px" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{% elif item.card %}
+<img src="{{ item.card|e }}" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{% elif item.medium %}
+<img src="{{ item.thumbnail|e }}" srcset="{{ item.thumbnail|e }} 1x, {{ item.medium|e }} 2x" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{% elif item.image %}
+<img src="{{ item.image|e }}" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{% else %}
+<img src="{{ item.thumbnail|e }}" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async" onerror="this.onerror=null;this.src='/assets/biozone_web/images/product-placeholder.svg';">
+{% endif %}
+{% endmacro %}
+
+{% macro cart_control(item, compact=false) %}
+<div
+  class="catalog-cart-control"
+  data-item-code="{{ item.item_code|e }}"
+  data-item-name="{{ item.item_name|e }}"
+  data-item-group="{{ item.item_group|e }}"
+  data-item-price="{{ item.price or 0 }}"
+  data-item-uom="{{ item.display_uom or '' }}"
+  data-item-image="{{ item.thumbnail or '' }}"
+>
+  <button
+    aria-label="أضف للسلة"
+    class="{% if compact %}w-full px-6 py-3.5 text-base gap-2 rounded-xl bg-primary hover:bg-primary-hover text-on-primary shadow-md shadow-primary/20 active:scale-[0.99] transition-all{% else %}h-9 px-3 sm:px-4 gap-1.5 text-xs rounded-xl bg-primary hover:bg-primary-hover text-white active:scale-95 shadow-sm transition-all duration-200{% endif %} font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
+    {% if not item.price %}disabled{% endif %}
+    type="button"
+  >
+    <span class="material-symbols-outlined {% if compact %}text-[18px]{% else %}text-base{% endif %}">add_shopping_cart</span>
+    <span class="{% if not compact %}hidden sm:inline{% endif %}">{% if compact %}أضف للسلة{% else %}أضف{% endif %}</span>
+  </button>
+  {% if compact %}
+  <div class="hidden items-center justify-between w-fit rounded-xl border border-borderSubtle bg-surfaceMuted p-1 catalog-stepper">
+    <button aria-label="زيادة الكمية" class="flex h-9 w-9 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-increment" type="button">
+      <span class="material-symbols-outlined text-xl">add</span>
+    </button>
+    <span class="min-w-10 text-base text-center font-bold catalog-qty">0</span>
+    <button aria-label="إنقاص الكمية" class="flex h-9 w-9 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-decrement" type="button">
+      <span class="material-symbols-outlined text-xl">remove</span>
+    </button>
+  </div>
+  {% else %}
+  <div class="hidden items-center justify-between w-fit rounded-xl bg-primary p-0.5 catalog-stepper">
+    <button aria-label="إنقاص الكمية" class="flex h-7 w-7 rounded-lg bg-white text-primary hover:bg-primary-light shadow-sm items-center justify-center transition-colors catalog-decrement" type="button">
+      <span class="material-symbols-outlined text-base">remove</span>
+    </button>
+    <span class="w-7 text-xs text-white text-center font-bold catalog-qty">0</span>
+    <button aria-label="زيادة الكمية" class="flex h-7 w-7 rounded-lg bg-white text-primary hover:bg-primary-light shadow-sm items-center justify-center transition-colors catalog-increment" type="button">
+      <span class="material-symbols-outlined text-base">add</span>
+    </button>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro product_card(item, lazy=false) %}
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col justify-between overflow-hidden relative group h-full transition-all duration-[250ms] hover:-translate-y-[3px]">
+  <div class="p-4 pb-0 flex items-center justify-between z-10">
+    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
+  </div>
+  <div class="px-6 py-4 flex items-center justify-center min-h-[200px] bg-slate-50/50">
+    <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-36" aria-label="{{ item.item_name|e }}">
+      {{ product_image(item, lazy) }}
+    </a>
+  </div>
+  <div class="p-4 pt-3 flex-1 flex flex-col justify-between">
+    <div>
+      <a href="/item?code={{ item.item_code|urlencode }}" class="text-base font-bold text-slate-800 leading-snug hover:text-primary transition-colors text-right line-clamp-2 block">{{ item.item_name|e }}</a>
+    </div>
+    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div class="text-right">
+        {% if item.price %}
+        <div class="flex items-baseline gap-1">
+          <span class="text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
+          <span class="text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+        </div>
+        <span class="text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
+        {% else %}
+        <span class="text-sm text-outline">السعر غير متاح</span>
+        {% endif %}
+      </div>
+      {{ cart_control(item) }}
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+{% macro product_card_list(item, lazy=false) %}
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 gap-4 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
+  <div class="flex items-center gap-5 w-full sm:w-auto sm:flex-1 min-w-0">
+    <div class="w-24 h-24 sm:w-40 sm:h-40 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-center shrink-0 p-2">
+      <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-full" aria-label="{{ item.item_name|e }}">
+        {{ product_image(item, lazy) }}
+      </a>
+    </div>
+    <div class="flex-1 text-right min-w-0">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
+      </div>
+      <a href="/item?code={{ item.item_code|urlencode }}" class="text-base font-bold text-slate-800 leading-snug hover:text-primary transition-colors line-clamp-2 block">{{ item.item_name|e }}</a>
+    </div>
+  </div>
+  <div class="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+    <div class="text-right">
+      {% if item.price %}
+      <div class="flex items-baseline gap-1">
+        <span class="text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
+        <span class="text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+      </div>
+      <span class="text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
+      {% else %}
+      <span class="text-sm text-outline">السعر غير متاح</span>
+      {% endif %}
+    </div>
+    {{ cart_control(item) }}
+  </div>
+</article>
+{% endmacro %}
