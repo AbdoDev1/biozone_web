@@ -6,7 +6,8 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "sections"
+  "sections",
+  "brands"
  ],
  "fields": [
   {
@@ -14,6 +15,12 @@
    "fieldtype": "Table",
    "label": "أقسام الرئيسية",
    "options": "Biozone Home Section"
+  },
+  {
+   "fieldname": "brands",
+   "fieldtype": "Table",
+   "label": "علامات الرئيسية",
+   "options": "Biozone Home Brand"
   }
  ],
  "index_web_pages_for_search": 0,

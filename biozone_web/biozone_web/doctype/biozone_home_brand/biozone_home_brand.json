@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "creation": "2026-10-18 00:00:00.000000",
+ "custom": 1,
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "brand",
+  "label",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "العلامة التجارية",
+   "options": "Brand",
+   "reqd": 1
+  },
+  {
+   "columns": 4,
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "الاسم المعروض في الرئيسية"
+  },
+  {
+   "columns": 2,
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "الترتيب"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biozone Web",
+ "name": "Biozone Home Brand",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

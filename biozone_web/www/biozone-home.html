@@ -47,15 +47,15 @@
 
   <!-- Trust row: shared strip (same design language as the item page) — phrases kept verbatim -->
   {% set trust_items = [
-    {"icon": "verified_user", "title": "منتجات أصلية ومضمونة", "subtitle": "معتمدة من الهيئات الصحية الرسمية"},
-    {"icon": "local_shipping", "title": "توصيل سريع وآمن", "subtitle": "شحن مبرد ومحمي لجميع المناطق"},
-    {"icon": "sell", "title": "أسعار تنافسية", "subtitle": "عروض مستمرة للقطاعين الطبي والمنزلي"},
+    {"icon": "verified_user", "title": "منتجات أصلية ومضمونة"},
+    {"icon": "local_shipping", "title": "توصيل سريع وآمن"},
+    {"icon": "sell", "title": "أسعار تنافسية"},
   ] %}
   <section class="max-w-container-max mx-auto px-md pt-xl">
     {{ trust_strip(trust_items, "cards") }}
   </section>
 
-  <!-- تسوّق حسب العلامة التجارية — dynamic from ERPNext Brand (logo image + name). -->
+  <!-- تسوّق حسب العلامة التجارية — صفوف Biozone Home Settings عند وجودها، مع رجوع ديناميكي لأعلى البراندات. -->
   {% if top_brands %}
   <section class="max-w-container-max mx-auto px-md pt-xl">
     <div class="flex items-center justify-between mb-lg">
@@ -70,11 +70,11 @@
       <a href="/catalog?brand={{ b.brand|urlencode }}" class="bg-surface-container-lowest border border-surface-variant rounded-xl shadow-[0_2px_8px_rgba(11,28,48,0.04)] p-5 flex flex-col items-center justify-center text-center hover:border-primary/40 transition-colors">
         {% if b.image %}
         <img src="{{ b.image|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-cover rounded-lg mb-3" loading="lazy" decoding="async">
-        <span class="font-bold text-sm text-on-surface">{{ b.brand|e }}</span>
+        <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
         {% elif b.logo_url %}
         <img src="{{ b.logo_url|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-contain" loading="lazy" decoding="async">
         {% else %}
-        <span class="font-bold text-sm text-on-surface">{{ b.brand|e }}</span>
+        <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
         {% endif %}
       </a>
       {% endfor %}

@@ -142,14 +142,14 @@
       {% if search_term %}<input type="hidden" name="q" value="{{ search_term|e }}">{% endif %}
       <div class="p-5 space-y-6 overflow-y-auto flex-1 text-right">
         <div>
-          <button type="button" class="w-full text-xs font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="category-options" aria-expanded="false" aria-controls="category-options">
+          <button type="button" class="w-full text-base font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="category-options" aria-expanded="false" aria-controls="category-options">
             <span>القسم / الفئة</span>
             <span class="flex items-center gap-2">
               <span class="text-[10px] text-slate-400 font-normal" id="category-count">محدد: {{ sel_categories_count_ar }}</span>
               <span class="material-symbols-outlined text-base text-slate-400 filter-toggle-icon transition-transform">expand_more</span>
             </span>
           </button>
-          <div class="space-y-2 text-xs hidden" id="category-options">
+          <div class="space-y-2 text-base hidden" id="category-options">
             {% for cat in categories %}
             <label class="flex items-center gap-2.5 text-slate-700 cursor-pointer"><input type="checkbox" name="category" class="w-4 h-4 accent-primary rounded border-slate-300" data-filter-group="category" value="{{ cat|e }}" {% if cat in selected_categories %}checked{% endif %}><span class="font-medium">{{ cat|e }}</span></label>
             {% endfor %}
@@ -157,14 +157,14 @@
         </div>
         <div class="h-[1px] bg-slate-100"></div>
         <div>
-          <button type="button" class="w-full text-xs font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="brand-options" aria-expanded="false" aria-controls="brand-options">
+          <button type="button" class="w-full text-base font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="brand-options" aria-expanded="false" aria-controls="brand-options">
             <span>العلامة التجارية</span>
             <span class="flex items-center gap-2">
               <span class="text-[10px] text-slate-400 font-normal" id="brand-count">محدد: {{ sel_brands_count_ar }}</span>
               <span class="material-symbols-outlined text-base text-slate-400 filter-toggle-icon transition-transform">expand_more</span>
             </span>
           </button>
-          <div class="space-y-2 text-xs hidden" id="brand-options">
+          <div class="space-y-2 text-base hidden" id="brand-options">
             {% for b in brands %}
             <label class="flex items-center gap-2.5 text-slate-700 cursor-pointer"><input type="checkbox" name="brand" class="w-4 h-4 accent-primary rounded border-slate-300" data-filter-group="brand" value="{{ b|e }}" {% if b in selected_brands %}checked{% endif %}><span class="font-medium">{{ b|e }}</span></label>
             {% endfor %}

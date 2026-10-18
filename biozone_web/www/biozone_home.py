@@ -8,13 +8,15 @@ from biozone_web.utils import (
     redirect_staff_away_from_store,
 )
 
-# Home sections come from Biozone Home Settings (owner-managed rows: group +
-# optional display label + "show products" flag + order) — rename/delete-safe,
-# no code change needed to swap sections. When the settings table is empty the
-# home falls back to the legacy dynamic behavior: top real categories by active
-# item count, plus a top-category rail and a curated personal-care collection.
+# Home sections and the brand strip come from Biozone Home Settings
+# (owner-managed rows: group/brand + optional display label + "show products"
+# flag + order) — rename/delete-safe, no code change needed to swap content.
+# When a settings table is empty its part of the home falls back to the legacy
+# dynamic behavior: top real categories by active item count, plus a
+# top-category rail, a curated personal-care collection and top brands.
 SETTINGS_PARENT = "Biozone Home Settings"
 SECTION_DOCTYPE = "Biozone Home Section"
+BRAND_DOCTYPE = "Biozone Home Brand"
 PERFUME_GROUP = "عطور"
 CARE_GROUPS = [
     "شامبو",
@@ -74,6 +76,29 @@ def _settings_rows():
     )
 
 
+def _settings_brand_rows():
+    """Owner-typed brand rows in display order (same plain-table read)."""
+    return frappe.db.get_all(
+        BRAND_DOCTYPE,
+        filters={"parent": SETTINGS_PARENT, "parenttype": SETTINGS_PARENT},
+        fields=["brand", "label", "sort_order"],
+        order_by="sort_order asc, idx asc",
+    )
+
+
+def _existing_brands(rows):
+    """{brand: image} for the rows' Brand values that still exist."""
+    names = {(row.get("brand") or "").strip() for row in rows or []} - {""}
+    if not names:
+        return {}
+    return {
+        b.name: b.image
+        for b in frappe.db.get_all(
+            "Brand", filters={"name": ["in", sorted(names)]}, fields=["name", "image"]
+        )
+    }
+
+
 def _existing_groups():
     return set(frappe.db.get_all("Item Group", pluck="name"))
 
@@ -114,6 +139,26 @@ def build_rail_defs(rows, existing_groups):
             }
         )
     return defs
+
+
+def build_top_brands(rows, existing_brands):
+    """Brand cards from settings rows; rows pointing at deleted brands are
+    dropped and a brand listed twice keeps its first row (no cap)."""
+    cards, seen = [], set()
+    for row in rows or []:
+        brand = (row.get("brand") or "").strip()
+        if not brand or brand in seen or brand not in existing_brands:
+            continue
+        seen.add(brand)
+        cards.append(
+            {
+                "brand": brand,
+                "image": existing_brands[brand],
+                "label": (row.get("label") or "").strip() or brand,
+                "logo_url": brand_logo_url(brand),
+            }
+        )
+    return cards
 
 
 def _fallback_tiles():
@@ -183,24 +228,30 @@ def get_context(context):
             },
         ]
 
-    # Product brands: real ERPNext `Brand` values, ranked by how many active
-    # items carry them. Dynamic on purpose — the home never hardcodes a brand
-    # list (no Brand master / no items with a brand => the section hides).
-    # Carries the Brand master's `image` (if any) so the card can show a logo;
-    # otherwise it falls back to the app-shipped wordmark (services.brands).
-    context.top_brands = frappe.db.sql(
-        """
-        select i.brand as brand, b.image as image, count(*) as item_count
-        from `tabItem` i
-        left join `tabBrand` b on b.name = i.brand
-        where i.disabled = 0 and ifnull(i.brand, '') != ''
-        group by i.brand, b.image
-        order by item_count desc, i.brand asc
-        limit 6
-        """,
-        as_dict=True,
-    )
-    for brand in context.top_brands:
-        brand["logo_url"] = brand_logo_url(brand.brand)
+    # Product brands: owner rows (Biozone Home Brand) in display order when
+    # present (no cap; deleted brands dropped, display label optional);
+    # otherwise the legacy dynamic fallback — real ERPNext `Brand` values
+    # ranked by active item count (no hardcoded list; hides when empty).
+    # Cards carry the Brand master's `image` (if any), else the app-shipped
+    # wordmark (services.brands).
+    brand_rows = _settings_brand_rows()
+    if brand_rows:
+        context.top_brands = build_top_brands(brand_rows, _existing_brands(brand_rows))
+    else:
+        context.top_brands = frappe.db.sql(
+            """
+            select i.brand as brand, b.image as image, count(*) as item_count
+            from `tabItem` i
+            left join `tabBrand` b on b.name = i.brand
+            where i.disabled = 0 and ifnull(i.brand, '') != ''
+            group by i.brand, b.image
+            order by item_count desc, i.brand asc
+            limit 6
+            """,
+            as_dict=True,
+        )
+        for brand in context.top_brands:
+            brand["logo_url"] = brand_logo_url(brand.brand)
+            brand["label"] = brand.brand
 
     return context
