@@ -23,6 +23,7 @@
 <script>
     // Sidebar Drawer Toggle for Mobile and Tablet (unchanged by desktop collapse below)
     function toggleSidebar(open) {
+      enableSidebarAnim();
       const sidebar = document.getElementById('sidebar');
       const backdrop = document.getElementById('drawer-backdrop');
       if (open) {
@@ -39,7 +40,19 @@
     // Independent from the mobile drawer above: this only ever toggles the
     // `sidebar-collapsed` body class (styled under min-width:1024px), while
     // toggleSidebar() only touches `max-lg:translate-x-full` (below lg).
-    var BIOZONE_SIDEBAR_KEY = 'biozone-sidebar-collapsed';
+    var BIOZONE_SIDEBAR_KEY = window.BIOZONE_SIDEBAR_KEY || 'biozone-sidebar-collapsed';
+    // Motion is enabled only around a deliberate toggle. applyDesktopSidebar()
+    // (page load / navigation) must never add this class, otherwise the saved
+    // collapsed state animates the sidebar and content on every page change.
+    var BIOZONE_SIDEBAR_ANIM_MS = 400;
+    var bzSidebarAnimTimer = null;
+    function enableSidebarAnim() {
+      document.body.classList.add('sidebar-anim');
+      clearTimeout(bzSidebarAnimTimer);
+      bzSidebarAnimTimer = setTimeout(function () {
+        document.body.classList.remove('sidebar-anim');
+      }, BIOZONE_SIDEBAR_ANIM_MS);
+    }
     // Both toggle buttons (desktop edge button `#sidebar-edge-toggle` and the
     // mobile header button `#sidebar-toggle-mobile`) expose the SAME
     // `aria-expanded` value: "true" = the sidebar itself is currently expanded.
@@ -72,6 +85,7 @@
       syncSidebarAria();
     }
     function toggleDesktopSidebar() {
+      enableSidebarAnim();
       var collapsed = document.body.classList.toggle('sidebar-collapsed');
       try {
         localStorage.setItem(BIOZONE_SIDEBAR_KEY, collapsed ? '1' : '0');

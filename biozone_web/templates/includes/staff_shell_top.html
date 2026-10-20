@@ -32,12 +32,32 @@
   body.sidebar-collapsed #sidebar .sidebar-foot { justify-content: center !important; }
   body.sidebar-collapsed .sidebar-main { margin-right: 5rem !important; }
 }
+/* Motion is opt-in only for a deliberate toggle. Page load, navigation and
+   the initial localStorage state change must never animate the layout. */
+body.sidebar-anim #sidebar { transition: width 300ms ease-in-out, transform 300ms ease-in-out; }
+body.sidebar-anim .sidebar-main { transition: margin-right 300ms ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  body.sidebar-anim #sidebar,
+  body.sidebar-anim .sidebar-main,
+  #drawer-backdrop { transition: none !important; }
+}
 </style>
 <body class="min-h-screen bg-surface flex flex-col antialiased text-navy-text selection:bg-primary/15 selection:text-primary">
+<script>
+/* Apply the saved desktop sidebar state before the sidebar is parsed/painted.
+   Doing this only at the end of <body> caused a one-frame expanded flash on
+   every staff-page navigation even with transitions disabled. */
+window.BIOZONE_SIDEBAR_KEY = 'biozone-sidebar-collapsed';
+try {
+  if (localStorage.getItem(window.BIOZONE_SIDEBAR_KEY) === '1') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+} catch (e) { /* storage unavailable: stay expanded */ }
+</script>
 <!-- Mobile & Tablet Sidebar Overlay Backdrop -->
 <div class="fixed inset-0 bg-navy-text/30 backdrop-blur-sm z-40 hidden transition-opacity duration-300" id="drawer-backdrop" onclick="toggleSidebar(false)"></div>
 <!-- Collapsible Right Sidebar (RTL) -->
-<aside class="fixed top-0 right-0 h-full bg-white z-50 flex flex-col justify-between transition-all duration-300 ease-in-out border-l border-surface-subtle shadow-sm w-64 max-lg:translate-x-full lg:max-xl:w-20 xl:w-64" id="sidebar">
+<aside class="fixed top-0 right-0 h-full bg-white z-50 flex flex-col justify-between border-l border-surface-subtle shadow-sm w-64 max-lg:translate-x-full lg:max-xl:w-20 xl:w-64" id="sidebar">
 <!-- Desktop sidebar toggle, attached to the sidebar's own content-facing edge
      (physical left = inline-end under RTL). `end-0` pins it to that edge and
      `-translate-x-1/2` shifts it half its own width outward so the 32px hit
@@ -101,7 +121,7 @@
   following content out of <main>/.sidebar-main so it renders underneath the
   fixed sidebar (this exact bug once hid in items.html + dashboard.html).
   scripts/check_staff_layout.py exists to catch this automatically. -->
-<div class="sidebar-main flex-1 flex flex-col transition-all duration-300 xl:mr-64 lg:max-xl:mr-20 pb-20 sm:pb-8">
+<div class="sidebar-main flex-1 flex flex-col xl:mr-64 lg:max-xl:mr-20 pb-20 sm:pb-8">
 <header class="h-16 bg-white border-b border-surface-subtle sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between">
 <div class="flex items-center gap-3 sm:gap-4">
 <button aria-label="فتح القائمة" aria-controls="sidebar" aria-expanded="true" class="lg:hidden p-2 text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle rounded-lg focus:outline-none" id="sidebar-toggle-mobile" onclick="toggleSidebar(true)">
