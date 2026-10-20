@@ -115,6 +115,10 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 <span class="flex items-center gap-1.5 font-medium"><span class="material-symbols-outlined text-[15px] text-primary">drag_indicator</span>يمكن سحب الحافة الفاصلة بين الأعمدة لتغيير عرضها</span>
 <span class="font-mono" id="itemsCountLabel">{{ items|length }} عناصر</span>
 </div>
+<div class="mx-4 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-alert-red/25 bg-alert-bg/50 px-2.5 py-1.5 text-[11px] font-bold leading-5 text-alert-red" id="stockSummaryBanner" style="{% if not stock_shortage_count %}display:none;{% else %}display:flex;{% endif %}">
+<span class="material-symbols-outlined shrink-0 text-[15px] leading-none">warning</span>
+<span class="min-w-0 flex-1">المخزون غير كافٍ لـ <span class="align-middle text-[16px] font-extrabold leading-none" id="stockShortageCount">{{ stock_shortage_count|e }}</span> من الأصناف</span>
+</div>
 <div class="overflow-x-auto w-full">
 <table class="resizable-table text-right text-xs" id="itemsTable">
 <thead>
@@ -129,13 +133,14 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 </thead>
 <tbody id="itemsTableBody">
 {% for it in items %}
-<tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name|e }}">
+<tr class="hover:bg-surface-subtle/60 transition-colors {% if not it.confirmed %}bg-amber-50/30{% endif %}" id="row-{{ it.name|e }}"{% if it.stock_short %} data-stock-short="1"{% endif %}>
 <td class="py-3 px-3 text-center text-navy-text/50 font-mono">{{ it.idx|e }}</td>
 <td class="py-3 px-4">
 <div class="flex items-start justify-between gap-2">
 <div class="flex flex-col min-w-0">
-<a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/items?code={{ it.item_code|e }}" target="_blank" title="فتح صفحة الصنف في تبويب جديد"><span>{{ it.item_name|e }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
+<a class="font-bold text-primary hover:underline text-sm inline-flex items-center gap-1.5" href="/staff/stock?q={{ it.item_code|urlencode }}" target="_blank" title="فتح حركة المخزون للصنف في تبويب جديد"><span>{{ it.item_name|e }}</span><span class="material-symbols-outlined text-[14px] text-navy-text/40">open_in_new</span></a>
 <span class="text-[10px] text-primary font-mono mt-0.5">كود الصنف: {{ it.item_code|e }}</span>
+<div class="mt-1 inline-flex items-center gap-1 rounded-md border border-alert-red/30 bg-alert-bg/60 px-2 py-0.5 text-[10px] font-bold text-alert-red {% if not it.get('stock_short') %}hidden{% endif %}" id="stock-warning-{{ it.name|e }}"{% if stock_warehouse %} title="المتاح في {{ stock_warehouse|e }}: {{ '%g'|format(it.get('available_qty') or 0) }} {{ it.get('stock_uom') or it.get('uom') or '' }}"{% endif %}><span class="material-symbols-outlined text-[13px]">warning</span><span class="stock-warning-text">المخزون غير كافٍ — المتاح {{ '%g'|format(it.get('available_qty') or 0) }} {{ it.get('stock_uom') or it.get('uom') or '' }}</span></div>
 </div>
 <button aria-label="حذف الصنف {{ it.item_name|e }} من الطلب" class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-navy-text/40 transition-colors hover:bg-alert-bg/40 hover:text-alert-red" onclick="openDeleteItemModal('{{ it.name|e }}')" title="حذف الصنف من الطلب" type="button"><span class="material-symbols-outlined text-[20px]">delete</span></button>
 </div>
@@ -180,6 +185,14 @@ class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 round
 {% endfor %}
 </tbody>
 </table>
+</div>
+<div class="flex-col items-center justify-between gap-2 border-t border-surface-container px-4 py-3 text-[11px] text-navy-text/60 sm:flex-row" id="itemsPagination" style="display:none;">
+<span id="itemsPageInfo"></span>
+<div class="flex items-center gap-1.5">
+<button class="rounded-lg border border-surface-container bg-white px-3 py-1.5 font-bold text-navy-text transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-40" id="itemsPrevPage" type="button">السابق</button>
+<span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-white" id="itemsPageNumber"></span>
+<button class="rounded-lg border border-surface-container bg-white px-3 py-1.5 font-bold text-navy-text transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-40" id="itemsNextPage" type="button">التالي</button>
+</div>
 </div>
 </section>
 
@@ -271,6 +284,86 @@ const CSRF_TOKEN = {{ csrf_token|tojson }};
 const ORDER_NAME = {{ order_name|tojson }};
 let ITEMS = {{ items|tojson }};
 let activeRow = null;
+const ITEMS_PAGE_SIZE = 20;
+let itemsCurrentPage = 1;
+
+function getItemRows() {
+  return Array.from(document.querySelectorAll('#itemsTableBody tr'));
+}
+
+function formatStockQty(value) {
+  const n = Number(value || 0);
+  return String(Math.round(n * 1000) / 1000);
+}
+
+function applyStockState(name, state) {
+  if (!state || typeof state.stock_short !== 'boolean') return;
+  const row = document.getElementById('row-' + name);
+  const badge = document.getElementById('stock-warning-' + name);
+  if (!row || !badge) return;
+  if (state.stock_short) {
+    const uom = state.stock_uom || '';
+    const available = formatStockQty(state.available_qty);
+    row.setAttribute('data-stock-short', '1');
+    badge.classList.remove('hidden');
+    badge.title = 'المتاح: ' + available + (uom ? ' ' + uom : '');
+    const text = badge.querySelector('.stock-warning-text');
+    if (text) text.textContent = 'المخزون غير كافٍ — المتاح ' + available + (uom ? ' ' + uom : '');
+  } else {
+    row.removeAttribute('data-stock-short');
+    badge.classList.add('hidden');
+  }
+}
+
+function refreshStockSummary() {
+  const count = document.querySelectorAll('#itemsTableBody tr[data-stock-short="1"]').length;
+  const banner = document.getElementById('stockSummaryBanner');
+  const countEl = document.getElementById('stockShortageCount');
+  if (countEl) countEl.textContent = String(count);
+  if (banner) banner.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function renderItemsPage(scrollToTableTop) {
+  const rows = getItemRows();
+  const pages = Math.max(1, Math.ceil(rows.length / ITEMS_PAGE_SIZE));
+  if (itemsCurrentPage > pages) itemsCurrentPage = pages;
+  if (itemsCurrentPage < 1) itemsCurrentPage = 1;
+  const start = (itemsCurrentPage - 1) * ITEMS_PAGE_SIZE;
+  const end = Math.min(start + ITEMS_PAGE_SIZE, rows.length);
+  rows.forEach((tr, i) => {
+    tr.style.display = i >= start && i < end ? '' : 'none';
+  });
+  const pag = document.getElementById('itemsPagination');
+  if (pag) pag.style.display = rows.length > ITEMS_PAGE_SIZE ? 'flex' : 'none';
+  const info = document.getElementById('itemsPageInfo');
+  if (info) {
+    info.textContent = rows.length
+      ? 'عرض ' + (start + 1) + '–' + end + ' من ' + rows.length
+      : 'لا توجد أصناف';
+  }
+  const num = document.getElementById('itemsPageNumber');
+  if (num) num.textContent = String(itemsCurrentPage);
+  const prev = document.getElementById('itemsPrevPage');
+  const next = document.getElementById('itemsNextPage');
+  if (prev) prev.disabled = itemsCurrentPage <= 1;
+  if (next) next.disabled = itemsCurrentPage >= pages;
+  if (scrollToTableTop) {
+    const table = document.getElementById('itemsTable');
+    if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function showPageForRow(name) {
+  const rows = getItemRows();
+  const idx = rows.findIndex((tr) => tr.id === 'row-' + name);
+  if (idx < 0) return;
+  const page = Math.floor(idx / ITEMS_PAGE_SIZE) + 1;
+  if (page !== itemsCurrentPage) {
+    itemsCurrentPage = page;
+    renderItemsPage();
+  }
+  rows[idx].scrollIntoView({ block: 'nearest' });
+}
 
 function apiCall(method, args) {
   return fetch('/api/method/biozone_web.api.' + method, {
@@ -345,11 +438,18 @@ function refreshSlim(p) {
     ITEMS = ITEMS.filter((x) => x.name !== p.removed);
     const tr = document.getElementById('row-' + p.removed);
     if (tr) tr.remove();
+    renderItemsPage();
   } else if (p.row) {
     const ex = ITEMS.find((x) => x.name === p.row.name);
-    if (ex) { ex.qty = p.row.qty; ex.uom = p.row.uom; }
+    if (ex) {
+      ex.qty = p.row.qty;
+      ex.uom = p.row.uom;
+      if (p.row.stock_qty != null) ex.stock_qty = p.row.stock_qty;
+    }
     updateRowSlim(p.row);
+    applyStockState(p.row.name, p.row);
   }
+  refreshStockSummary();
   document.getElementById('metricRatioText').innerText = p.progress_text;
   document.getElementById('metricPercentText').innerText = p.percent + '%';
   document.getElementById('progressBar').style.width = p.percent + '%';
@@ -411,6 +511,11 @@ function refreshFromPayload(p) {
   document.querySelectorAll('#itemsTableBody tr').forEach((tr) => {
     if (!alive.has(tr.id)) tr.remove();
   });
+  (p.items || []).forEach((it) => {
+    if (typeof it.stock_short === 'boolean') applyStockState(it.name, it);
+  });
+  renderItemsPage();
+  refreshStockSummary();
   const input = document.getElementById('barcodeInput');
   if (input) input.focus();
 }
@@ -430,6 +535,11 @@ async function processEnteredBarcode() {
     if (p.already) showToast('صنف مؤكد مسبقًا', 'هذا الصنف مسجل ومكتمل مسبقًا في هذا الطلب.', 'info');
     else showToast('تم بنجاح', 'تم التعرف على الصنف وتأكيده بنجاح.', 'success');
     refreshFromPayload(p);
+    const code = p.confirmed_code || p.item_code;
+    if (code) {
+      const rowItem = ITEMS.find((x) => x.item_code === code);
+      if (rowItem) showPageForRow(rowItem.name);
+    }
   } catch (err) {
     const info = window.StaffUI.errorInfo(err);
     showToast(info.title, info.message, info.type);
@@ -505,7 +615,7 @@ async function executeFinalDelivery() {
     const r = await apiCall('staff_confirm_delivery', { order_name: ORDER_NAME });
     window.location.href = r.redirect || ('/staff/order-delivery?order=' + ORDER_NAME + '&invoice=' + (r.sales_invoice || ''));
   } catch (err) {
-    showToast('تعذر التسليم', err.message, 'error');
+    showToast('تعذر التسليم', err.message, 'error', { center: true });
     btn.disabled = false;
   }
 }
@@ -513,13 +623,12 @@ async function executeFinalDelivery() {
 function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('hidden'); m.classList.add('flex'); } }
 function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
 
-function showToast(title, desc, type) {
+function showToast(title, desc, type, options) {
   // Phase 4: direct delegation to the unified safe builder (StaffUI.toast).
-  // Signature and all 14 calls unchanged; barcode titles now resolve via
-  // the shared converter (Phase 5), so no local map remains here.
+  // Existing calls unchanged; the optional 4th arg enables centered display.
   // No local fallback by design: the shell partial loads on every staff
   // page, so a missing StaffUI must fail loudly, never render silently.
-  return window.StaffUI.toast(title, desc, type);
+  return window.StaffUI.toast(title, desc, type, options);
 }
 
 (function initResizableColumns() {
@@ -552,6 +661,14 @@ function showToast(title, desc, type) {
   });
 })();
 document.addEventListener('DOMContentLoaded', () => { const i = document.getElementById('barcodeInput'); if (i) i.focus(); const tb = document.getElementById('itemsTableBody'); if (tb && !tb.dataset.confirmBound) { tb.dataset.confirmBound = '1'; tb.addEventListener('click', (e) => { const b = e.target && e.target.closest ? e.target.closest('[data-confirm-row]') : null; if (b) confirmManualDirect(b.getAttribute('data-confirm-row')); }); } });
+document.addEventListener('DOMContentLoaded', () => {
+  const prev = document.getElementById('itemsPrevPage');
+  const next = document.getElementById('itemsNextPage');
+  if (prev) prev.addEventListener('click', () => { if (itemsCurrentPage > 1) { itemsCurrentPage -= 1; renderItemsPage(true); } });
+  if (next) next.addEventListener('click', () => { itemsCurrentPage += 1; renderItemsPage(true); });
+  renderItemsPage();
+  refreshStockSummary();
+});
 </script>
 {% endif %}
 </body></html>

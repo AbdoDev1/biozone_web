@@ -61,6 +61,57 @@ def get_order_prep_state(so_doc) -> dict:
 	}
 
 
+def get_stock_availability(so_doc, warehouse: str) -> dict:
+	"""رصيد المخزون الفعلي (actual_qty) لكل صنف في مستودع واحد — قراءة فقط.
+
+	الكمية المطلوبة تُجمَّع من `stock_qty` لكل كود (بوحدة المخزون)، ثم
+	تُقارن برصيد `Bin.actual_qty` في المستودع الممرر. النتيجة استشارية
+	للعرض/الفحص المبكر؛ الحكم النهائي يبقى لمحرك المخزون عند اعتماد
+	مستند التسليم. لا تُرجع أصناف الخدمات (stock_qty = 0).
+	"""
+	if not warehouse:
+		return {}
+
+	required, meta = {}, {}
+	for it in so_doc.get("items") or []:
+		code = (it.get("item_code") or "").strip()
+		if not code:
+			continue
+		qty = frappe.utils.flt(it.get("stock_qty") or 0)
+		if qty <= 0:
+			continue
+		required[code] = required.get(code, 0.0) + qty
+		meta.setdefault(
+			code,
+			{
+				"item_name": it.get("item_name") or code,
+				"uom": it.get("stock_uom") or it.get("uom") or "",
+			},
+		)
+
+	available = {}
+	if required:
+		for row in frappe.get_all(
+			"Bin",
+			filters={"item_code": ["in", list(required)], "warehouse": warehouse},
+			fields=["item_code", "actual_qty"],
+			ignore_permissions=True,
+		):
+			available[row.item_code] = frappe.utils.flt(row.actual_qty)
+
+	out = {}
+	for code, req in required.items():
+		avail = available.get(code, 0.0)
+		out[code] = {
+			"item_name": meta[code]["item_name"],
+			"uom": meta[code]["uom"],
+			"required": req,
+			"available": avail,
+			"shortage": max(req - avail, 0.0),
+		}
+	return out
+
+
 def find_item_code_by_barcode(barcode: str) -> str | None:
 	"""يبحث عن صنف برقم باركود (نص حرفي، بلا تحويل رقمي).
 

@@ -2027,7 +2027,22 @@ def _b9_slim_payload(so, row=None, removed=None) -> dict:
 			"uom": row.uom,
 			"confirmed": bool(frappe.utils.cint(row.get("custom_confirmed"))),
 			"confirmed_by": row.get("custom_confirmed_by") or "",
+			"stock_qty": float(row.stock_qty or 0),
 		}
+		try:
+			from biozone_web.b9_utils import get_stock_availability
+			from biozone_web.utils import get_default_warehouse
+
+			info = get_stock_availability(so, get_default_warehouse()).get(row.item_code) or {}
+			out["row"].update(
+				{
+					"stock_short": bool(info.get("shortage", 0) > 0),
+					"available_qty": float(info.get("available", 0) or 0),
+					"stock_uom": info.get("uom") or row.stock_uom or row.uom or "",
+				}
+			)
+		except Exception:
+			pass
 	return out
 
 
@@ -2503,6 +2518,27 @@ def _b9_existing_delivery_docs(order_name: str) -> dict:
 	return {"delivery_note": dn, "sales_invoice": si}
 
 
+def _b9_stock_shortages(so, warehouse: str) -> list:
+	"""نواقص المخزون الفعلية (actual_qty) قبل إنشاء التسليم — قراءة فقط."""
+	from biozone_web.b9_utils import get_stock_availability
+
+	if frappe.utils.cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock")):
+		return []
+	return [
+		{"item_code": code, **info}
+		for code, info in get_stock_availability(so, warehouse).items()
+		if info["shortage"] > 0
+	]
+
+
+def _is_insufficient_stock_error(exc) -> bool:
+	try:
+		from erpnext.stock.stock_ledger import NegativeStockError
+	except Exception:
+		NegativeStockError = ()
+	return isinstance(exc, NegativeStockError) or "to complete this transaction" in str(exc)
+
+
 # Phase-2 shipping: single Actual row on the draft order, copied to the
 # invoice by the existing taxes copy. Never in store/cart — staff only.
 SHIPPING_ACCOUNT = "مصاريف الشحن - BIO"
@@ -2643,6 +2679,43 @@ def staff_confirm_delivery(order_name: str):
 		}
 
 	try:
+		warehouse = get_default_warehouse()
+	except Exception:
+		return {
+			"ok": False,
+			"error": _("تعذر تحديد مستودع التسليم"),
+			"error_code": "warehouse_missing",
+		}
+
+	try:
+		shortages = _b9_stock_shortages(so, warehouse)
+	except Exception:
+		frappe.log_error(
+			title="Biozone stock pre-check failed",
+			message=frappe.get_traceback(),
+		)
+		shortages = []
+	if shortages:
+		if len(shortages) == 1:
+			short = shortages[0]
+			message = _("المخزون غير كافٍ للصنف {0}: المطلوب {1} والمتاح {2} {3}").format(
+				short["item_name"],
+				f"{short['required']:g}",
+				f"{short['available']:g}",
+				short["uom"],
+			)
+		else:
+			message = _(
+				"المخزون غير كافٍ لـ {0} أصناف في مستودع التسليم — راجع الأصناف المعلّمة بالتحذير ثم أعد المحاولة"
+			).format(len(shortages))
+		return {
+			"ok": False,
+			"error": message,
+			"error_code": "insufficient_stock",
+			"shortages": shortages,
+		}
+
+	try:
 		so.submit()
 	except Exception:
 		frappe.db.rollback()
@@ -2671,13 +2744,24 @@ def staff_confirm_delivery(order_name: str):
 			}
 		return {"ok": False, "error": _("تعذر اعتماد الطلب")}
 
-	warehouse = get_default_warehouse()
 	try:
 		so.reload()
 		dn = _create_delivery_note_for_order(so, warehouse)
 		si = _create_sales_invoice_for_delivery(so, dn)
 	except Exception as exc:
 		frappe.db.rollback()
+		if _is_insufficient_stock_error(exc):
+			frappe.log_error(
+				title="Biozone insufficient stock on delivery",
+				message=frappe.get_traceback(),
+			)
+			return {
+				"ok": False,
+				"error": _(
+					"المخزون غير كافٍ لصنف واحد أو أكثر في مستودع التسليم — راجع الكميات المتاحة ثم أعد المحاولة"
+				),
+				"error_code": "insufficient_stock",
+			}
 		return {"ok": False, "error": _("تعذر إنشاء التسليم والفاتورة: {0}").format(exc)}
 
 	# Phase 2 (ND17/X1): customer bell — last write inside the

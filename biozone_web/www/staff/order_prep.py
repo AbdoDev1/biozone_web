@@ -1,9 +1,14 @@
 import frappe
 from frappe import _
 
-from biozone_web.b9_utils import get_items_barcodes, get_order_prep_state
+from biozone_web.b9_utils import (
+	get_items_barcodes,
+	get_order_prep_state,
+	get_stock_availability,
+)
 from biozone_web.utils import (
 	get_csrf_token_safe,
+	get_default_warehouse,
 	get_header_context,
 	render_state_page,
 	require_staff_access,
@@ -43,8 +48,16 @@ def _b9_prep_details(so):
 			}
 	# الباركودات دفعة واحدة (استعلام واحد) — نفس شكل الاستجابة حرفيًا.
 	_b9_barcodes_map = get_items_barcodes([it.item_code for it in (so.items or [])])
+	stock_info, stock_warehouse = {}, ""
+	if so.docstatus == 0:
+		try:
+			stock_warehouse = get_default_warehouse()
+			stock_info = get_stock_availability(so, stock_warehouse)
+		except Exception:
+			stock_info, stock_warehouse = {}, ""
 	for idx, it in enumerate(so.items or [], start=1):
 		pub = pub_map.get(it.item_code) or {}
+		stock = stock_info.get(it.item_code) or {}
 		items.append(
 			{
 				"idx": idx,
@@ -60,6 +73,13 @@ def _b9_prep_details(so):
 				"confirmed": bool(frappe.utils.cint(it.get("custom_confirmed"))),
 				"confirmation_method": it.get("custom_confirmation_method") or "",
 				"confirmed_by": it.get("custom_confirmed_by") or "",
+				"is_stock_item": bool(stock),
+				"stock_qty": float(it.stock_qty or 0),
+				"stock_required_total": float(stock.get("required") or 0),
+				"available_qty": float(stock.get("available") or 0),
+				"stock_short": bool(stock.get("shortage", 0) > 0),
+				"stock_shortage": float(stock.get("shortage") or 0),
+				"stock_uom": stock.get("uom") or stock_map.get(it.item_code, "") or it.uom or "",
 			}
 		)
 	# Phase-2 shipping (read-only هنا): القيمة الحالية + إجمالي الطلب.
@@ -70,7 +90,7 @@ def _b9_prep_details(so):
 		if (t.account_head or "").strip() == SHIPPING_ACCOUNT:
 			_shipping = float(t.get("tax_amount") or 0)
 			break
-	return items, _shipping, float(so.grand_total or 0)
+	return items, _shipping, float(so.grand_total or 0), stock_warehouse
 
 
 def get_context(context):
@@ -96,7 +116,7 @@ def get_context(context):
 		# S1: الملغى يُعرض بتفاصيله للقراءة فقط — مقفل بلا أي إجراء
 		# (القالب يتجاهل كل الأزرار والسكربت في فرع error_state).
 		state = get_order_prep_state(so)
-		items, _shipping, grand_total = _b9_prep_details(so)
+		items, _shipping, grand_total, _stock_warehouse = _b9_prep_details(so)
 		context.order_name = so.name
 		context.customer_name = so.customer_name
 		context.state = state["state"]
@@ -125,8 +145,10 @@ def get_context(context):
 	context.needs_attention = state["needs_attention"]
 	context.attention_note = state["attention_note"]
 
-	items, _shipping, grand_total = _b9_prep_details(so)
+	items, _shipping, grand_total, stock_warehouse = _b9_prep_details(so)
 	context.items = items
+	context.stock_warehouse = stock_warehouse
+	context.stock_shortage_count = sum(1 for it in items if it.get("stock_short"))
 	# فئة العميل الحالية للشارة (قراءة فقط).
 	context.live_customer_group = (
 		frappe.db.get_value("Customer", so.customer, "customer_group") or ""

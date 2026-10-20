@@ -23,6 +23,22 @@
    warning/error → alert+assertive. Timers pause on hover/focus and honour
    `prefers-reduced-motion`. Toasts are removed from the DOM after hiding. #}
 <div aria-live="off" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none" dir="rtl" id="staff-toast-stack"></div>
+<style>
+#staff-toast-stack .staff-toast-center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  min-width: 0;
+  z-index: 80;
+}
+#staff-toast-stack .staff-toast-center .staff-toast-body {
+  font-size: 15px;
+  line-height: 1.5;
+}
+</style>
 <script>
 (function () {
   'use strict';
@@ -164,7 +180,8 @@
 
   // Display only: builds DOM via createElement + textContent. Never reads
   // error codes and never touches message text semantics.
-  function staffToast(title, message, type) {
+  function staffToast(title, message, type, options) {
+    options = options || {};
     type = normalizeType(type);
     title = toText(title, '');
     message = toText(message, '');
@@ -185,7 +202,9 @@
     }
 
     var toast = document.createElement('div');
-    toast.className = 'pointer-events-auto flex items-center gap-3 bg-white p-3.5 rounded-xl border shadow-xl min-w-[280px] max-w-sm transition-opacity duration-300 ' + cfg.border;
+    toast.className = 'pointer-events-auto flex items-center gap-3 bg-white p-3.5 rounded-xl border shadow-xl transition-opacity duration-300 '
+      + cfg.border
+      + (options.center ? ' staff-toast-center' : ' min-w-[280px] max-w-sm');
     toast.setAttribute('role', cfg.role);
     toast.setAttribute('aria-live', cfg.live);
 
@@ -195,7 +214,7 @@
     icon.textContent = cfg.icon;
 
     var body = document.createElement('div');
-    body.className = 'flex flex-col gap-0.5 text-xs min-w-0 flex-1 break-words';
+    body.className = 'staff-toast-body flex flex-col gap-0.5 text-xs min-w-0 flex-1 break-words';
 
     var titleEl = document.createElement('span');
     titleEl.className = 'font-bold text-navy-text';
