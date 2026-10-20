@@ -102,12 +102,13 @@
 <button type="submit" class="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-accent transition-colors">بحث</button>
 </form>
 <div id="filterPanel" class="hidden border-t border-surface-subtle pt-4">
-<form method="get" action="/staff/orders" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<form method="get" action="/staff/orders" class="flex flex-col gap-3">
 <input type="hidden" name="page" value="1">
 <input type="hidden" name="q" value="{{ filters.q|e }}">
+<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">حالة الطلب</label>
-<select name="state" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
+<select name="state" class="h-11 w-full min-w-0 cursor-pointer rounded-xl border border-surface-subtle bg-white px-3.5 text-sm text-navy-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary">
 <option value="all" {% if filters.state == 'all' %}selected{% endif %}>النشطة</option>
 <option value="preparing" {% if filters.state == 'preparing' %}selected{% endif %}>جارٍ التجهيز</option>
 <option value="ready" {% if filters.state == 'ready' %}selected{% endif %}>جاهز للتسليم</option>
@@ -119,7 +120,7 @@
 </div>
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">العميل</label>
-<select name="customer" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
+<select name="customer" class="h-11 w-full min-w-0 cursor-pointer rounded-xl border border-surface-subtle bg-white px-3.5 text-sm text-navy-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary">
 <option value="">جميع العملاء</option>
 {% for c in customers %}
 <option value="{{ c.name|e }}" {% if filters.customer == c.name %}selected{% endif %}>{{ c.label|e }}</option>
@@ -128,15 +129,16 @@
 </div>
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">من تاريخ</label>
-<input type="date" name="date_from" value="{{ filters.date_from|e }}" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
+<input type="date" name="date_from" value="{{ filters.date_from|e }}" dir="ltr" class="h-11 w-full min-w-0 rounded-xl border border-surface-subtle bg-white px-3.5 text-left text-sm text-navy-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary">
 </div>
 <div class="flex flex-col gap-1.5">
 <label class="text-xs font-bold text-navy-text">إلى تاريخ</label>
-<input type="date" name="date_to" value="{{ filters.date_to|e }}" class="rounded-xl border-surface-subtle text-sm text-navy-text focus:ring-primary focus:border-primary">
+<input type="date" name="date_to" value="{{ filters.date_to|e }}" dir="ltr" class="h-11 w-full min-w-0 rounded-xl border border-surface-subtle bg-white px-3.5 text-left text-sm text-navy-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary">
 </div>
-<div class="flex items-end gap-2">
-<button type="submit" class="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-accent transition-colors">تطبيق الفلاتر</button>
-<a href="/staff/orders" class="px-4 py-2.5 rounded-xl border border-surface-subtle text-navy-text/70 text-sm font-bold hover:bg-surface-subtle transition-colors">مسح</a>
+</div>
+<div class="flex items-center justify-end gap-2">
+<button type="submit" class="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-bold text-white transition-colors hover:bg-primary-accent">تطبيق الفلاتر</button>
+<a href="/staff/orders" class="inline-flex h-11 items-center justify-center rounded-xl border border-surface-subtle px-5 text-sm font-bold text-navy-text/70 transition-colors hover:bg-surface-subtle">مسح</a>
 </div>
 </form>
 </div>
@@ -189,7 +191,10 @@
 {% endif %}
 </td>
 <td class="py-4 px-5 font-bold">{{ so.customer_name|e }}</td>
-<td class="py-4 px-5 text-navy-text/70 whitespace-nowrap text-xs">{{ so.created_display|e }}</td>
+<td class="py-4 px-5 text-navy-text/70 whitespace-nowrap text-center text-sm">
+<div>{{ so.created_date_display|e }}</div>
+<div class="text-navy-text/50">{{ so.created_time_display|e }}</div>
+</td>
 <td class="py-4 px-5 text-center font-bold">{{ so.total|e }} أصناف</td>
 <td class="py-4 px-5 text-center font-bold whitespace-nowrap">{{ so.grand_total_display|e }}</td>
 <td class="py-4 px-5">
