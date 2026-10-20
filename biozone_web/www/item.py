@@ -1,6 +1,6 @@
 import frappe
 
-from biozone_web.services.store_items import enrich_store_items
+from biozone_web.services.store_items import enrich_store_items, get_item_actual_qty
 from biozone_web.utils import (
     get_header_context,
     redirect_staff_away_from_store,
@@ -24,7 +24,7 @@ def get_context(context):
 
     rows = frappe.get_all(
         "Item",
-        fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "description", "image"],
+        fields=["item_code", "item_name", "item_group", "brand", "stock_uom", "is_stock_item", "description", "image"],
         filters={"item_code": code, "disabled": 0},
         limit_page_length=1,
     )
@@ -35,6 +35,14 @@ def get_context(context):
     if not enriched:
         return context
     context.item = enriched[0]
+
+    # Actual stock is shown on the item page only. A missing warehouse/stock
+    # setting must not take the storefront down; the template hides None.
+    if context.item.get("is_stock_item"):
+        try:
+            context.item["actual_qty"] = get_item_actual_qty(code)
+        except Exception:
+            context.item["actual_qty"] = None
 
     # Similar products (fallback rule until the staff-picked field lands):
     # same item_group, newest first, excluding the current item.

@@ -61,6 +61,68 @@ def get_order_prep_state(so_doc) -> dict:
 	}
 
 
+def get_order_return_state(so_name: str) -> dict:
+	"""حالة إرجاع الطلب من مستندات التسليم المعتمدة — قراءة فقط.
+
+	يعتبر الطلب مُرجَعًا بالكامل فقط إذا كانت كل أسطر التسليم الأصلية
+	مُرتجعة بالكامل (بمجموع مرتجعات DN المعتمدة). أي فشل أو بنية غير
+	متوقعة = not fully_returned، ولا يرفع استثناءً إلى واجهة الموظف.
+	"""
+	out = {"fully_returned": False, "return_dns": [], "original_dns": []}
+	try:
+		parents = {
+			r.parent
+			for r in frappe.get_all(
+				"Delivery Note Item",
+				filters={"against_sales_order": so_name, "docstatus": 1},
+				fields=["parent"],
+			)
+		}
+		original = [
+			name
+			for name in parents
+			if not frappe.utils.cint(frappe.db.get_value("Delivery Note", name, "is_return"))
+		]
+		if not original:
+			return out
+		out["original_dns"] = sorted(original)
+		returns = frappe.get_all(
+			"Delivery Note",
+			filters={
+				"is_return": 1,
+				"docstatus": 1,
+				"return_against": ["in", original],
+			},
+			fields=["name"],
+			order_by="creation asc",
+		)
+		out["return_dns"] = [r.name for r in returns]
+		if not returns:
+			return out
+
+		from erpnext.controllers.sales_and_purchase_return import (
+			get_already_returned_items,
+		)
+
+		for dn_name in original:
+			dn = frappe.get_doc("Delivery Note", dn_name)
+			tmp = frappe.get_doc(
+				{"doctype": "Delivery Note", "is_return": 1, "return_against": dn.name}
+			)
+			already = get_already_returned_items(tmp) or {}
+			for it in dn.items or []:
+				key = (it.item_code, it.name)
+				delivered = float(it.qty or 0)
+				returned = float((already.get(key) or {}).get("qty", 0) or 0)
+				if returned + 1e-6 < delivered:
+					return out
+		out["fully_returned"] = True
+	except Exception:
+		frappe.log_error(title="Biozone order return state failed")
+		return {"fully_returned": False, "return_dns": [], "original_dns": []}
+	return out
+
+
 def get_stock_availability(so_doc, warehouse: str) -> dict:
 	"""رصيد المخزون الفعلي (actual_qty) لكل صنف في مستودع واحد — قراءة فقط.
 

@@ -1513,32 +1513,64 @@ def staff_confirm_order(order_name: str):
 	}
 
 
-def _create_delivery_note_for_order(so, warehouse):
-	dn = frappe.get_doc(
+def _so_item_pricing_fields(it):
+	return {
+		"price_list_rate": frappe.utils.flt(it.price_list_rate),
+		"discount_percentage": frappe.utils.flt(it.discount_percentage),
+		"discount_amount": frappe.utils.flt(it.discount_amount),
+		"margin_type": it.get("margin_type"),
+		"margin_rate_or_amount": frappe.utils.flt(it.get("margin_rate_or_amount")),
+		"rate": frappe.utils.flt(it.rate),
+	}
+
+
+def _build_delivery_note_for_order(so, warehouse, qty_by_so_detail=None):
+	"""None = كل كميات الطلب؛ تمرير قاموس = فقط مفاتيحه، والغائب صفر."""
+	items = []
+	for it in so.items or []:
+		qty = (
+			frappe.utils.flt(it.qty)
+			if qty_by_so_detail is None
+			else frappe.utils.flt(qty_by_so_detail.get(it.name, 0))
+		)
+		if qty <= 0:
+			continue
+		items.append(
+			{
+				"item_code": it.item_code,
+				"item_name": it.item_name,
+				"description": it.description or it.item_name,
+				"qty": qty,
+				"uom": it.uom,
+				"against_sales_order": so.name,
+				"so_detail": it.name,
+				"warehouse": warehouse,
+				**_so_item_pricing_fields(it),
+			}
+		)
+
+	return frappe.get_doc(
 		{
 			"doctype": "Delivery Note",
 			"customer": so.customer,
+			"customer_group": so.customer_group,
+			"territory": so.territory,
 			"company": so.company,
 			"delivery_date": frappe.utils.today(),
 			"set_warehouse": warehouse,
-			"items": [
-				{
-					"item_code": it.item_code,
-					"item_name": it.item_name,
-					"description": it.description or it.item_name,
-					"qty": it.qty,
-					"uom": it.uom,
-					"rate": it.rate,
-					"amount": it.amount,
-					"against_sales_order": so.name,
-					"so_detail": it.name,
-					"warehouse": warehouse,
-				}
-				for it in so.items
-			],
+			"selling_price_list": so.selling_price_list,
+			"currency": so.currency,
+			"conversion_rate": so.conversion_rate,
+			"price_list_currency": so.get("price_list_currency"),
+			"plc_conversion_rate": so.get("plc_conversion_rate"),
+			"ignore_pricing_rule": 1,
+			"items": items,
 		}
 	)
 
+
+def _create_delivery_note_for_order(so, warehouse, qty_by_so_detail=None):
+	dn = _build_delivery_note_for_order(so, warehouse, qty_by_so_detail)
 	dn.insert(ignore_permissions=True)
 	dn.submit()
 
@@ -2063,6 +2095,17 @@ def staff_get_order_prep(order_name: str):
 		if frappe.db.exists("Sales Order", (order_name or "").strip()):
 			doc = frappe.get_doc("Sales Order", (order_name or "").strip())
 			if doc.docstatus == 1:
+				from biozone_web.b9_utils import get_order_return_state
+
+				return_state = get_order_return_state(doc.name)
+				if return_state["fully_returned"]:
+					return {
+						"ok": False,
+						"error": _("تم إرجاع هذا الطلب بالكامل — راجع المرتجع"),
+						"returned": True,
+						"delivered": False,
+						"return_dns": return_state["return_dns"],
+					}
 				return {"ok": False, "error": _("هذا الطلب تم تسليمه بالفعل"), "delivered": True}
 		return {"ok": False, "error": err}
 	return _b9_prep_payload(so)
@@ -2616,11 +2659,22 @@ def staff_confirm_delivery(order_name: str):
 	if not order_name or not frappe.db.exists("Sales Order", order_name):
 		return {"ok": False, "error": _("الطلب غير موجود")}
 
+	so_check = frappe.get_doc("Sales Order", order_name)
+	from biozone_web.b9_utils import get_order_return_state
+
+	return_state = get_order_return_state(order_name)
+	if return_state["fully_returned"]:
+		return {
+			"ok": False,
+			"error": _("تم إرجاع هذا الطلب بالكامل — لا يمكن تسليمه مرة أخرى"),
+			"returned": True,
+			"return_dns": return_state["return_dns"],
+		}
+
 	# منع التكرار (1): مستندات موجودة بالفعل — تُرجع كما هي بلا إنشاء جديد.
 	# C4: الاكتمال فقط يُعاد كنجاح. الجزئي (DN دون SI أو العكس) خطأ صريح،
 	# لا ok:true مع sales_invoice=null.
 	existing = _b9_existing_delivery_docs(order_name)
-	so_check = frappe.get_doc("Sales Order", order_name)
 	if existing["delivery_note"] and existing["sales_invoice"]:
 		return {
 			"ok": True,
@@ -2794,8 +2848,12 @@ def staff_confirm_delivery(order_name: str):
 	}
 
 
-def _create_sales_invoice_for_delivery(so, dn):
-	"""فاتورة مبيعات معتمَدة (submitted) مرتبطة بالطلب والتسليم معًا.
+def _build_sales_invoice_for_delivery(so, dn):
+	"""يبني فاتورة مبيعات غير محفوظة مرتبطة بالطلب والتسليم معًا.
+
+	بنود الفاتورة تُبنى من بنود التسليم نفسها — لا من كامل بنود الطلب —
+	حتى لا تُفاتر كميات غير مسلَّمة، ويُرفض أي بند تسليم بلا ربط صريح
+	ببند طلب بيع بدلًا من الرجوع الصامت إلى فاتورة كاملة.
 
 	تثبيت الرصيد السابق (C2): يُلتقط رصيد العميل الآجل من دفتر الأستاذ
 	الفعلي هنا — قبل إنشاء مستند الفاتورة نفسه — ويُحفظ في
@@ -2807,34 +2865,53 @@ def _create_sales_invoice_for_delivery(so, dn):
 		get_customer_outstanding(so.customer, so.company, ignore_outstanding_sales_order=True)
 	)
 
-	dn_map = {}
-	for dit in dn.items or []:
-		if dit.get("so_detail"):
-			dn_map[dit.so_detail] = {"delivery_note": dn.name, "dn_detail": dit.name}
+	so_items_by_name = {it.name: it for it in (so.items or [])}
 
 	si_items = []
-	for it in so.items or []:
-		link = dn_map.get(it.name, {})
+	for dit in dn.items or []:
+		so_detail = dit.get("so_detail")
+		if not so_detail:
+			frappe.throw(
+				_("لا يمكن إنشاء فاتورة مبيعات: بند التسليم {0} غير مرتبط ببند طلب بيع").format(
+					dit.name
+				)
+			)
+		so_item = so_items_by_name.get(so_detail)
+		if not so_item:
+			frappe.throw(
+				_("لا يمكن إنشاء فاتورة مبيعات: بند التسليم {0} يشير إلى بند طلب غير موجود").format(
+					dit.name
+				)
+			)
+		if dit.item_code != so_item.item_code:
+			frappe.throw(
+				_("لا يمكن إنشاء فاتورة مبيعات: صنف بند التسليم {0} لا يطابق بند طلب البيع").format(
+					dit.name
+				)
+			)
+		qty = frappe.utils.flt(dit.qty)
+		if qty <= 0:
+			continue
 		si_items.append(
 			{
-				"item_code": it.item_code,
-				"item_name": it.item_name,
-				"description": it.description or it.item_name,
-				"qty": it.qty,
-				"uom": it.uom,
-				"price_list_rate": it.price_list_rate,
-				"discount_percentage": it.discount_percentage,
-				"discount_amount": it.discount_amount,
-				"rate": it.rate,
-				"amount": it.amount,
-				"warehouse": it.warehouse,
+				"item_code": so_item.item_code,
+				"item_name": so_item.item_name,
+				"description": so_item.description or so_item.item_name,
+				"qty": qty,
+				"uom": so_item.uom,
+				"warehouse": dit.warehouse or so_item.warehouse or so.get("set_warehouse"),
 				"sales_order": so.name,
-				"so_detail": it.name,
-				"delivery_note": link.get("delivery_note"),
-				"dn_detail": link.get("dn_detail"),
-				"cost_center": it.get("cost_center"),
+				"so_detail": so_detail,
+				"delivery_note": dn.name,
+				"dn_detail": dit.name,
+				"cost_center": so_item.get("cost_center"),
+				"item_tax_template": so_item.get("item_tax_template"),
+				**_so_item_pricing_fields(so_item),
 			}
 		)
+
+	if not si_items:
+		frappe.throw(_("لا يمكن إنشاء فاتورة مبيعات: لا يوجد بند تسليم صالح مرتبط بطلب البيع"))
 
 	due_date = frappe.utils.add_days(frappe.utils.today(), 30)
 	try:
@@ -2856,6 +2933,8 @@ def _create_sales_invoice_for_delivery(so, dn):
 		{
 			"doctype": "Sales Invoice",
 			"customer": so.customer,
+			"customer_group": so.customer_group,
+			"territory": so.territory,
 			"company": so.company,
 			"posting_date": frappe.utils.today(),
 			"posting_time": frappe.utils.nowtime(),
@@ -2863,25 +2942,34 @@ def _create_sales_invoice_for_delivery(so, dn):
 			"selling_price_list": so.selling_price_list,
 			"currency": so.currency,
 			"conversion_rate": so.conversion_rate,
+			"price_list_currency": so.get("price_list_currency"),
+			"plc_conversion_rate": so.get("plc_conversion_rate"),
+			"ignore_pricing_rule": 1,
 			"update_stock": 0,
 			"set_warehouse": so.get("set_warehouse"),
 			"custom_previous_balance": previous_balance,
 			"taxes_and_charges": so.get("taxes_and_charges"),
 			"items": si_items,
-		"taxes": [
-			{
-				"charge_type": t.charge_type,
-				"account_head": t.account_head,
-				"description": t.description,
-				"rate": t.rate,
-				"tax_amount": t.get("tax_amount"),
-				"included_in_print_rate": t.get("included_in_print_rate"),
-			}
-			for t in (so.get("taxes") or [])
-			if t.get("account_head")
-		],
+			"taxes": [
+				{
+					"charge_type": t.charge_type,
+					"account_head": t.account_head,
+					"description": t.description,
+					"rate": t.rate,
+					"tax_amount": t.get("tax_amount") if t.charge_type == "Actual" else None,
+					"included_in_print_rate": t.get("included_in_print_rate"),
+					"cost_center": t.get("cost_center"),
+				}
+				for t in (so.get("taxes") or [])
+				if t.get("account_head")
+			],
 		}
 	)
+	return si
+
+
+def _create_sales_invoice_for_delivery(so, dn):
+	si = _build_sales_invoice_for_delivery(so, dn)
 	si.insert(ignore_permissions=True)
 	si.submit()
 	return si

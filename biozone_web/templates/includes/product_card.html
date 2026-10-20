@@ -83,27 +83,30 @@
 {% endmacro %}
 
 {% macro product_card(item, lazy=false, image_height='h-36') %}
-<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col justify-between overflow-hidden relative group h-full transition-all duration-[250ms] hover:-translate-y-[3px]">
-  <div class="p-4 pb-0 flex items-center justify-between z-10">
-    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
+<article class="catalog-product-card bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col justify-between overflow-hidden relative group h-full transition-all duration-[250ms] hover:-translate-y-[3px]">
+  <div class="catalog-product-head p-4 pb-0 flex items-center justify-between z-10">
+    <span class="catalog-product-group inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
   </div>
-  <div class="px-6 py-4 flex items-center justify-center min-h-[200px] bg-slate-50/50">
-    <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full {{ image_height }}" aria-label="{{ item.item_name|e }}">
+  <div class="catalog-product-media px-6 py-4 flex items-center justify-center min-h-[200px] bg-slate-50/50">
+    <a href="/item?code={{ item.item_code|urlencode }}" class="catalog-product-image flex items-center justify-center w-full {{ image_height }}" aria-label="{{ item.item_name|e }}">
       {{ product_image(item, lazy) }}
     </a>
   </div>
-  <div class="p-4 pt-3 flex-1 flex flex-col justify-between">
+  <div class="catalog-product-body p-4 pt-3 flex-1 flex flex-col justify-between">
     <div>
-      <a href="/item?code={{ item.item_code|urlencode }}" class="text-base font-bold text-slate-800 leading-snug hover:text-primary transition-colors text-right line-clamp-2 block">{{ item.item_name|e }}</a>
+      <a href="/item?code={{ item.item_code|urlencode }}" class="catalog-product-title text-base font-bold text-slate-800 leading-snug hover:text-primary transition-colors text-right line-clamp-2 block">{{ item.item_name|e }}</a>
     </div>
-    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-      <div class="text-right">
+    <div class="catalog-product-foot mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div class="catalog-product-price text-right">
         {% if item.price %}
+        {% if item.base_price and item.base_price > item.price %}
+        <s class="catalog-price-base block text-xs sm:text-sm font-medium leading-tight text-slate-500" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
+        {% endif %}
         <div class="flex items-baseline gap-1">
-          <span class="text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
-          <span class="text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+          <span class="catalog-price-current text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
+          <span class="catalog-price-unit text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
         </div>
-        <span class="text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
+        <span class="catalog-price-note text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
         {% else %}
         <span class="text-sm text-outline">السعر غير متاح</span>
         {% endif %}
@@ -115,7 +118,7 @@
 {% endmacro %}
 
 {% macro product_card_list(item, lazy=false) %}
-<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 gap-4 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
+<article class="catalog-list-card bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 gap-4 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
   <div class="flex items-center gap-5 w-full sm:w-auto sm:flex-1 min-w-0">
     <div class="w-24 h-24 sm:w-52 sm:h-52 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-center shrink-0 p-2">
       <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-full" aria-label="{{ item.item_name|e }}">
@@ -132,11 +135,14 @@
   <div class="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto gap-4 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
     <div class="text-right">
       {% if item.price %}
+      {% if item.base_price and item.base_price > item.price %}
+      <s class="catalog-price-base block text-xs sm:text-sm font-medium leading-tight text-slate-500" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
+      {% endif %}
       <div class="flex items-baseline gap-1">
-        <span class="text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
-        <span class="text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+        <span class="catalog-price-current text-[22px] font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
+        <span class="catalog-price-unit text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
       </div>
-      <span class="text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
+      <span class="catalog-price-note text-[10px] text-slate-400 font-medium block">سعر القطعة</span>
       {% else %}
       <span class="text-sm text-outline">السعر غير متاح</span>
       {% endif %}

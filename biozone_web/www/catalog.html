@@ -7,12 +7,68 @@
 <title>Biozone - المتجر</title>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
 <link rel="stylesheet" href="/assets/biozone_web/css/app.1364c758.css">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_agenda,view_column,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* موبايل: وضعا عمود واحد/عمودين — الديسكتوب يبقى على شبكته الحالية. */
+  .mobile-cols-toggle { display: flex; }
+  .desktop-view-toggle { display: flex; }
+  @media (min-width: 640px) {
+    .mobile-cols-toggle { display: none; }
+  }
+  @media (max-width: 639px) {
+    .desktop-view-toggle { display: none; }
+    #catalog-grid-view {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.5rem .5rem;
+    }
+    #catalog-grid-view[data-mobile-cols="1"] {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-head {
+      display: none;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-media {
+      min-height: 0;
+      aspect-ratio: 1 / 1;
+      padding: .25rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-image {
+      height: 100%;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-body {
+      padding: .5rem .55rem .65rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-title {
+      font-size: .8125rem;
+      line-height: 1.35;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-foot {
+      margin-top: .5rem;
+      padding-top: .5rem;
+      gap: .25rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-price-current {
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-price-unit {
+      font-size: .625rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-price-note {
+      display: none;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-add-btn {
+      height: 2rem;
+      padding-left: .45rem;
+      padding-right: .45rem;
+    }
+  }
 </style>
 </head>
 <body class="bg-appBg text-on-surface">
@@ -46,7 +102,15 @@
         <span class="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] flex items-center justify-center font-bold">{{ active_filters_count_ar }}</span>
         {% endif %}
       </button>
-      <div class="flex items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5">
+      <div class="mobile-cols-toggle items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5" role="group" aria-label="عدد الأعمدة">
+        <button type="button" id="cols-2-btn" title="صنفان في الصف" aria-label="عرض عمودين" aria-controls="catalog-grid-view" aria-pressed="true" class="w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center">
+          <span class="material-symbols-outlined text-base">view_column</span>
+        </button>
+        <button type="button" id="cols-1-btn" title="صنف واحد في الصف" aria-label="عرض عمود واحد" aria-controls="catalog-grid-view" aria-pressed="false" class="w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors">
+          <span class="material-symbols-outlined text-base">view_agenda</span>
+        </button>
+      </div>
+      <div class="desktop-view-toggle items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5">
         <button type="button" id="view-grid-btn" title="عرض شبكي" aria-pressed="true" class="w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center">
           <span class="material-symbols-outlined text-base">grid_view</span>
         </button>
@@ -62,7 +126,7 @@
   {% endif %}
 
   {% if items %}
-  <div id="catalog-grid-view" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div id="catalog-grid-view" data-mobile-cols="2" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
     {% for item in items %}
     {{ product_card(item, lazy=(loop.index > 4), image_height='h-52') }}
     {% endfor %}
@@ -184,39 +248,75 @@
 </script>
 <script>
   (function () {
-    // تبديل العرض شبكة/قائمة: النسختان مصدَّرتان، والتفضيل محلي فقط،
-    // وعند التبديل تُعاد مزامنة كل عدّادات السلة الظاهرة (steppers).
+    // شبكة/قائمة للديسكتوب فقط؛ الموبايل له وضعا عمود واحد/عمودين.
+    // التفضيل محلي فقط، وعند التبديل تُعاد مزامنة عدّادات السلة الظاهرة.
     var VIEW_KEY = 'biozone_catalog_view';
+    var COLS_KEY = 'biozone_catalog_cols';
+    var mobileQuery = window.matchMedia('(max-width: 639px)');
     var grid = document.getElementById('catalog-grid-view');
     var list = document.getElementById('catalog-list-view');
     var gridBtn = document.getElementById('view-grid-btn');
     var listBtn = document.getElementById('view-list-btn');
+    var cols2Btn = document.getElementById('cols-2-btn');
+    var cols1Btn = document.getElementById('cols-1-btn');
+
+    function setToggle(btn, on) {
+      if (!btn) return;
+      btn.className = on
+        ? 'w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center'
+        : 'w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors';
+      btn.setAttribute('aria-pressed', String(on));
+    }
     function paintView(listOn) {
-      if (grid) grid.classList.toggle('hidden', listOn);
+      var effectiveList = listOn && !mobileQuery.matches;
+      if (grid) grid.classList.toggle('hidden', effectiveList);
       if (list) {
-        list.classList.toggle('hidden', !listOn);
-        list.classList.toggle('flex', listOn);
+        list.classList.toggle('hidden', !effectiveList);
+        list.classList.toggle('flex', effectiveList);
       }
-      if (gridBtn) {
-        gridBtn.className = listOn
-          ? 'w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors'
-          : 'w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center';
-        gridBtn.setAttribute('aria-pressed', String(!listOn));
-      }
-      if (listBtn) {
-        listBtn.className = listOn
-          ? 'w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center'
-          : 'w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors';
-        listBtn.setAttribute('aria-pressed', String(listOn));
-      }
+      setToggle(gridBtn, !effectiveList);
+      setToggle(listBtn, effectiveList);
       if (window.refreshAllCatalogControls) window.refreshAllCatalogControls();
     }
+    function paintCols(cols) {
+      if (!grid) return;
+      grid.setAttribute('data-mobile-cols', cols);
+      setToggle(cols2Btn, cols === '2');
+      setToggle(cols1Btn, cols === '1');
+    }
+
     if (grid && list && gridBtn && listBtn) {
       var saved = 'grid';
       try { saved = localStorage.getItem(VIEW_KEY) || 'grid'; } catch (e) {}
-      paintView(saved === 'list');
-      gridBtn.addEventListener('click', function () { paintView(false); try { localStorage.setItem(VIEW_KEY, 'grid'); } catch (e) {} });
-      listBtn.addEventListener('click', function () { paintView(true); try { localStorage.setItem(VIEW_KEY, 'list'); } catch (e) {} });
+      var savedList = saved === 'list';
+      paintView(savedList);
+      gridBtn.addEventListener('click', function () {
+        savedList = false;
+        paintView(false);
+        try { localStorage.setItem(VIEW_KEY, 'grid'); } catch (e) {}
+      });
+      listBtn.addEventListener('click', function () {
+        savedList = true;
+        paintView(true);
+        try { localStorage.setItem(VIEW_KEY, 'list'); } catch (e) {}
+      });
+      var onViewportChange = function () { paintView(savedList); };
+      if (mobileQuery.addEventListener) mobileQuery.addEventListener('change', onViewportChange);
+      else if (mobileQuery.addListener) mobileQuery.addListener(onViewportChange);
+    }
+
+    if (grid && cols2Btn && cols1Btn) {
+      var savedCols = '2';
+      try { savedCols = localStorage.getItem(COLS_KEY) === '1' ? '1' : '2'; } catch (e) {}
+      paintCols(savedCols);
+      cols2Btn.addEventListener('click', function () {
+        paintCols('2');
+        try { localStorage.setItem(COLS_KEY, '2'); } catch (e) {}
+      });
+      cols1Btn.addEventListener('click', function () {
+        paintCols('1');
+        try { localStorage.setItem(COLS_KEY, '1'); } catch (e) {}
+      });
     }
 
     // لوحة الفلاتر: فتح/إغلاق + اختيار متعدد بلا حد لكل مجموعة — كل صندوق
