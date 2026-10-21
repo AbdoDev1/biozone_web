@@ -1,14 +1,15 @@
 <!DOCTYPE html><html dir="rtl" lang="ar">
 <head>
-<link href="https://fonts.googleapis.com" rel="preconnect">
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - شريكك الموثوق للمستلزمات الطبية</title>
+<meta name="description" content="Biozone شريكك الموثوق للمستلزمات الطبية والعناية؛ منتجات أصلية، أسعار تنافسية، وتوصيل سريع.">
+<link rel="preload" as="image" type="image/webp" href="/assets/biozone_web/images/hero/hero-pharmacy-800.webp" imagesrcset="/assets/biozone_web/images/hero/hero-pharmacy-800.webp 800w, /assets/biozone_web/images/hero/hero-pharmacy-1200.webp 1200w, /assets/biozone_web/images/hero/hero-pharmacy.webp 1376w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="font" type="font/woff2" href="/assets/biozone_web/fonts/tajawal-arabic-800.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="/assets/biozone_web/fonts/tajawal-latin-800.woff2" crossorigin>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
 <link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning&display=block" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
   .brand-marquee { position: relative; overflow: hidden; direction: ltr; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); }
@@ -37,8 +38,8 @@
   <!-- Hero (Stitch: stitch_biozone_hero_banner) -->
   <section class="relative w-full overflow-hidden bg-[#03201d]">
     <picture>
-      <source srcset="/assets/biozone_web/images/hero/hero-pharmacy.webp" type="image/webp">
-      <img src="/assets/biozone_web/images/hero/hero-pharmacy.jpg" alt="رفوف متجر مستلزمات طبية وعناية" width="1376" height="768" fetchpriority="high" decoding="async" class="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-[2px] brightness-[0.88]">
+      <source srcset="/assets/biozone_web/images/hero/hero-pharmacy-800.webp 800w, /assets/biozone_web/images/hero/hero-pharmacy-1200.webp 1200w, /assets/biozone_web/images/hero/hero-pharmacy.webp 1376w" sizes="100vw" type="image/webp">
+      <img src="/assets/biozone_web/images/hero/hero-pharmacy.jpg" alt="رفوف متجر مستلزمات طبية وعناية" width="1376" height="768" fetchpriority="high" decoding="async" class="absolute inset-0 w-full h-full object-cover object-center scale-105 brightness-[0.88]">
     </picture>
     <div class="absolute inset-0 bg-gradient-to-l from-[#00685f]/95 via-[#00685f]/80 via-55% to-transparent pointer-events-none"></div>
     <div class="absolute inset-0 bg-[#004d46]/25 mix-blend-multiply pointer-events-none"></div>
@@ -85,10 +86,10 @@
           {% for b in top_brands %}
           <a href="/catalog?brand={{ b.brand|urlencode }}" dir="rtl" class="brand-marquee-card bg-surface-container-lowest border border-surface-variant rounded-xl shadow-[0_2px_8px_rgba(11,28,48,0.04)] p-5 flex flex-col items-center justify-center text-center hover:border-primary/40 transition-colors"{% if copy %} tabindex="-1"{% endif %}>
             {% if b.image %}
-            <img src="{{ b.image|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-cover rounded-lg mb-3" loading="lazy" decoding="async">
+            <img src="{{ b.image|e }}" alt="" width="150" height="96" class="w-full h-24 object-cover rounded-lg mb-3" loading="lazy" decoding="async">
             <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
             {% elif b.logo_url %}
-            <img src="{{ b.logo_url|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-contain" loading="lazy" decoding="async">
+            <img src="{{ b.logo_url|e }}" alt="{{ b.brand|e }}" width="150" height="96" class="w-full h-24 object-contain" loading="lazy" decoding="async">
             {% else %}
             <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
             {% endif %}
