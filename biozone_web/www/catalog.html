@@ -7,7 +7,7 @@
 <title>Biozone - المتجر</title>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
 <link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_agenda,view_column,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,pause,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_agenda,view_column,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
@@ -16,6 +16,24 @@
 
   /* موبايل: وضعا عمود واحد/عمودين — الديسكتوب يبقى على شبكته الحالية. */
   .mobile-cols-toggle { display: flex; }
+  .mobile-cols-toggle .mobile-cols-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(11, 28, 48, 0.08);
+    transition: background-color .2s, border-color .2s, color .2s;
+  }
+  .mobile-cols-toggle .mobile-cols-btn[aria-pressed="true"] {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
+  }
   .desktop-view-toggle { display: flex; }
   @media (min-width: 640px) {
     .mobile-cols-toggle { display: none; }
@@ -134,12 +152,12 @@
         <span class="w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold" style="background: #D63A2F; color: #fff;">{{ active_filters_count }}</span>
         {% endif %}
       </button>
-      <div class="mobile-cols-toggle items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5" role="group" aria-label="عدد الأعمدة">
-        <button type="button" id="cols-2-btn" title="صنفان في الصف" aria-label="عرض عمودين" aria-controls="catalog-grid-view" aria-pressed="true" class="w-8 h-7 rounded-lg bg-slate-100 text-primary flex items-center justify-center">
-          <span class="material-symbols-outlined text-base">view_column</span>
+      <div class="mobile-cols-toggle items-center gap-2" role="group" aria-label="طريقة عرض المنتجات">
+        <button type="button" id="cols-1-btn" title="صنف واحد في الصف" aria-label="عرض عمود واحد" aria-controls="catalog-grid-view" aria-pressed="false" class="mobile-cols-btn">
+          <span class="material-symbols-outlined text-xl">menu</span>
         </button>
-        <button type="button" id="cols-1-btn" title="صنف واحد في الصف" aria-label="عرض عمود واحد" aria-controls="catalog-grid-view" aria-pressed="false" class="w-8 h-7 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors">
-          <span class="material-symbols-outlined text-base">view_agenda</span>
+        <button type="button" id="cols-2-btn" title="صنفان في الصف" aria-label="عرض عمودين" aria-controls="catalog-grid-view" aria-pressed="true" class="mobile-cols-btn">
+          <span class="material-symbols-outlined text-xl">pause</span>
         </button>
       </div>
       <div class="desktop-view-toggle items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5">
@@ -310,11 +328,14 @@
       setToggle(listBtn, effectiveList);
       if (window.refreshAllCatalogControls) window.refreshAllCatalogControls();
     }
+    function setColsToggle(btn, on) {
+      if (btn) btn.setAttribute('aria-pressed', String(on));
+    }
     function paintCols(cols) {
       if (!grid) return;
       grid.setAttribute('data-mobile-cols', cols);
-      setToggle(cols2Btn, cols === '2');
-      setToggle(cols1Btn, cols === '1');
+      setColsToggle(cols2Btn, cols === '2');
+      setColsToggle(cols1Btn, cols === '1');
     }
 
     if (grid && list && gridBtn && listBtn) {
