@@ -2,8 +2,8 @@ import frappe
 
 from biozone_web.services.store_items import enrich_store_items, get_item_actual_qty
 from biozone_web.utils import (
-    get_free_shipping_threshold,
     get_header_context,
+    get_storefront_free_shipping_threshold,
     redirect_staff_away_from_store,
 )
 
@@ -14,7 +14,7 @@ def get_context(context):
     context.no_cache = 1
     context.active_page = "catalog"
     context.update(get_header_context())
-    context.free_shipping_threshold = get_free_shipping_threshold()
+    context.free_shipping_threshold = get_storefront_free_shipping_threshold()
 
     code = (frappe.form_dict.get("code") or "").strip()
     context.item_code = code

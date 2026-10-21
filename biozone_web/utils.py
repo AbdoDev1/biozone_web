@@ -792,27 +792,69 @@ def get_storefront_price_context(customer=None):
 MIN_ORDER_AMOUNT_FIELD = "min_order_amount"
 MIN_ORDER_MAX = 100000000.0
 
-# حد الشحن المجاني المعروض في المتجر (إعداد عام للعرض فقط).
+# حد الشحن المجاني المعروض في المتجر (إعداد للعرض فقط).
 FREE_SHIPPING_THRESHOLD_FIELD = "free_shipping_threshold"
+FREE_SHIPPING_TABLE_FIELD = "shipping_thresholds"
+FREE_SHIPPING_TABLE_DOCTYPE = "Biozone Home Shipping Threshold"
 
 
-def get_free_shipping_threshold():
-	"""حد الشحن المجاني المعروض — 0.0 يعني إخفاء السطر.
+def _free_shipping_threshold_value(raw):
+	import math
 
-	الحقل غائب قبل migrate أو تعذّرت قراءته ← 0.0 (fail-open للعرض فقط).
-	"""
+	try:
+		value = float(raw or 0)
+	except (TypeError, ValueError):
+		return 0.0
+	if not math.isfinite(value) or value <= 0:
+		return 0.0
+	return value
+
+
+def _global_free_shipping_threshold():
 	try:
 		if not frappe.get_meta("Biozone Home Settings").has_field(FREE_SHIPPING_THRESHOLD_FIELD):
 			return 0.0
 		value = frappe.db.get_single_value("Biozone Home Settings", FREE_SHIPPING_THRESHOLD_FIELD)
-		value = float(value or 0)
 	except Exception:
 		return 0.0
-	import math
+	return _free_shipping_threshold_value(value)
 
-	if not math.isfinite(value) or value <= 0:
-		return 0.0
-	return value
+
+def get_free_shipping_threshold(customer_group=None):
+	"""حد الشحن المجاني المعروض لفئة العميل — 0.0 يعني إخفاء السطر.
+
+	صف الفئة في جدول الإعدادات يتجاوز الحد العام. غياب الصف أو الجدول
+	(قبل migrate) يرجع للحد العام. القيمة غير الصالحة أو غير الموجبة
+	تُعامل كإخفاء للسطر لهذه الفئة.
+	"""
+	global_value = _global_free_shipping_threshold()
+	group = (customer_group or "").strip()
+	if not group:
+		return global_value
+	try:
+		if not frappe.get_meta("Biozone Home Settings").has_field(FREE_SHIPPING_TABLE_FIELD):
+			return global_value
+		rows = frappe.db.get_all(
+			FREE_SHIPPING_TABLE_DOCTYPE,
+			filters={
+				"parent": "Biozone Home Settings",
+				"parenttype": "Biozone Home Settings",
+				"customer_group": group,
+			},
+			fields=[FREE_SHIPPING_THRESHOLD_FIELD],
+			order_by="idx asc",
+			limit_page_length=1,
+		)
+	except Exception:
+		return global_value
+	if not rows:
+		return global_value
+	return _free_shipping_threshold_value(rows[0].get(FREE_SHIPPING_THRESHOLD_FIELD))
+
+
+def get_storefront_free_shipping_threshold():
+	"""حد الشحن المجاني المعروض للفئة السعرية الحالية (Guest → الجمهور)."""
+	return get_free_shipping_threshold(get_customer_price_group())
 
 
 class MinOrderConfigError(Exception):
