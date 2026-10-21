@@ -39,7 +39,7 @@
 {% endif %}
 {% endmacro %}
 
-{% macro cart_control(item, compact=false, card=false) %}
+{% macro cart_control(item, compact=false, card=false, list=false) %}
 <div
   class="catalog-cart-control"
   data-item-code="{{ item.item_code|e }}"
@@ -51,13 +51,13 @@
 >
   <button
     aria-label="أضف للسلة"
-    class="{% if compact %}w-full px-6 py-3.5 text-base gap-2 rounded-xl bg-primary hover:bg-primary-hover text-on-primary shadow-md shadow-primary/20 active:scale-[0.99] transition-all{% elif card %}w-full h-10 px-4 gap-2 text-xs sm:text-sm rounded-full text-white active:scale-[0.99] shadow-sm transition-all duration-200{% else %}h-11 min-w-[116px] px-4 gap-1.5 text-sm rounded-xl bg-primary hover:bg-primary-hover text-white active:scale-95 shadow-sm transition-all duration-200{% endif %} font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
+    class="{% if compact %}w-full px-6 py-3.5 text-base gap-2 rounded-xl bg-primary hover:bg-primary-hover text-on-primary shadow-md shadow-primary/20 active:scale-[0.99] transition-all{% elif card %}w-full h-10 px-4 gap-2 text-xs sm:text-sm rounded-full text-white active:scale-[0.99] shadow-sm transition-all duration-200{% elif list %}w-full sm:w-auto h-12 px-7 gap-2.5 text-base rounded-xl bg-primary hover:bg-primary-hover text-white active:scale-[0.98] shadow-sm transition-all duration-200{% else %}h-11 min-w-[116px] px-4 gap-1.5 text-sm rounded-xl bg-primary hover:bg-primary-hover text-white active:scale-95 shadow-sm transition-all duration-200{% endif %} font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed catalog-add-btn"
     {% if card %}style="background-color: #128050;"{% endif %}
     {% if not item.price %}disabled{% endif %}
     type="button"
   >
-    <span class="material-symbols-outlined {% if card %}text-lg{% elif compact %}text-[18px]{% else %}text-base{% endif %}">add_shopping_cart</span>
-    <span class="{% if card %}inline{% elif not compact %}hidden sm:inline{% endif %}">{% if compact %}أضف للسلة{% else %}أضف{% endif %}</span>
+    <span class="material-symbols-outlined {% if card %}text-lg{% elif list %}text-xl{% elif compact %}text-[18px]{% else %}text-base{% endif %}">add_shopping_cart</span>
+    <span class="{% if card or list %}inline{% elif not compact %}hidden sm:inline{% endif %}">{% if compact %}أضف للسلة{% else %}أضف{% endif %}</span>
   </button>
   {% if compact %}
   <div class="hidden items-center justify-center gap-6 w-full rounded-xl border border-borderSubtle bg-surfaceMuted p-1 catalog-stepper catalog-stepper-compact">
@@ -70,12 +70,12 @@
     </button>
   </div>
   {% else %}
-  <div class="hidden items-center justify-between {% if card %}w-full rounded-full{% else %}w-fit rounded-xl{% endif %} border border-borderSubtle bg-surfaceMuted p-1 catalog-stepper">
-    <button aria-label="زيادة الكمية" class="flex h-9 w-9 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-increment" type="button">
+  <div class="hidden items-center justify-between {% if card %}w-full rounded-full{% elif list %}w-full rounded-xl{% else %}w-fit rounded-xl{% endif %} border border-borderSubtle bg-surfaceMuted p-1 catalog-stepper">
+    <button aria-label="زيادة الكمية" class="flex {% if list %}h-10 w-10{% else %}h-9 w-9{% endif %} rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-increment" type="button">
       <span class="material-symbols-outlined text-base">add</span>
     </button>
-    <span class="w-9 text-sm text-center font-bold catalog-qty">0</span>
-    <button aria-label="إنقاص الكمية" class="flex h-9 w-9 rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-decrement" type="button">
+    <span class="{% if list %}w-10{% else %}w-9{% endif %} text-sm text-center font-bold catalog-qty">0</span>
+    <button aria-label="إنقاص الكمية" class="flex {% if list %}h-10 w-10{% else %}h-9 w-9{% endif %} rounded-lg bg-surface-container-lowest text-on-surface-variant hover:bg-primary-light hover:text-primary shadow-sm items-center justify-center transition-colors catalog-decrement" type="button">
       <span class="material-symbols-outlined text-base">remove</span>
     </button>
   </div>
@@ -124,35 +124,43 @@
 {% endmacro %}
 
 {% macro product_card_list(item, lazy=false) %}
-<article class="catalog-list-card bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
-  <div class="flex items-center gap-4 sm:gap-5 w-full sm:flex-1 min-w-0">
-    <div class="w-24 h-24 sm:w-40 sm:h-40 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-center shrink-0 p-2">
+{% set has_discount = item.price and item.base_price and item.base_price > item.price %}
+{% set discount_percent = (((item.base_price - item.price) * 100 / item.base_price)|round(0)|int) if has_discount else 0 %}
+<article class="catalog-list-card bg-white rounded-2xl border border-slate-200/80 shadow-card hover:shadow-card-hover flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 p-4 sm:p-5 overflow-hidden relative group transition-all duration-[250ms] hover:-translate-y-[3px]">
+  <div class="flex items-center gap-4 sm:gap-6 w-full sm:flex-1 min-w-0">
+    <div class="relative w-36 h-36 sm:w-40 sm:h-40 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 p-3">
+      {% if has_discount %}
+      <span class="catalog-discount-badge absolute z-10 inline-flex items-center rounded-full font-bold shadow-sm" style="top: 8px; right: 8px; background: #D63A2F; color: #fff; font-size: 11px; padding: 2px 8px;">خصم {{ discount_percent }}%</span>
+      {% endif %}
       <a href="/item?code={{ item.item_code|urlencode }}" class="flex items-center justify-center w-full h-full" aria-label="{{ item.item_name|e }}">
         {{ product_image(item, lazy) }}
       </a>
     </div>
     <div class="flex-1 text-right min-w-0">
-      <div class="flex items-center gap-2 mb-2">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 text-primary border border-emerald-100">{{ item.item_group|e }}</span>
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200/80">{{ item.item_group|e }}</span>
+        {% if item.brand %}
+        <span class="text-xs font-bold text-slate-400 tracking-wider uppercase">{{ item.brand|e }}</span>
+        {% endif %}
       </div>
-      <a href="/item?code={{ item.item_code|urlencode }}" class="text-base font-bold text-slate-800 leading-snug hover:text-primary transition-colors line-clamp-2 block">{{ item.item_name|e }}</a>
+      <a href="/item?code={{ item.item_code|urlencode }}" class="text-lg sm:text-xl font-bold text-slate-800 leading-snug hover:text-primary transition-colors line-clamp-2 block">{{ item.item_name|e }}</a>
     </div>
   </div>
-  <div class="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center w-full sm:w-[132px] gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+  <div class="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-4 sm:pt-0 shrink-0">
     <div class="text-right">
       {% if item.price %}
-      {% if item.base_price and item.base_price > item.price %}
-      <s class="catalog-price-base block text-sm font-medium leading-tight text-slate-500" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
+      {% if has_discount %}
+      <s class="catalog-price-base block text-sm font-semibold leading-tight text-slate-400" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
       {% endif %}
       <div class="flex items-baseline gap-1">
-        <span class="catalog-price-current text-xl font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
-        <span class="catalog-price-unit text-xs font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+        <span class="catalog-price-current text-2xl sm:text-3xl font-extrabold text-primary font-tajawal">{{ "%.2f"|format(item.price) }}</span>
+        <span class="catalog-price-unit text-sm font-bold text-slate-600">ج.م{% if item.display_uom %} <span class="font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
       </div>
       {% else %}
       <span class="text-sm text-outline">السعر غير متاح</span>
       {% endif %}
     </div>
-    {{ cart_control(item) }}
+    {{ cart_control(item, list=true) }}
   </div>
 </article>
 {% endmacro %}

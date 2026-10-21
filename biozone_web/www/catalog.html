@@ -99,6 +99,9 @@
     #catalog-grid-view[data-mobile-cols="2"] .catalog-add-btn span:last-child {
       display: inline;
     }
+    #catalog-grid-view[data-mobile-cols="1"] .catalog-add-btn {
+      height: 2.75rem;
+    }
   }
   /* Catalog controls: add and stepper share 44px height, 12px radius, and
      the same muted stepper surface. Width is reserved so state changes do
@@ -115,6 +118,22 @@
     #catalog-grid-view[data-mobile-cols="1"] .catalog-add-btn span:last-child,
     #catalog-list-view .catalog-add-btn span:last-child {
       display: inline;
+    }
+  }
+  @media (min-width: 640px) and (max-width: 767px) {
+    .catalog-list-card {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .catalog-list-card > div:first-child {
+      width: 100%;
+      flex: none;
+    }
+    .catalog-list-card > div:last-child {
+      width: 100%;
+      justify-content: space-between;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 1rem;
     }
   }
 </style>
@@ -181,7 +200,7 @@
   </div>
   {# نسخة القائمة مصدَّرة مع الشبكة (تبديل فوري بلا reload) — مخفية افتراضيًا؛
      images مخفية بـdisplay:none لا تُحمَّل (lazy) فلا كلفة شبكة مضاعفة. #}
-  <div id="catalog-list-view" class="hidden flex-col gap-4 max-w-3xl w-full mx-auto">
+  <div id="catalog-list-view" class="hidden flex-col gap-4 w-full">
     {% for item in items %}
     {{ product_card_list(item, lazy=(loop.index > 3)) }}
     {% endfor %}
