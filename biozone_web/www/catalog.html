@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - المتجر</title>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
-<link rel="stylesheet" href="/assets/biozone_web/css/app.1364c758.css">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,grid_view,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,view_agenda,view_column,view_list,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -51,7 +51,17 @@
     #catalog-grid-view[data-mobile-cols="2"] .catalog-product-foot {
       margin-top: .5rem;
       padding-top: .5rem;
-      gap: .25rem;
+      flex-direction: column;
+      align-items: stretch;
+      gap: .5rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-product-price,
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-cart-control,
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-stepper {
+      width: 100%;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-stepper {
+      justify-content: space-between;
     }
     #catalog-grid-view[data-mobile-cols="2"] .catalog-price-current {
       font-size: 1rem;
@@ -64,9 +74,31 @@
       display: none;
     }
     #catalog-grid-view[data-mobile-cols="2"] .catalog-add-btn {
-      height: 2rem;
-      padding-left: .45rem;
-      padding-right: .45rem;
+      width: 100%;
+      height: 2.75rem;
+      min-width: 0;
+      padding-left: .75rem;
+      padding-right: .75rem;
+    }
+    #catalog-grid-view[data-mobile-cols="2"] .catalog-add-btn span:last-child {
+      display: inline;
+    }
+  }
+  /* Catalog controls: add and stepper share 44px height, 12px radius, and
+     the same muted stepper surface. Width is reserved so state changes do
+     not overflow narrow cards. */
+  #catalog-grid-view .catalog-add-btn,
+  #catalog-list-view .catalog-add-btn {
+    min-width: 7.25rem;
+  }
+  #catalog-grid-view .catalog-stepper,
+  #catalog-list-view .catalog-stepper {
+    padding: 3px;
+  }
+  @media (max-width: 639px) {
+    #catalog-grid-view[data-mobile-cols="1"] .catalog-add-btn span:last-child,
+    #catalog-list-view .catalog-add-btn span:last-child {
+      display: inline;
     }
   }
 </style>
@@ -99,7 +131,7 @@
         <span class="material-symbols-outlined text-base text-primary">tune</span>
         <span>الفلاتر</span>
         {% if active_filters_count %}
-        <span class="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] flex items-center justify-center font-bold">{{ active_filters_count_ar }}</span>
+        <span class="w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold" style="background: #D63A2F; color: #fff;">{{ active_filters_count }}</span>
         {% endif %}
       </button>
       <div class="mobile-cols-toggle items-center p-1 bg-white border border-slate-200 rounded-xl shadow-subtle gap-0.5" role="group" aria-label="عدد الأعمدة">
@@ -126,14 +158,14 @@
   {% endif %}
 
   {% if items %}
-  <div id="catalog-grid-view" data-mobile-cols="2" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div id="catalog-grid-view" data-mobile-cols="2" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
     {% for item in items %}
-    {{ product_card(item, lazy=(loop.index > 4), image_height='h-52') }}
+    {{ product_card(item, lazy=(loop.index > 4)) }}
     {% endfor %}
   </div>
   {# نسخة القائمة مصدَّرة مع الشبكة (تبديل فوري بلا reload) — مخفية افتراضيًا؛
      images مخفية بـdisplay:none لا تُحمَّل (lazy) فلا كلفة شبكة مضاعفة. #}
-  <div id="catalog-list-view" class="hidden flex-col gap-4 max-w-4xl w-full mx-auto">
+  <div id="catalog-list-view" class="hidden flex-col gap-4 max-w-3xl w-full mx-auto">
     {% for item in items %}
     {{ product_card_list(item, lazy=(loop.index > 3)) }}
     {% endfor %}
@@ -209,7 +241,7 @@
           <button type="button" class="w-full text-base font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="category-options" aria-expanded="false" aria-controls="category-options">
             <span>القسم / الفئة</span>
             <span class="flex items-center gap-2">
-              <span class="text-[10px] text-slate-400 font-normal" id="category-count">محدد: {{ sel_categories_count_ar }}</span>
+              <span class="text-xs font-semibold text-rose-500" id="category-count">محدد: {{ selected_categories|length }}</span>
               <span class="material-symbols-outlined text-base text-slate-400 filter-toggle-icon transition-transform">expand_more</span>
             </span>
           </button>
@@ -224,7 +256,7 @@
           <button type="button" class="w-full text-base font-bold text-slate-900 mb-3 flex items-center justify-between cursor-pointer" data-filter-toggle="brand-options" aria-expanded="false" aria-controls="brand-options">
             <span>العلامة التجارية</span>
             <span class="flex items-center gap-2">
-              <span class="text-[10px] text-slate-400 font-normal" id="brand-count">محدد: {{ sel_brands_count_ar }}</span>
+              <span class="text-xs font-semibold text-rose-500" id="brand-count">محدد: {{ selected_brands|length }}</span>
               <span class="material-symbols-outlined text-base text-slate-400 filter-toggle-icon transition-transform">expand_more</span>
             </span>
           </button>
@@ -332,14 +364,13 @@
     var counts = { category: document.getElementById('category-count'), brand: document.getElementById('brand-count') };
     function groups() { return ['category', 'brand']; }
     function boxes(group) { return drawer.querySelectorAll('input[data-filter-group="' + group + '"]'); }
-    function arDigits(n) { return String(n).replace(/[0-9]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'[d]; }); }
     function checkedCount(group) {
       var n = 0;
       boxes(group).forEach(function (cb) { if (cb.checked) n++; });
       return n;
     }
     function setCount(group) {
-      if (counts[group]) counts[group].textContent = 'محدد: ' + arDigits(checkedCount(group));
+      if (counts[group]) counts[group].textContent = 'محدد: ' + checkedCount(group);
     }
     function open() { drawer.classList.remove('hidden'); if (openBtn) openBtn.setAttribute('aria-expanded', 'true'); }
     function close() { drawer.classList.add('hidden'); if (openBtn) openBtn.setAttribute('aria-expanded', 'false'); }

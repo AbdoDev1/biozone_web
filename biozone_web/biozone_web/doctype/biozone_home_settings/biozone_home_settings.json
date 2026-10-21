@@ -7,7 +7,9 @@
  "engine": "InnoDB",
  "field_order": [
   "sections",
-  "brands"
+  "brands",
+  "section_break_shipping",
+  "free_shipping_threshold"
  ],
  "fields": [
   {
@@ -21,12 +23,24 @@
    "fieldtype": "Table",
    "label": "علامات الرئيسية",
    "options": "Biozone Home Brand"
+  },
+  {
+   "fieldname": "section_break_shipping",
+   "fieldtype": "Section Break",
+   "label": "الشحن"
+  },
+  {
+   "default": "800",
+   "description": "الطلبات التي تزيد عن هذا المبلغ يتم شحنها مجانًا (للعرض فقط).",
+   "fieldname": "free_shipping_threshold",
+   "fieldtype": "Currency",
+   "label": "حد الشحن المجاني (ج.م)"
   }
  ],
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-18 00:00:00.000000",
+ "modified": "2026-10-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Biozone Web",
  "name": "Biozone Home Settings",

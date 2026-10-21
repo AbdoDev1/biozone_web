@@ -6,11 +6,24 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - شريكك الموثوق للمستلزمات الطبية</title>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
-<link rel="stylesheet" href="/assets/biozone_web/css/app.1364c758.css">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
+  .brand-marquee { position: relative; overflow: hidden; direction: ltr; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); }
+  .brand-marquee-track { display: flex; width: max-content; transition: transform .55s ease; will-change: transform; }
+  .brand-marquee-group { display: flex; flex: none; gap: 16px; padding-right: 16px; }
+  .brand-marquee-card { flex: 0 0 150px; width: 150px; direction: rtl; box-sizing: border-box; }
+  .brand-marquee--few .brand-marquee-group { min-width: 100vw; justify-content: space-around; }
+  .brand-marquee--single .brand-marquee-track { transition: none; width: auto; justify-content: center; }
+  .brand-marquee--single .brand-marquee-group { min-width: 0; padding-right: 0; justify-content: center; }
+  .brand-marquee--single .brand-marquee-group[aria-hidden="true"] { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .brand-marquee { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+    .brand-marquee-track { transition: none; }
+    .brand-marquee-group[aria-hidden="true"] { display: none; }
+  }
 </style>
 </head>
 <body class="bg-appBg text-on-surface flex flex-col min-h-screen">
@@ -55,7 +68,7 @@
     {{ trust_strip(trust_items, "cards") }}
   </section>
 
-  <!-- تسوّق حسب العلامة التجارية — صفوف Biozone Home Settings عند وجودها، مع رجوع ديناميكي لأعلى البراندات. -->
+  <!-- تسوّق حسب العلامة التجارية — صفوف Biozone Home Settings فقط، بلا fallback. -->
   {% if top_brands %}
   <section class="max-w-container-max mx-auto px-md pt-xl">
     <div class="flex items-center justify-between mb-lg">
@@ -65,24 +78,90 @@
         <span class="material-symbols-outlined text-[18px]">chevron_left</span>
       </a>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-md">
-      {% for b in top_brands %}
-      <a href="/catalog?brand={{ b.brand|urlencode }}" class="bg-surface-container-lowest border border-surface-variant rounded-xl shadow-[0_2px_8px_rgba(11,28,48,0.04)] p-5 flex flex-col items-center justify-center text-center hover:border-primary/40 transition-colors">
-        {% if b.image %}
-        <img src="{{ b.image|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-cover rounded-lg mb-3" loading="lazy" decoding="async">
-        <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
-        {% elif b.logo_url %}
-        <img src="{{ b.logo_url|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-contain" loading="lazy" decoding="async">
-        {% else %}
-        <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
-        {% endif %}
-      </a>
-      {% endfor %}
+    <div id="brand-marquee" class="brand-marquee{% if top_brands|length == 1 %} brand-marquee--single{% elif top_brands|length < 4 %} brand-marquee--few{% endif %}" aria-label="العلامات التجارية">
+      <div id="brand-marquee-track" class="brand-marquee-track">
+        {% for copy in [false, true] %}
+        <div class="brand-marquee-group"{% if copy %} aria-hidden="true"{% endif %}>
+          {% for b in top_brands %}
+          <a href="/catalog?brand={{ b.brand|urlencode }}" dir="rtl" class="brand-marquee-card bg-surface-container-lowest border border-surface-variant rounded-xl shadow-[0_2px_8px_rgba(11,28,48,0.04)] p-5 flex flex-col items-center justify-center text-center hover:border-primary/40 transition-colors"{% if copy %} tabindex="-1"{% endif %}>
+            {% if b.image %}
+            <img src="{{ b.image|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-cover rounded-lg mb-3" loading="lazy" decoding="async">
+            <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
+            {% elif b.logo_url %}
+            <img src="{{ b.logo_url|e }}" alt="{{ b.brand|e }}" class="w-full h-24 object-contain" loading="lazy" decoding="async">
+            {% else %}
+            <span class="font-bold text-sm text-on-surface">{{ b.label|e }}</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
     </div>
+    <script>
+      (function () {
+        var root = document.getElementById('brand-marquee');
+        if (!root) return;
+        var track = document.getElementById('brand-marquee-track');
+        var groups = Array.prototype.slice.call(root.querySelectorAll('.brand-marquee-group'));
+        var cards = Array.prototype.slice.call(groups[0].querySelectorAll('.brand-marquee-card'));
+        var total = cards.length;
+        if (groups.length < 2 || total < 2) return;
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (reduce.matches) return;
+        var offsets = [];
+        var groupWidth = 0;
+        var index = 0;
+        var timer = null;
+        var paused = false;
+        function measure() {
+          groupWidth = groups[1].offsetLeft - groups[0].offsetLeft;
+          var base = cards[0].offsetLeft;
+          offsets = cards.map(function (card) { return card.offsetLeft - base; });
+        }
+        function setX(x, animate) {
+          track.style.transition = animate ? 'transform .55s ease' : 'none';
+          track.style.transform = 'translateX(-' + x + 'px)';
+        }
+        function reset() {
+          index = 0;
+          setX(0, false);
+        }
+        function advance() {
+          if (index < total - 1) {
+            index += 1;
+            setX(offsets[index], true);
+          } else {
+            setX(groupWidth, true);
+            setTimeout(reset, 600);
+          }
+        }
+        function stop() { if (timer) { clearInterval(timer); timer = null; } }
+        function start() {
+          stop();
+          if (paused) return;
+          timer = setInterval(advance, 4000);
+        }
+        function pause() { paused = true; stop(); }
+        function resume() { paused = false; start(); }
+        root.addEventListener('mouseenter', pause);
+        root.addEventListener('mouseleave', resume);
+        root.addEventListener('focusin', pause);
+        root.addEventListener('focusout', function (event) {
+          if (!root.contains(event.relatedTarget)) resume();
+        });
+        window.addEventListener('resize', function () {
+          measure();
+          reset();
+        });
+        measure();
+        start();
+      })();
+    </script>
   </section>
   {% endif %}
 
-  <!-- تصفح حسب التصنيف — صفوف Biozone Home Settings (يديرها المالك)، مع رجوع ديناميكي عند فراغها. -->
+  <!-- تصفح حسب التصنيف — صفوف Biozone Home Settings فقط، بلا fallback. -->
   {% if top_categories %}
   <section class="max-w-container-max mx-auto px-md pt-xl">
     <h2 class="text-2xl font-bold text-on-surface mb-lg text-right">تسوّق حسب التصنيف</h2>
@@ -99,7 +178,7 @@
   </section>
   {% endif %}
 
-  <!-- أقسام المنتجات — بيانات ERPNext حقيقية: تصنيف (عطور) + مجموعة عناية شخصية. -->
+  <!-- أقسام المنتجات — صفوف Biozone Home Settings فقط، بنفس كارت المتجر. -->
   {% if home_rails %}
   {% for rail in home_rails %}
   <section class="max-w-container-max mx-auto px-md pt-xl{% if loop.last %} pb-xl{% endif %}">
@@ -112,7 +191,7 @@
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg">
       {% for item in rail.products %}
-      {{ product_card(item, image_height='h-52') }}
+      {{ product_card(item, lazy=true) }}
       {% endfor %}
     </div>
   </section>

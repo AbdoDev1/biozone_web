@@ -206,13 +206,21 @@ def search_items(term, category=None, page=1, page_size=PAGE_SIZE, brand=None):
     total_pages = max((total + page_size - 1) // page_size, 1)
     page = min(page, total_pages)
     rows = frappe.db.sql(
-        "select item_code, item_name, item_group from `tabItem` where " + where
+        "select item_code, item_name, item_group, brand from `tabItem` where " + where
         + " order by " + order + " limit %(start)s, %(size)s",
         dict(order_params, start=(page - 1) * page_size, size=page_size),
         as_dict=True,
     )
     return (
-        [{"item_code": r.item_code, "item_name": r.item_name, "item_group": r.item_group} for r in rows],
+        [
+            {
+                "item_code": r.item_code,
+                "item_name": r.item_name,
+                "item_group": r.item_group,
+                "brand": r.brand,
+            }
+            for r in rows
+        ],
         total,
     )
 
@@ -537,8 +545,6 @@ def get_context(context):
     context.active_chips = active_chips
     context.filters_qs = filters_qs
     context.qs_without_q = qs_without_q
-    context.sel_categories_count_ar = _to_arabic_digits(len(selected_categories))
-    context.sel_brands_count_ar = _to_arabic_digits(len(selected_brands))
     context.search_term = search_term
     context.search_error = search_error
     context.did_you_mean = did_you_mean
@@ -555,7 +561,6 @@ def get_context(context):
     context.active_filters_count = (
         int(bool(search_term)) + len(selected_categories) + len(selected_brands)
     )
-    context.active_filters_count_ar = _to_arabic_digits(context.active_filters_count)
     context.shown_count_ar = _to_arabic_digits(len(items))
     range_start = (page - 1) * PAGE_SIZE + 1 if total_count else 0
     range_end = min(page * PAGE_SIZE, total_count)

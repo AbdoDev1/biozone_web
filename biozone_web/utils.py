@@ -792,6 +792,28 @@ def get_storefront_price_context(customer=None):
 MIN_ORDER_AMOUNT_FIELD = "min_order_amount"
 MIN_ORDER_MAX = 100000000.0
 
+# حد الشحن المجاني المعروض في المتجر (إعداد عام للعرض فقط).
+FREE_SHIPPING_THRESHOLD_FIELD = "free_shipping_threshold"
+
+
+def get_free_shipping_threshold():
+	"""حد الشحن المجاني المعروض — 0.0 يعني إخفاء السطر.
+
+	الحقل غائب قبل migrate أو تعذّرت قراءته ← 0.0 (fail-open للعرض فقط).
+	"""
+	try:
+		if not frappe.get_meta("Biozone Home Settings").has_field(FREE_SHIPPING_THRESHOLD_FIELD):
+			return 0.0
+		value = frappe.db.get_single_value("Biozone Home Settings", FREE_SHIPPING_THRESHOLD_FIELD)
+		value = float(value or 0)
+	except Exception:
+		return 0.0
+	import math
+
+	if not math.isfinite(value) or value <= 0:
+		return 0.0
+	return value
+
 
 class MinOrderConfigError(Exception):
 	"""عطل تهيئة/قراءة لحد الطلب الأدنى — يُترجم دائمًا لـMIN_ORDER_CALC_FAILED.

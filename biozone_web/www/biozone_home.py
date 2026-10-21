@@ -11,30 +11,10 @@ from biozone_web.utils import (
 # Home sections and the brand strip come from Biozone Home Settings
 # (owner-managed rows: group/brand + optional display label + "show products"
 # flag + order) — rename/delete-safe, no code change needed to swap content.
-# When a settings table is empty its part of the home falls back to the legacy
-# dynamic behavior: top real categories by active item count, plus a
-# top-category rail, a curated personal-care collection and top brands.
+# Empty settings mean an empty homepage area: there is no dynamic fallback.
 SETTINGS_PARENT = "Biozone Home Settings"
 SECTION_DOCTYPE = "Biozone Home Section"
 BRAND_DOCTYPE = "Biozone Home Brand"
-PERFUME_GROUP = "عطور"
-CARE_GROUPS = [
-    "شامبو",
-    "كريم شعر",
-    "زيت شعر",
-    "جل شعر",
-    "بلسم شعر",
-    "شاور جل",
-    "صابون",
-    "صابون سائل",
-    "كريمات جسم",
-    "غسول وجه",
-    "عناية بالبشرة",
-    "صنفرة جسم",
-    "ليف استحمام",
-    "مزيل عرق",
-    "عناية بالشفاه",
-]
 RAIL_SIZE = 4
 
 
@@ -47,7 +27,7 @@ def _rail_items(filters, limit=RAIL_SIZE, diversify=False, candidates=60):
     """
     rows = frappe.get_all(
         "Item",
-        fields=["item_code", "item_name", "item_group"],
+        fields=["item_code", "item_name", "item_group", "brand"],
         filters=filters,
         order_by="creation asc",
         limit_page_length=candidates if diversify else limit,
@@ -161,28 +141,6 @@ def build_top_brands(rows, existing_brands):
     return cards
 
 
-def _fallback_tiles():
-    """Legacy dynamic tiles: top real item groups by active item count."""
-    return [
-        {
-            "item_group": r.item_group,
-            "label": r.item_group,
-            "url": "/catalog?category=" + quote(r.item_group, safe=""),
-        }
-        for r in frappe.db.sql(
-            """
-            select item_group, count(*) as item_count
-            from `tabItem`
-            where disabled = 0
-            group by item_group
-            order by item_count desc
-            limit 4
-            """,
-            as_dict=True,
-        )
-    ]
-
-
 def get_context(context):
     redirect_staff_away_from_store()
 
@@ -195,63 +153,21 @@ def get_context(context):
     rows = _settings_rows()
     existing = _existing_groups()
 
-    if rows:
-        context.top_categories = build_tiles(rows, existing)
-        context.home_rails = [
-            {
-                "title": d["title"],
-                "url": d["url"],
-                "products": enrich_store_items(
-                    _rail_items({"disabled": 0, "item_group": d["group"]})
-                ),
-            }
-            for d in build_rail_defs(rows, existing)
-        ]
-    else:
-        context.top_categories = _fallback_tiles()
-        context.home_rails = [
-            {
-                "title": PERFUME_GROUP,
-                "url": "/catalog?category=" + quote(PERFUME_GROUP),
-                "products": enrich_store_items(
-                    _rail_items({"disabled": 0, "item_group": PERFUME_GROUP})
-                ),
-            },
-            {
-                "title": "العناية الشخصية",
-                "url": "/catalog",
-                "products": enrich_store_items(
-                    _rail_items(
-                        {"disabled": 0, "item_group": ["in", CARE_GROUPS]}, diversify=True
-                    )
-                ),
-            },
-        ]
+    context.top_categories = build_tiles(rows, existing)
+    context.home_rails = [
+        {
+            "title": d["title"],
+            "url": d["url"],
+            "products": enrich_store_items(
+                _rail_items({"disabled": 0, "item_group": d["group"]})
+            ),
+        }
+        for d in build_rail_defs(rows, existing)
+    ]
 
-    # Product brands: owner rows (Biozone Home Brand) in display order when
-    # present (no cap; deleted brands dropped, display label optional);
-    # otherwise the legacy dynamic fallback — real ERPNext `Brand` values
-    # ranked by active item count (no hardcoded list; hides when empty).
-    # Cards carry the Brand master's `image` (if any), else the app-shipped
-    # wordmark (services.brands).
+    # Product brands: owner rows (Biozone Home Brand) in display order.
+    # No fallback: an empty table hides the brand strip.
     brand_rows = _settings_brand_rows()
-    if brand_rows:
-        context.top_brands = build_top_brands(brand_rows, _existing_brands(brand_rows))
-    else:
-        context.top_brands = frappe.db.sql(
-            """
-            select i.brand as brand, b.image as image, count(*) as item_count
-            from `tabItem` i
-            left join `tabBrand` b on b.name = i.brand
-            where i.disabled = 0 and ifnull(i.brand, '') != ''
-            group by i.brand, b.image
-            order by item_count desc, i.brand asc
-            limit 6
-            """,
-            as_dict=True,
-        )
-        for brand in context.top_brands:
-            brand["logo_url"] = brand_logo_url(brand.brand)
-            brand["label"] = brand.brand
+    context.top_brands = build_top_brands(brand_rows, _existing_brands(brand_rows))
 
     return context

@@ -6,23 +6,230 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Biozone - {{ item.item_name if item else "الصنف غير متاح" }}</title>
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
-<link rel="stylesheet" href="/assets/biozone_web/css/app.1364c758.css">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning&display=block" rel="stylesheet">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,add_shopping_cart,arrow_back,arrow_forward,barcode_scanner,cancel,category,check,check_circle,chevron_left,chevron_right,close,content_copy,dashboard,delete,delete_sweep,download,drag_indicator,edit,edit_note,error,expand_more,fact_check,group,groups,home,home_storage,hourglass_empty,image,inbox,info,inventory_2,label_off,local_pharmacy,local_shipping,lock,logout,mail,medical_services,menu,menu_open,notifications,open_in_new,payments,percent,person,phone,print,progress_activity,push_pin,receipt,receipt_long,refresh,remove,remove_shopping_cart,save,search,search_off,sell,shopping_cart,storefront,straighten,support_agent,sync_alt,table_view,task_alt,tune,upload_file,verified,verified_user,visibility,visibility_off,warning,zoom_in&display=block" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
+  .item-hero-image {
+    width: 100%;
+    max-width: 100%;
+    max-height: clamp(360px, 50vh, 500px);
+    object-fit: contain;
+  }
+  .catalog-stepper-compact { padding: 3px; }
+  @media (max-width: 767px) {
+    .item-hero-image { max-height: 420px; }
+  }
+  @media (max-width: 639px) {
+    #similar-products .catalog-product-foot {
+      flex-direction: column;
+      align-items: stretch;
+      gap: .5rem;
+    }
+    #similar-products .catalog-product-price,
+    #similar-products .catalog-cart-control,
+    #similar-products .catalog-stepper {
+      width: 100%;
+    }
+    #similar-products .catalog-stepper { justify-content: space-between; }
+    #similar-products .catalog-add-btn { width: 100%; min-width: 0; }
+  }
+  .product-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  @media (min-width: 768px) {
+    .product-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr); gap: 40px; }
+    .product-info { position: sticky; top: 96px; align-self: start; }
+  }
+  .product-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 420px;
+    padding: 32px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 28px;
+    background: radial-gradient(circle at 30% 20%, #ffffff 0%, #f1f5f9 48%, #e6f3f2 100%);
+  }
+  .product-stage::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    width: 280px;
+    height: 280px;
+    inset-inline-start: -80px;
+    bottom: -120px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+  .product-stage .item-hero-image {
+    position: relative;
+    z-index: 1;
+    max-height: 500px;
+    mix-blend-mode: multiply;
+  }
+  .product-zoom-wrap {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: zoom-in;
+  }
+  .product-zoom-wrap:focus-visible { outline: 3px solid #00685f; outline-offset: -3px; }
+  .product-zoom-wrap .item-hero-image { cursor: zoom-in; }
+  .product-zoom-media {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+  }
+  .product-zoom-hint {
+    position: absolute;
+    top: 12px;
+    inset-inline-end: 12px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(0, 104, 95, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #00685f;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(11, 28, 48, 0.12);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+  .product-zoom-hint .material-symbols-outlined { font-size: 21px; }
+  @media (max-width: 767px) {
+    .product-zoom-hint { top: 10px; inset-inline-end: 10px; width: 38px; height: 38px; }
+    .product-zoom-hint .material-symbols-outlined { font-size: 20px; }
+  }
+  .product-lightbox {
+    width: fit-content;
+    max-width: 94vw;
+    max-height: 92vh;
+    padding: 0;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    color: #ffffff;
+    overflow: visible;
+  }
+  .product-lightbox::backdrop {
+    background: rgba(8, 18, 14, 0.82);
+    backdrop-filter: blur(6px);
+  }
+  .product-lightbox-image {
+    display: block;
+    width: auto;
+    height: 88vh;
+    max-width: 94vw;
+    max-height: 88vh;
+    margin: 0 auto;
+    border-radius: 18px;
+    background: #ffffff;
+    object-fit: contain;
+    touch-action: pinch-zoom;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+  .product-lightbox-close {
+    position: absolute;
+    top: -14px;
+    inset-inline-start: -14px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    background: #00685f;
+    color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .product-lightbox-close:hover { background: #00524c; }
+  .product-lightbox-close:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+  @media (max-width: 767px) {
+    .product-lightbox { width: 94vw; }
+    .product-lightbox-close { top: 8px; inset-inline-start: 8px; }
+    .product-lightbox-image { width: 94vw; height: auto; max-height: 84vh; border-radius: 14px; }
+  }
+  .product-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #e6f3f2;
+    color: #00685f;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .product-chip--brand { background: #f1f5f9; color: #3d4947; }
+  .product-buy-card {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 2px 8px -2px rgba(0, 92, 85, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+  .product-price { font-size: 36px; line-height: 1.1; font-weight: 800; color: #00685f; letter-spacing: -0.02em; }
+  .product-old-price { color: #94a3b8; text-decoration: line-through; font-size: 15px; font-weight: 600; }
+  .product-discount { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: #ffdad6; color: #93000a; font-size: 13px; font-weight: 800; }
+  .product-stock { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; font-weight: 700; color: #00685f; }
+  .product-stock-dot { width: 8px; height: 8px; border-radius: 999px; background: #10b981; }
+  .product-stock--out { color: #ba1a1a; }
+  .product-stock--out .product-stock-dot { background: #ba1a1a; }
+  .product-trust-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  .product-trust-item { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; color: #3d4947; font-size: 11px; font-weight: 700; }
+  .product-trust-item .material-symbols-outlined { font-size: 18px; color: #00685f; }
+  .product-similar { margin-top: 40px; padding: 28px; border: 1px solid #e2e8f0; border-radius: 28px; background: #f8f9ff; }
+  .product-similar-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 767px) {
+    .product-stage { min-height: 320px; padding: 20px; border-radius: 24px; }
+    .product-stage .item-hero-image { max-height: 360px; }
+    .product-buy-card { padding: 16px; border-radius: 20px; }
+    .product-price { font-size: 32px; }
+    .product-similar { margin-top: 28px; padding: 20px; border-radius: 24px; }
+    .product-similar-head { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+  }
 </style>
 </head>
-<body class="bg-appBg text-on-surface flex flex-col min-h-screen">
+<body class="bg-white text-on-surface flex flex-col min-h-screen">
 
 {% include "biozone_web/templates/includes/site_header.html" %}
 
 {% from "biozone_web/templates/includes/product_card.html" import product_card, cart_control, detail_image %}
 {% from "biozone_web/templates/includes/trust_strip.html" import trust_strip %}
 
-<main class="flex-grow max-w-container-max mx-auto px-md py-md w-full">
+<main class="flex-grow max-w-container-max mx-auto px-md py-lg w-full">
   <!-- Breadcrumbs: home / store / group / item (all real links) — kept visually lighter than the product content -->
-  <nav class="flex flex-wrap items-center gap-1 text-sm text-on-surface-variant mb-md max-w-6xl mx-auto w-full" aria-label="مسار التنقل">
+  <nav class="flex flex-wrap items-center gap-1 text-sm text-on-surface-variant mb-md w-full" aria-label="مسار التنقل">
     <a href="/biozone-home" class="hover:text-primary inline-flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">home</span>الرئيسية</a>
     <span>/</span>
     <a href="/catalog" class="hover:text-primary">المتجر</a>
@@ -35,66 +242,94 @@
   </nav>
 
   {% if item %}
-  <!-- Item detail: balanced width-capped card, close columns — image on the
-       right, info on the left (RTL). Vertically centered on desktop; on
-       mobile the image comes first (order-*) then the purchase info. -->
-  <section class="max-w-6xl mx-auto bg-surface-container-lowest border border-borderSubtle shadow-sm rounded-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-lg md:items-center p-lg">
-    <div class="order-2 flex flex-col gap-md">
-      <h1 class="text-2xl md:text-3xl font-bold text-on-surface leading-tight">{{ item.item_name|e }}</h1>
-      <!-- Price block (styled card) -->
-      <div class="rounded-2xl border border-primary/15 bg-gradient-to-l from-primary-light/60 via-surface-container-lowest to-transparent p-4">
-        {% if item.price %}
-        {% if item.base_price and item.base_price > item.price %}
-        <s class="block text-sm font-medium text-slate-500 mb-1" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
-        {% endif %}
-        <div class="flex items-baseline gap-2">
-          <span class="font-extrabold text-primary text-3xl sm:text-4xl">{{ "%.2f"|format(item.price) }}</span>
-          <span class="text-base font-bold text-on-surface">ج.م{% if item.display_uom %} <span class="text-sm font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
-        </div>
-        {% if item.is_stock_item and item.actual_qty is not none %}
-        <div class="mt-3 flex items-center gap-2 text-sm font-semibold {% if item.actual_qty > 0 %}text-primary{% else %}text-error{% endif %}">
-          <span class="w-2 h-2 rounded-full {% if item.actual_qty > 0 %}bg-emerald-500{% else %}bg-error{% endif %}" aria-hidden="true"></span>
-          <span dir="ltr">in stock {{ (item.actual_qty|int) if item.actual_qty > 0 else 0 }}</span>
-        </div>
-        {% endif %}
-        {% else %}
-        <span class="text-base text-outline">السعر غير متاح</span>
-        {% endif %}
-      </div>
-      <!-- Cart control: width-filling button inside the info column (hooks unchanged) -->
-      <div>
-        {{ cart_control(item, compact=true) }}
-      </div>
-      {% if item.brand or item.description %}
-      <div class="border-t border-borderSubtle pt-md">
-        {% if item.brand %}<div class="text-sm text-on-surface-variant">العلامة: {{ item.brand|e }}</div>{% endif %}
-        {% if item.description %}<p class="text-sm text-on-surface-variant leading-relaxed{% if item.brand %} mt-1{% endif %}">{{ item.description|e }}</p>{% endif %}
-      </div>
-      {% endif %}
-    </div>
-    <div class="order-1 relative w-full bg-white rounded-xl flex items-center justify-center overflow-hidden aspect-[4/3] p-6 md:p-10">
-      {% if item.image or item.thumbnail %}
-      {{ detail_image(item) }}
-      {% else %}
-      <img src="/assets/biozone_web/images/product-placeholder.svg" alt="{{ item.item_name|e }}" class="max-h-full max-w-full object-contain" decoding="async">
-      {% endif %}
-    </div>
-  </section>
-
-  <!-- Trust row: shared compact strip (same design as the homepage) — phrases kept verbatim -->
   {% set trust_items = [
     {"icon": "local_shipping", "title": "توصيل سريع"},
     {"icon": "verified", "title": "منتجات أصلية"},
     {"icon": "support_agent", "title": "دعم سريع"},
   ] %}
-  <section class="py-md max-w-6xl mx-auto w-full">
-    {{ trust_strip(trust_items, "compact") }}
+  {% set has_discount = item.price and item.base_price and item.base_price > item.price %}
+  {% set discount_pct = ((item.base_price - item.price) / item.base_price * 100)|round(0)|int if has_discount else 0 %}
+  <!-- Item detail: image stage on the right, sticky purchase column on the left (RTL). -->
+  <section class="product-hero w-full">
+    <div class="product-info order-2 flex flex-col min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="/catalog?category={{ item.item_group|urlencode }}" class="product-chip">
+          <span class="material-symbols-outlined text-[14px]">category</span>
+          {{ item.item_group|e }}
+        </a>
+        {% if item.brand %}
+        <a href="/catalog?brand={{ item.brand|urlencode }}" class="product-chip product-chip--brand">
+          <span class="material-symbols-outlined text-[14px]">sell</span>
+          {{ item.brand|e }}
+        </a>
+        {% endif %}
+      </div>
+      <h1 class="mt-4 text-3xl sm:text-4xl font-extrabold text-on-surface leading-tight">{{ item.item_name|e }}</h1>
+      <div class="product-buy-card">
+        {% if item.price %}
+        <div>
+          {% if has_discount %}
+          <div class="flex flex-wrap items-center gap-2">
+            <s class="product-old-price" title="السعر قبل الخصم">{{ "%.2f"|format(item.base_price) }} ج.م</s>
+            <span class="product-discount">خصم {{ discount_pct }}%</span>
+          </div>
+          {% endif %}
+          <div class="flex items-baseline gap-2{% if has_discount %} mt-4{% endif %}">
+            <span class="product-price">{{ "%.2f"|format(item.price) }}</span>
+            <span class="text-base font-bold text-on-surface">ج.م{% if item.display_uom %} <span class="text-sm font-medium text-on-surface-variant">/ {{ item.display_uom|e }}</span>{% endif %}</span>
+          </div>
+        </div>
+        {% else %}
+        <span class="text-base text-outline">السعر غير متاح</span>
+        {% endif %}
+        {% if item.is_stock_item and item.actual_qty is not none %}
+        <div class="product-stock {% if item.actual_qty <= 0 %}product-stock--out{% endif %}">
+          <span class="product-stock-dot" aria-hidden="true"></span>
+          <span dir="ltr">{% if item.actual_qty > 0 %}in stock {{ item.actual_qty|int }}{% else %}out of stock{% endif %}</span>
+        </div>
+        {% endif %}
+        <!-- Cart control: width-filling button inside the purchase card (hooks unchanged). -->
+        <div class="mt-5">
+          {{ cart_control(item, compact=true) }}
+        </div>
+        {% if free_shipping_threshold %}
+        <p class="mt-3 flex items-start justify-center gap-2 text-center text-sm sm:text-base font-semibold leading-relaxed text-on-surface-variant">
+          <span class="material-symbols-outlined text-lg shrink-0 text-primary">local_shipping</span>
+          <span>الطلبات التي تزيد عن {{ free_shipping_threshold|int }} جنيه يتم شحنها مجانًا.</span>
+        </p>
+        {% endif %}
+        {{ trust_strip(trust_items, "inline") }}
+      </div>
+    </div>
+    <div class="order-1 w-full min-w-0">
+      <div class="product-stage">
+        <button type="button" class="product-zoom-wrap" id="product-zoom-trigger" aria-label="تكبير صورة {{ item.item_name|e }}" aria-haspopup="dialog" aria-controls="product-zoom-dialog">
+          <span class="product-zoom-media">
+            {% if item.image or item.thumbnail %}
+            {{ detail_image(item) }}
+            {% else %}
+            <img src="/assets/biozone_web/images/product-placeholder.svg" alt="{{ item.item_name|e }}" class="item-hero-image block w-full max-w-full object-contain" decoding="async">
+            {% endif %}
+            <span class="product-zoom-hint" aria-hidden="true">
+              <span class="material-symbols-outlined">zoom_in</span>
+            </span>
+          </span>
+        </button>
+      </div>
+    </div>
   </section>
+
+  <dialog class="product-lightbox" id="product-zoom-dialog" aria-label="صورة {{ item.item_name|e }} مكبرة">
+    <button type="button" class="product-lightbox-close" id="product-zoom-close" aria-label="إغلاق التكبير">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <img class="product-lightbox-image" id="product-zoom-image" src="" alt="{{ item.item_name|e }}" decoding="async">
+  </dialog>
 
   <!-- Similar products: same item_group fallback until staff-picked field lands -->
   {% if similar_items %}
-  <section class="py-lg">
-    <div class="flex items-start sm:items-center justify-between gap-3 mb-lg">
+  <section id="similar-products" class="product-similar">
+    <div class="product-similar-head">
       <div>
         <h2 class="text-2xl font-bold text-on-surface flex items-center gap-2">
           <span class="w-2.5 h-6 bg-primary rounded-full inline-block"></span>
@@ -127,5 +362,44 @@
 
 {% include "biozone_web/templates/includes/site_footer.html" %}
 {% include "biozone_web/templates/includes/cart_helpers.html" %}
+
+<script>
+(function () {
+  var trigger = document.getElementById('product-zoom-trigger');
+  var dialog = document.getElementById('product-zoom-dialog');
+  var closeBtn = document.getElementById('product-zoom-close');
+  var zoomImage = document.getElementById('product-zoom-image');
+  if (!trigger || !dialog || !closeBtn || !zoomImage) return;
+
+  var sourceImage = trigger.querySelector('img');
+  var previousOverflow = '';
+
+  function open() {
+    if (dialog.open || !sourceImage) return;
+    var url = sourceImage.currentSrc || sourceImage.src;
+    if (!url) return;
+    zoomImage.src = url;
+    zoomImage.alt = sourceImage.alt || '';
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    closeBtn.focus();
+  }
+
+  function close() {
+    if (dialog.open) dialog.close();
+  }
+
+  trigger.addEventListener('click', open);
+  closeBtn.addEventListener('click', close);
+  dialog.addEventListener('click', function (event) {
+    if (event.target === dialog) close();
+  });
+  dialog.addEventListener('close', function () {
+    document.body.style.overflow = previousOverflow;
+    trigger.focus();
+  });
+})();
+</script>
 
 </body></html>
