@@ -150,6 +150,24 @@ def resolve_item_display(item_code, customer_group=None, _cache=None):
 	}
 
 
+def resolve_item_uom_factor(item_code, uom, _cache=None):
+	"""Return the server-side factor for a valid item UOM, else None."""
+	uom = (uom or "").strip() if isinstance(uom, str) else ""
+	if not uom:
+		return None
+	data = (_cache or {}).get(item_code)
+	if data is None:
+		data = _item_unit_data([item_code]).get(item_code)
+	if not data:
+		return None
+	if uom == (data.get("stock_uom") or "").strip():
+		return 1.0
+	for conv in data.get("conversions") or []:
+		if (conv.get("uom") or "").strip() == uom:
+			return conv.get("factor")
+	return None
+
+
 def resolve_items_display(codes, customer_group=None):
 	"""Batch version (one batched read for all items)."""
 	data = _item_unit_data(codes)

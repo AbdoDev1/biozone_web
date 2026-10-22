@@ -431,12 +431,11 @@ def biozone_confirm_order(items):
 			)
 			shipping_address_name = None
 
-		# Phase-2 unit gate (definitive; the store sends freely, staff
-		# confirmation decides): every line must match the group's display
-		# unit resolved server-side, meet its minimum, and carry the item's
-		# own conversion factor (client values never trusted). The snapshot
-		# (uom + factor) freezes into the order lines.
-		from biozone_web.units import resolve_items_display
+		# Phase-2 unit gate: prefer the group's display unit resolved
+		# server-side, but accept a stale yet valid client UOM so an open
+		# cart does not fail after a display-unit change. The factor always
+		# comes from the server, never from the client.
+		from biozone_web.units import resolve_item_uom_factor, resolve_items_display
 
 		display = resolve_items_display(
 			[it["item_code"] for it in so_items], customer_group
@@ -450,19 +449,32 @@ def biozone_confirm_order(items):
 						it["item_code"]
 					)
 				)
-			want_uom = d.get("uom")
-			if (it.get("uom") or "").strip() and (it.get("uom") or "").strip() != want_uom:
-				frappe.throw(
-					_("الوحدة المرسلة للصنف {0} لا تطابق وحدة العرض لفئتك — حدّث السلة").format(
-						it["item_code"]
+			want_uom = (d.get("uom") or "").strip()
+			sent_uom = (it.get("uom") or "").strip()
+			line_uom = want_uom
+			line_factor = d.get("factor") or 1.0
+			if sent_uom and sent_uom != want_uom:
+				sent_factor = resolve_item_uom_factor(it["item_code"], sent_uom)
+				if sent_factor is None:
+					frappe.throw(
+						_("الوحدة المرسلة للصنف {0} لا تطابق وحدة العرض لفئتك — حدّث السلة").format(
+							it["item_code"]
+						)
 					)
+				line_uom = sent_uom
+				line_factor = sent_factor
+				frappe.logger().warning(
+					"biozone_confirm_order: accepted stale uom item=%s uom=%s group=%s",
+					it["item_code"],
+					sent_uom,
+					customer_group,
 				)
 			final_items.append(
 				{
 					"item_code": it["item_code"],
 					"qty": it["qty"],
-					"uom": want_uom,
-					"conversion_factor": d.get("factor") or 1.0,
+					"uom": line_uom,
+					"conversion_factor": line_factor,
 				}
 			)
 		so_items = final_items

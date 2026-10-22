@@ -57,7 +57,7 @@
           <span class="text-base font-bold text-on-surface" id="summary-total-label">الإجمالي</span>
           <span class="text-xl font-extrabold text-primary" id="summary-total">٠٫٠٠ ج.م</span>
         </div>
-        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button">
+        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled>
           <span class="material-symbols-outlined text-xl">check_circle</span>
           تأكيد الطلب
         </button>
@@ -388,16 +388,25 @@
   window.addEventListener('storage', function (e) {
     if (e && e.key === CART_KEY) render();
   });
-repriceFromServer(loadCart()).then((outcome) => {
-if (outcome.failed) return;
-cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
+  const repriceConfirmBtn = document.getElementById('confirm-order-btn');
+  repriceFromServer(loadCart()).then((outcome) => {
+    const noticeEl = document.getElementById('cart-reprice-notice');
+    if (outcome.failed) {
+      if (noticeEl) {
+        noticeEl.textContent = 'تعذر تحديث السلة تلقائيًا. إن استمر الخطأ، حدّث الصفحة.';
+        noticeEl.classList.remove('hidden');
+      }
+      if (repriceConfirmBtn) repriceConfirmBtn.disabled = false;
+      return;
+    }
+    cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
     saveCart(outcome.items);
     render();
-    const noticeEl = document.getElementById('cart-reprice-notice');
-    if (outcome.removedCount > 0) {
+    if (outcome.removedCount > 0 && noticeEl) {
       noticeEl.textContent = 'أُزيلت ' + outcome.removedCount + ' أصناف من السلة لعدم توفر سعرها حاليًا.';
       noticeEl.classList.remove('hidden');
     }
+    if (repriceConfirmBtn) repriceConfirmBtn.disabled = false;
   });
 })();
 </script>
