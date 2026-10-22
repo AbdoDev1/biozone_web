@@ -328,16 +328,20 @@ class LiveConfirmCase(MinOrderDBCase):
         self.assertTrue(res2.get("ok"), res2)
         self._orders.append(res2["sales_order"])
         self._set_limit(self.group, net + 0.01)
+        frappe.local.response = {}
         res3 = self._confirm_as_customer(self._cart(2))
         self.assertFalse(res3.get("ok"))
         self.assertEqual(res3.get("error_code"), "MIN_ORDER_BELOW_MINIMUM")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 422)
 
     def test_t_midflight_limit_change(self):
         """T-midflight: same cart rejected then accepted after live limit change."""
         self._set_limit(self.group, 10**9)
+        frappe.local.response = {}
         res = self._confirm_as_customer(self._cart(1))
         self.assertFalse(res.get("ok"))
         self.assertEqual(res.get("error_code"), "MIN_ORDER_BELOW_MINIMUM")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 422)
         self.assertIn("shortfall", res)
         self._set_limit(self.group, 0)
         res2 = self._confirm_as_customer(self._cart(1))
@@ -349,8 +353,10 @@ class LiveConfirmCase(MinOrderDBCase):
         self._set_limit(self.group, 10**9)
         so_before = frappe.db.count("Sales Order", {"customer": self.customer})
         ntf_before = frappe.db.count("Notification Log", {"for_user": TEST_EMAIL})
+        frappe.local.response = {}
         res = self._confirm_as_customer(self._cart(1))
         self.assertFalse(res.get("ok"))
+        self.assertEqual(frappe.local.response.get("http_status_code"), 422)
         self.assertEqual(frappe.db.count("Sales Order", {"customer": self.customer}), so_before)
         self.assertEqual(frappe.db.count("Notification Log", {"for_user": TEST_EMAIL}), ntf_before)
         self.assertEqual(self._new_min_order_errors(), [])
@@ -364,9 +370,8 @@ class LiveConfirmCase(MinOrderDBCase):
             self._set_limit(self.group, 1)
             frappe.db.set_single_value("Stock Settings", flag, 1)
             frappe.db.commit()
-            res = self._confirm_as_customer(self._cart(1))
-            self.assertFalse(res.get("ok"))
-            self.assertEqual(res.get("error_code"), "MIN_ORDER_CALC_FAILED")
+            with self.assertRaises(biozone_api.BiozoneConfirmInternalError):
+                self._confirm_as_customer(self._cart(1))
             self.assertEqual(
                 frappe.db.count("Sales Order", {"customer": self.customer}), so_before
             )
@@ -395,16 +400,20 @@ class LiveConfirmCase(MinOrderDBCase):
         self.assertEqual(meta.get("min_limit"), 4321.0)
         self.assertTrue(meta.get("min_applies"))
 
-    def test_r_confirm_core_rejects_unchanged(self):
-        """R-confirm-core: guest + empty-cart guards behave exactly as before."""
+    def test_r_confirm_core_rejects(self):
+        """R-confirm-core: guest يبقى PermissionError، والسلة الفارغة 422."""
         frappe.set_user("Guest")
         try:
             with self.assertRaises(frappe.PermissionError):
                 biozone_api.biozone_confirm_order(self._cart(1))
         finally:
             frappe.set_user(self._prev_user)
-        with self.assertRaises(frappe.ValidationError):
-            biozone_api.biozone_confirm_order([])
+        frappe.local.response = {}
+        response = biozone_api.biozone_confirm_order([])
+        self.assertEqual(frappe.local.response.get("http_status_code"), 422)
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["error_code"], "CART_EMPTY")
+        self.assertTrue(response["request_id"])
 
 
 class TestDisplayUntouched(MinOrderDBCase):

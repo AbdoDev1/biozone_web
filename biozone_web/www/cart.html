@@ -317,6 +317,7 @@
     // Default user-facing message; replaced only with curated text below.
     // Raw network / framework text must never reach the page.
     let failMessage = 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
+    let failRequestId = '';
     try {
       const res = await fetch('/api/method/biozone_web.api.biozone_confirm_order', {
         method: 'POST',
@@ -328,15 +329,11 @@
       });
       let data = {};
       try { data = await res.json(); } catch (e) { data = {}; }
-      // الرفض التجاري المنسق (مثال حد الطلب الأدنى): 200 + ok:false —
-      // يُعرض النص المنسق فقط ويُعاد تفعيل الزر (بلا تحويل).
-      if (res.ok && data && data.message && data.message.ok === false) {
-        if (data.message && typeof data.message.error === 'string' && data.message.error) {
-          failMessage = data.message.error;
-        }
-        throw new Error('confirm-order rejected: ' + ((data.message && data.message.error_code) || 'business'));
-      }
+      failRequestId = (data && data.message && data.message.request_id)
+        || (data && data.request_id) || '';
       if (!res.ok) {
+        // الرفض التجاري المتوقع يصل 422 + {ok:false, error, error_code}
+        // داخل data.message؛ يُعرض النص المنسق فقط ويُعاد تفعيل الزر.
         // Never render server internals (exception / traceback / framework
         // messages). Curated API string only; otherwise local messages
         // chosen by status, never by parsing error text.
@@ -366,7 +363,9 @@
       } catch (e) {}
       window.location.href = (data.message && data.message.redirect) || '/biozone-home';
     } catch (err) {
-      errorEl.textContent = failMessage;
+      errorEl.textContent = failRequestId
+        ? failMessage + ' (مرجع الطلب: ' + failRequestId + ')'
+        : failMessage;
       errorEl.classList.remove('hidden');
       confirmBtn.disabled = false;
     }

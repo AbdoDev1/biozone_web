@@ -1,17 +1,36 @@
-import uuid
-
 import frappe
 from frappe import _
 
-from biozone_web.services.rate_limit import rate_limited
+from biozone_web.request_id import get_request_id
 from biozone_web.services.login_lock import (
 	acquire_login_lock,
 	login_busy_response,
 	release_login_lock,
 )
-
+from biozone_web.services.rate_limit import rate_limited
 
 STORE_LOGIN_FAILED_MESSAGE = "هذا الحساب غير مصرح له بالدخول إلى المتجر"
+
+
+class BiozoneConfirmInternalError(Exception):
+	http_status_code = 500
+
+
+def _api_fail(error_code: str, message: str, *, item_code=None, extra=None):
+	"""فشل تحقق عقد موحّد: 422 + request_id بعد rollback صريح."""
+	frappe.db.rollback()
+	frappe.local.response["http_status_code"] = 422
+	payload = {
+		"ok": False,
+		"error": message,
+		"error_code": error_code,
+	}
+	if item_code:
+		payload["item_code"] = item_code
+	if extra:
+		payload.update(extra)
+	payload["request_id"] = get_request_id()
+	return payload
 
 
 def _fail_store_login():
@@ -345,7 +364,7 @@ def biozone_confirm_order(items):
 		items = frappe.parse_json(items)
 
 	if not items:
-		frappe.throw(_("السلة فارغة"))
+		return _api_fail("CART_EMPTY", _("السلة فارغة"))
 
 	from biozone_web.utils import (
 		find_customer_for_current_user,
@@ -362,7 +381,7 @@ def biozone_confirm_order(items):
 		uom = (it.get("uom") or "").strip()
 
 		if not item_code or qty <= 0:
-			frappe.throw(_("بيانات صنف غير صحيحة في السلة"))
+			return _api_fail("ITEM_DATA_INVALID", _("بيانات صنف غير صحيحة في السلة"))
 
 		item = frappe.db.get_value(
 			"Item",
@@ -372,8 +391,10 @@ def biozone_confirm_order(items):
 		)
 
 		if not item or item.disabled:
-			frappe.throw(
-				_("أحد الأصناف في السلة لم يعد متاحًا، يرجى تحديث السلة")
+			return _api_fail(
+				"ITEM_UNAVAILABLE",
+				_("أحد الأصناف في السلة لم يعد متاحًا، يرجى تحديث السلة"),
+				item_code=item_code,
 			)
 
 		so_items.append(
@@ -397,21 +418,21 @@ def biozone_confirm_order(items):
 	frappe.flags.ignore_permissions = True
 
 	try:
-		# D2: الأهلية بلا علم — الرفض التجاري يُرجع 200 + ok:false بنص
-		# منسق لكل حالة (نمط الحد الأدنى) فيعرضه المتجر حرفيًا، لا
+		# D2: الأهلية بلا علم — الرفض التجاري المتوقع يُرجع 422 + ok:false
+		# بنص منسق لكل حالة (نمط الحد الأدنى) فيعرضه المتجر حرفيًا، لا
 		# استثناء 403 عامًا. find فقط (بلا إنشاء Customer) حتى لا تُنشأ
 		# صفوف يتيمة من محاولات مرفوضة.
 		customer = find_customer_for_current_user()
 		if not customer:
-			return {
-				"ok": False,
-				"error": _("لا يوجد حساب عميل مرتبط بهذا المستخدم — تواصل مع إدارة المتجر."),
-			}
+			return _api_fail(
+				"CUSTOMER_MISSING",
+				_("لا يوجد حساب عميل مرتبط بهذا المستخدم — تواصل مع إدارة المتجر."),
+			)
 		if not is_customer_order_eligible(customer):
-			return {
-				"ok": False,
-				"error": _("فئة حسابك غير مفعّلة حاليًا — تواصل مع إدارة المتجر."),
-			}
+			return _api_fail(
+				"CUSTOMER_GROUP_INELIGIBLE",
+				_("فئة حسابك غير مفعّلة حاليًا — تواصل مع إدارة المتجر."),
+			)
 		customer_group = get_customer_price_group(customer)
 
 		# عنوان الشحن (قرار Q3): يُضبط تلقائيًا من عنوان العميل المحفوظ —
@@ -444,10 +465,12 @@ def biozone_confirm_order(items):
 		for it in so_items:
 			d = display.get(it["item_code"]) or {}
 			if not d.get("ok") or not d.get("displayable", True):
-				frappe.throw(
+				return _api_fail(
+					"UOM_UNAVAILABLE",
 					_("الصنف {0} غير متاح بوحدة عرض صالحة حاليًا — حدّث السلة").format(
 						it["item_code"]
-					)
+					),
+					item_code=it["item_code"],
 				)
 			want_uom = (d.get("uom") or "").strip()
 			sent_uom = (it.get("uom") or "").strip()
@@ -456,10 +479,12 @@ def biozone_confirm_order(items):
 			if sent_uom and sent_uom != want_uom:
 				sent_factor = resolve_item_uom_factor(it["item_code"], sent_uom)
 				if sent_factor is None:
-					frappe.throw(
+					return _api_fail(
+						"UOM_CHANGED",
 						_("الوحدة المرسلة للصنف {0} لا تطابق وحدة العرض لفئتك — حدّث السلة").format(
 							it["item_code"]
-						)
+						),
+						item_code=it["item_code"],
 					)
 				line_uom = sent_uom
 				line_factor = sent_factor
@@ -489,11 +514,13 @@ def biozone_confirm_order(items):
 		)
 
 		def _min_order_unavailable():
-			return {
-				"ok": False,
-				"error": _("تعذر حساب إجمالي الطلب، يرجى المحاولة مرة أخرى"),
-				"error_code": "MIN_ORDER_CALC_FAILED",
-			}
+			# عطل داخلي غير متوقع (قراءة إعداد/بوابة تسعير/حساب) — 500
+			# عام عبر معالج Frappe، لا رفض تجاري 422. الرسالة التفصيلية
+			# تبقى في Error Log فقط.
+			frappe.throw(
+				_("تعذر حساب إجمالي الطلب، يرجى المحاولة مرة أخرى"),
+				BiozoneConfirmInternalError,
+			)
 
 		try:
 			_min_limit_value = get_group_min_order_amount(customer_group)
@@ -601,9 +628,9 @@ def biozone_confirm_order(items):
 
 			if _checked_net < _q_limit:
 				_shortfall = _q_limit - _checked_net
-				return {
-					"ok": False,
-					"error": _(
+				return _api_fail(
+					"MIN_ORDER_BELOW_MINIMUM",
+					_(
 						"الحد الأدنى للطلب لقيمة المنتجات هو {0} ج.م — "
 						"صافي طلبك الحالي {1} ج.م. أضف أصنافًا بقيمة {2} ج.م لإتمام الطلب."
 					).format(
@@ -611,12 +638,13 @@ def biozone_confirm_order(items):
 						f"{float(_checked_net):,.2f}",
 						f"{float(_shortfall):,.2f}",
 					),
-					"error_code": "MIN_ORDER_BELOW_MINIMUM",
-					"customer_group": customer_group,
-					"min_limit": float(_q_limit),
-					"net_total": float(_checked_net),
-					"shortfall": float(_shortfall),
-				}
+					extra={
+						"customer_group": customer_group,
+						"min_limit": float(_q_limit),
+						"net_total": float(_checked_net),
+						"shortfall": float(_shortfall),
+					},
+				)
 
 		# الملكية: ordering_user هو الجلسة الحقيقية قبل أي انتحال.
 		# نافذة الانتحال أدناه تضبط owner مؤقتًا على Administrator،
@@ -761,7 +789,10 @@ def biozone_confirm_order(items):
 							"Failed to delete Sales Order after owner mismatch",
 						)
 
-					frappe.throw(_("تعذر تأكيد الطلب بشكل آمن، يرجى المحاولة مرة أخرى"))
+					frappe.throw(
+						_("تعذر تأكيد الطلب بشكل آمن، يرجى المحاولة مرة أخرى"),
+						BiozoneConfirmInternalError,
+					)
 
 				# لا commit يدوي هنا: النجاح يُترك لـ Frappe يثبّته
 				# تلقائيًا في نهاية الـ request. الـ commit الوحيد
@@ -780,7 +811,10 @@ def biozone_confirm_order(items):
 				time.sleep(0.1 * (attempt + 1))
 
 		if so is None:
-			frappe.throw(_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"))
+			frappe.throw(
+				_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"),
+				BiozoneConfirmInternalError,
+			)
 
 		# Phase 1 (ND16/X1): staff bell — last write inside the
 		# transaction, outside the retry loop and the Administrator
@@ -1341,21 +1375,8 @@ def staff_disable_item(item_code: str):
 
 
 def _pilot_stock_fail(error_code: str, message: str):
-	"""فشل منظم لمسار المخزون (Pilot عقد الأخطاء — الحالات الخمس فقط).
-
-	يضبط 422 (تحقق أعمال: لا 417 الخاصة بشرط Expect في HTTP، ولا 200
-	التي تخفي التمييز بين التحقق والصلاحيات وفشل الخادم) ويُرجع جسمًا
-	نظيفًا {ok, error, error_code, request_id}. على مسار الإرجاع الطبيعي
-	لا يحقن الإطار أي exception/_server_messages/exc_type (مثبت حيًا
-	بنفس الآلية في _fail_staff_login). request_id فريد لكل استدعاء.
-	"""
-	frappe.local.response["http_status_code"] = 422
-	return {
-		"ok": False,
-		"error": message,
-		"error_code": error_code,
-		"request_id": uuid.uuid4().hex,
-	}
+	"""فشل منظم لمسار المخزون — نفس عقد السلة: 422 + request_id."""
+	return _api_fail(error_code, message)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -2124,22 +2145,8 @@ def staff_get_order_prep(order_name: str):
 
 
 def _pilot_barcode_fail(error_code: str, message: str, extra: dict | None = None):
-	"""فشل منظم لمسار تأكيد الباركود (Pilot-2 عقد الأخطاء).
-
-	نفس عقد Pilot-1: ‏422 + {ok, error, error_code, request_id} بلا حقول
-	خام. request_id فريد لكل استدعاء. extra مفاتيح توافقية إضافية
-	(مثل out_of_order/item_code) تُحفَظ كما هي.
-	"""
-	frappe.local.response["http_status_code"] = 422
-	out = {
-		"ok": False,
-		"error": message,
-		"error_code": error_code,
-		"request_id": uuid.uuid4().hex,
-	}
-	if extra:
-		out.update(extra)
-	return out
+	"""فشل منظم لمسار الباركود — نفس عقد السلة مع حقول توافقية إضافية."""
+	return _api_fail(error_code, message, extra=extra)
 
 
 @frappe.whitelist(methods=["POST"])

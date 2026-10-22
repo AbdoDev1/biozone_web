@@ -260,14 +260,16 @@ notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
 # نهائية: app.biozone.pro وحده يعرض Desk). المسارات محددة بدقة (^/desk ،^/app) حتى
 # لا يمس أي /api أو أصول أو صفحات متجر — وتفاصيل الحارس في utils.
 before_request = [
+	"biozone_web.request_id.set_request_id",
+	"biozone_web.sentry_scrubber.ensure_sentry_scrubber",
 	"biozone_web.utils.set_host_aware_home_page",
 	"biozone_web.utils.guard_domain_routes",
 ]
-# after_request = ["biozone_web.utils.after_request"]
+after_request = ["biozone_web.request_id.finalize_response"]
 
 # Job Events
 # ----------
-# before_job = ["biozone_web.utils.before_job"]
+before_job = ["biozone_web.sentry_scrubber.ensure_sentry_scrubber"]
 # after_job = ["biozone_web.utils.after_job"]
 
 # User Data Protection
