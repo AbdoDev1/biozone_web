@@ -90,6 +90,9 @@ get_website_user_home_page = "biozone_web.utils.get_website_user_home_page"
 # DocType مولّد ولا Web Form مستخدمان هنا).
 website_route_rules = [
 	{"from_route": "/staff/customers/<customer_name>", "to_route": "staff/customer-detail"},
+	# تفاصيل سلة عميل: /staff/carts/<name> تُحسم إلى الصفحة الثابتة
+	# staff/cart-detail، والاسم المطابَق يصل في frappe.form_dict.
+	{"from_route": "/staff/carts/<cart_name>", "to_route": "staff/cart-detail"},
 	# تفاصيل طلب العميل: /account/orders/<name> تُحسم إلى الصفحة الثابتة
 	# account/order-detail، والاسم المطابَق يصل في frappe.form_dict.
 	{"from_route": "/account/orders/<order_name>", "to_route": "account/order-detail"},
@@ -200,23 +203,12 @@ notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"biozone_web.tasks.all"
-# 	],
-# 	"daily": [
-# 		"biozone_web.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"biozone_web.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"biozone_web.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"biozone_web.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"biozone_web.tasks.expire_carts",
+		"biozone_web.tasks.purge_retained_records",
+	],
+}
 
 # Testing
 # -------

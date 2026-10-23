@@ -6,7 +6,7 @@
    responsive shell instead of copy-pasting it.
 
     Each page's get_context() must set:
-    - active_page: "dashboard" | "items" | "stock" | "orders" | "pricing" | "customers"
+    - active_page: "dashboard" | "items" | "stock" | "orders" | "pricing" | "customers" | "carts"
    - user_full_name, today_display (dashboard.py already sets these
      via get_header_context() + its own today_display line — other
      staff pages should do the same) #}
@@ -94,6 +94,10 @@ try {
 <span class="material-symbols-outlined text-[22px]">group</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">العملاء</span>
 <span aria-live="polite" id="sb-customers-badge" class="absolute top-1 left-1 min-w-5 h-5 px-1 items-center justify-center rounded-full bg-alert-red text-white text-[11px] font-bold leading-5 text-center {% if sb_unreviewed|default(0) %}flex{% else %}hidden{% endif %}">{{ sb_unreviewed|default(0) if (sb_unreviewed|default(0)) <= 99 else '99+' }}</span>
+</a>
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'carts' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/carts" title="سلال العملاء">
+<span class="material-symbols-outlined text-[22px]">shopping_cart</span>
+<span class="text-sm lg:max-xl:hidden sidebar-label">سلال العملاء</span>
 </a>
 </nav>
 </div>

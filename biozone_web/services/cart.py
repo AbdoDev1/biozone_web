@@ -201,13 +201,46 @@ def get_active_cart(user=None, *, for_update=False):
         )
         if not rows:
             return None
-        return frappe.get_doc("BZ Cart", rows[0].name)
-    name = frappe.db.get_value(
-        "BZ Cart",
-        {"user": user, "status": STATUS_ACTIVE, "active_key": user},
-        "name",
-    )
-    return frappe.get_doc("BZ Cart", name) if name else None
+        name = rows[0].name
+    else:
+        name = frappe.db.get_value(
+            "BZ Cart",
+            {"user": user, "status": STATUS_ACTIVE, "active_key": user},
+            "name",
+        )
+    if not name:
+        return None
+    cart = frappe.get_doc("BZ Cart", name)
+    if cart_is_expired(cart):
+        expire_cart(cart)
+        return None
+    return cart
+
+
+def cart_is_expired(cart, now=None):
+    """السلة المنتهية لا تُعاد حتى لو تأخر عامل الجدولة اليومي."""
+    if not cart or cart.status != STATUS_ACTIVE or not cart.expires_on:
+        return False
+    now = now or _now()
+    try:
+        return frappe.utils.get_datetime(cart.expires_on) <= now
+    except Exception:
+        return False
+
+
+def expire_cart(cart):
+    """إنهاء السلة مرة واحدة فقط، مع تفريغ active_key ورفع الإصدار."""
+    if not cart:
+        return False
+    if isinstance(cart, str):
+        cart = frappe.get_doc("BZ Cart", cart)
+    if cart.status != STATUS_ACTIVE:
+        return False
+    cart.status = STATUS_EXPIRED
+    cart.active_key = None
+    cart.version = int(cart.version or 0) + 1
+    cart.save(ignore_permissions=True)
+    return True
 
 
 def _item_meta(codes):

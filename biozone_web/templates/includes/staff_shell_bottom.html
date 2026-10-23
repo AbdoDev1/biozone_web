@@ -19,6 +19,10 @@
 <span class="material-symbols-outlined text-[20px]">receipt_long</span>
 <span class="text-[11px] {% if active_page == 'orders' %}font-bold{% else %}font-medium{% endif %}">الطلبات</span>
 </a>
+<a class="flex flex-col items-center gap-1 py-1 px-3 {% if active_page == 'carts' %}text-primary{% else %}text-navy-text/50 hover:text-primary{% endif %}" href="/staff/carts">
+<span class="material-symbols-outlined text-[20px]">shopping_cart</span>
+<span class="text-[11px] {% if active_page == 'carts' %}font-bold{% else %}font-medium{% endif %}">السلال</span>
+</a>
 </nav>
 <script>
     // Sidebar Drawer Toggle for Mobile and Tablet (unchanged by desktop collapse below)

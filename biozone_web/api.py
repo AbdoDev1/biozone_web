@@ -3286,3 +3286,45 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 		"print_time": frappe.utils.now_datetime().strftime("%H:%M - %d/%m/%Y"),
 		"company": si.company,
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_cart_detail(name: str):
+	from biozone_web.services import cart_staff
+
+	return {"ok": True, **cart_staff.get_cart_detail(name)}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_cart_recheck(name: str):
+	from biozone_web.services import cart_staff
+
+	return {"ok": True, **cart_staff.recheck_cart(name)}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_cart_copy(name: str, include_customer=0, include_prices=0):
+	from biozone_web.services import cart_staff
+
+	return {
+		"ok": True,
+		**cart_staff.copy_cart(
+			name,
+			include_customer=bool(frappe.utils.cint(include_customer)),
+			include_prices=bool(frappe.utils.cint(include_prices)),
+		),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_cart_csv(name: str, include_customer=0, include_prices=0):
+	from biozone_web.services import cart_staff
+
+	return {
+		"ok": True,
+		**cart_staff.csv_cart(
+			name,
+			include_customer=bool(frappe.utils.cint(include_customer)),
+			include_prices=bool(frappe.utils.cint(include_prices)),
+		),
+	}
