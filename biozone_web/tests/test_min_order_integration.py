@@ -19,6 +19,7 @@ plus a site database. Conventions:
 """
 
 import unittest
+import uuid
 from unittest.mock import patch
 
 import frappe
@@ -193,6 +194,8 @@ class LiveConfirmCase(MinOrderDBCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        if not frappe.db.table_exists("BZ Cart"):
+            raise unittest.SkipTest("BZ Cart tables absent — run migrate first")
         from biozone_web.units import resolve_items_display
         from biozone_web.utils import (
             create_customer_for_user,
@@ -288,9 +291,27 @@ class LiveConfirmCase(MinOrderDBCase):
         super().tearDown()
 
     def _confirm_as_customer(self, items):
+        from biozone_web.services.cart import add_item, clear_cart, get_cart
+
         frappe.set_user(TEST_EMAIL)
         try:
-            return biozone_api.biozone_confirm_order(items)
+            state = get_cart()
+            if state["cart"]["items"]:
+                state = clear_cart(cart_version=state["cart"]["version"])
+            version = state["cart"]["version"]
+            for it in items:
+                state = add_item(
+                    it["item_code"],
+                    it["quantity"],
+                    uom=it.get("uom"),
+                    cart_version=version,
+                )
+                version = state["cart"]["version"]
+            return biozone_api.biozone_confirm_order(
+                checkout_token=uuid.uuid4().hex,
+                cart_version=state["cart"]["version"],
+                quote_fingerprint=state["quote_fingerprint"],
+            )
         finally:
             frappe.set_user(self._prev_user)
 
@@ -405,7 +426,7 @@ class LiveConfirmCase(MinOrderDBCase):
         frappe.set_user("Guest")
         try:
             with self.assertRaises(frappe.PermissionError):
-                biozone_api.biozone_confirm_order(self._cart(1))
+                biozone_api.biozone_confirm_order()
         finally:
             frappe.set_user(self._prev_user)
         frappe.local.response = {}

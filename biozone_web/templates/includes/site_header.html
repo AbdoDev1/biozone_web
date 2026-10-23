@@ -105,53 +105,16 @@
   </div>
 </form>
 {% endif %}
+<script src="/assets/biozone_web/js/cart_store.js"></script>
 <script>
-  // مفاتيح السلة المحلية (قرار السلة المحلية — المتصفح الحالي وملفه فقط):
-  // الزائر على المفتاح المشترك القديم، وكل حساب على مفتاح مستقل ببريده.
-  // بلا سلة خادم وبلا عبور أجهزة؛ الأسعار والتحقق سيرفر-سايد دائمًا.
   window.BZ_STORE_USER = {{ store_user|default('Guest')|tojson }};
+  window.BZ_CSRF_TOKEN = {{ csrf_token|default('', true)|tojson }};
   var BZ_GUEST_KEY = 'biozone_cart_items';
   function bzAccountKey(user) { return 'biozone_cart_items:' + String(user || '').trim().toLowerCase(); }
   window.BZ_CART_KEY = (window.BZ_STORE_USER && window.BZ_STORE_USER !== 'Guest')
     ? bzAccountKey(window.BZ_STORE_USER) : BZ_GUEST_KEY;
-  // دمج سلة الزائر في سلة الحساب مرة واحدة عند أول تحميل بعد الدخول
-  // (يغطي الدخول من تبويب آخر أيضًا): جمع كميات السطر المتطابق
-  // (الصنف + الوحدة). حد المخزون يفرضه الخادم عند إعادة التسعير
-  // والتأكيد، لا لحظة الدمج.
-  window.BZ_CART_MERGED = false;
-  (function bzMergeGuestOnLoad() {
-    try {
-      if (!window.BZ_STORE_USER || window.BZ_STORE_USER === 'Guest') return;
-      if (window.BZ_CART_KEY === BZ_GUEST_KEY) return;
-      var guest = JSON.parse(localStorage.getItem(BZ_GUEST_KEY)) || [];
-      if (!guest.length) return;
-      var acc = JSON.parse(localStorage.getItem(window.BZ_CART_KEY)) || [];
-      guest.forEach(function (g) {
-        var ex = acc.find(function (it) { return it.item_code === g.item_code && (it.uom || '') === (g.uom || ''); });
-        if (ex) { ex.quantity = (ex.quantity || 0) + (g.quantity || 0); }
-        else { acc.push(g); }
-      });
-      localStorage.setItem(window.BZ_CART_KEY, JSON.stringify(acc));
-      localStorage.removeItem(BZ_GUEST_KEY);
-      window.BZ_CART_MERGED = true;
-    } catch (e) {}
-  })();
-  // Keeps the header cart badge in sync with the client-side cart
-  // (see /cart's own script for the full read/write logic and the
-  // localStorage key this depends on).
-  // البند 1: تحديث فوري + مستمع storage للمزامنة بين التبويبات
-  // (تصفير السلة بعد طلب ناجح يلتقط بلا reload).
-  function syncHeaderCartBadge() {
-    try {
-      var items = JSON.parse(localStorage.getItem(window.BZ_CART_KEY || BZ_GUEST_KEY)) || [];
-      var count = items.reduce(function (sum, it) { return sum + (it.quantity || 0); }, 0);
-      var badge = document.getElementById('cart-count-badge');
-      if (badge) badge.textContent = count;
-    } catch (e) {}
+  if (window.BiozoneCart) {
+    BiozoneCart.configure({ user: window.BZ_STORE_USER });
+    BiozoneCart.init({ autoMergeLocalAccount: true });
   }
-  syncHeaderCartBadge();
-  window.addEventListener('storage', function (e) {
-    if (!e) return;
-    if (e.key === window.BZ_CART_KEY || e.key === BZ_GUEST_KEY || e.key === 'biozone_cart_logout_ts') syncHeaderCartBadge();
-  });
 </script>

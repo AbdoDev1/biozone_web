@@ -398,6 +398,7 @@ def get_header_context():
 		"is_logged_in": is_logged_in,
 		"user_full_name": user_full_name,
 		"store_user": user if is_logged_in else "Guest",
+		"csrf_token": get_csrf_token_safe(),
 		"notif_unread_count": notif_unread_count,
 		"sb_new_orders": sb_new_orders,
 		"sb_unreviewed": sb_unreviewed,

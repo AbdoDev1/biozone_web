@@ -24,13 +24,27 @@
     </button>
   </div>
 
+  <div class="hidden mb-lg rounded-xl border border-primary/20 bg-primary-container/5 p-4 sm:p-5" id="cart-merge-panel">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <h2 class="text-base font-extrabold text-on-surface" id="cart-merge-title">لديك سلة سابقة</h2>
+        <p class="mt-1 text-sm leading-6 text-on-surface-variant" id="cart-merge-text"></p>
+        <ul class="mt-2 hidden list-disc space-y-1 pr-5 text-sm text-error" id="cart-merge-conflicts"></ul>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <button class="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-colors hover:bg-primary-container disabled:opacity-50" id="cart-merge-apply" type="button">نقل السلة</button>
+        <button class="rounded-full border border-outline-variant px-4 py-2.5 text-sm font-bold text-on-surface-variant transition-colors hover:bg-surface-container" id="cart-merge-dismiss" type="button">لاحقًا</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Empty state -->
   <div class="hidden flex-col items-center justify-center rounded-xl border border-outline-variant/50 bg-surface-container-lowest px-6 py-20 text-center shadow-sm" id="empty-cart">
     <div class="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container">
       <span class="material-symbols-outlined text-5xl text-primary">remove_shopping_cart</span>
     </div>
-    <h2 class="mt-6 text-xl font-extrabold text-on-surface">سلتك فارغة حاليًا</h2>
-    <p class="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant">
+    <h2 class="mt-6 text-xl font-extrabold text-on-surface" id="empty-cart-title">سلتك فارغة حاليًا</h2>
+    <p class="mt-2 max-w-sm text-sm leading-6 text-on-surface-variant" id="empty-cart-text">
       لم تقم بإضافة أي منتجات إلى سلة المشتريات بعد. تصفّح مجموعتنا من المستلزمات والأجهزة الطبية لبدء طلبك.
     </p>
     <a class="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container" href="/catalog">
@@ -59,7 +73,7 @@
         </div>
         <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled>
           <span class="material-symbols-outlined text-xl">check_circle</span>
-          تأكيد الطلب
+          <span id="confirm-order-label">تأكيد الطلب</span>
         </button>
         {% if free_shipping_threshold %}
         <p class="mt-3 flex items-start justify-center gap-2 text-center text-sm sm:text-base font-semibold leading-relaxed text-on-surface-variant">
@@ -103,6 +117,7 @@
           <span class="inline-flex items-center rounded-full bg-primary-container/10 px-2.5 py-0.5 text-xs font-medium text-primary-container cart-item-category"></span>
           <h3 class="mt-2 text-sm font-bold leading-6 text-on-surface sm:text-base cart-item-name"></h3>
           <p class="mt-1 text-sm text-on-surface-variant">سعر الوحدة: <span class="cart-item-unit-price"></span></p>
+          <p class="mt-1 hidden text-xs font-semibold text-error cart-item-issue"></p>
         </div>
         <button aria-label="إزالة" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error cart-item-remove" type="button">
           <span class="material-symbols-outlined text-xl">delete</span>
@@ -129,43 +144,118 @@
 
 <script>
 (function () {
-  const CSRF_TOKEN = {{ csrf_token|tojson }};
-  // مفتاح السلة النشط يحسمه الهيدر المشترك: مفتاح الحساب للداخل والمشترك للزائر.
-  const CART_KEY = window.BZ_CART_KEY || 'biozone_cart_items';
-  // Helper hint only: whether the last reprice saw a guest session.
-  // Never the sole basis for messaging; HTTP status decides.
-  let cartIsGuest = false;
-  // Cart shape: [{ item_code, item_name, item_group, price, image, quantity }]
+  var store = window.BiozoneCart;
+  if (!store) return;
+  var busy = false;
+  var shown = { autoMerged: false, merged: false, mergeError: '' };
 
-  function loadCart() {
-    try {
-      return JSON.parse(localStorage.getItem(CART_KEY)) || [];
-    } catch (e) {
-      return [];
+  function byId(id) { return document.getElementById(id); }
+
+  function formatPrice(value) {
+    var amount = Number(value) || 0;
+    return amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  }
+
+  function formatError(err) {
+    var message = (err && err.message) || 'تعذر تنفيذ الطلب، يرجى المحاولة مرة أخرى';
+    if (err && err.requestId) message += ' (مرجع الطلب: ' + err.requestId + ')';
+    return message;
+  }
+
+  function showConfirmError(message) {
+    var el = byId('confirm-order-error');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function clearConfirmError() {
+    var el = byId('confirm-order-error');
+    if (el) el.classList.add('hidden');
+  }
+
+  function showNotice(message) {
+    var el = byId('cart-reprice-notice');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+
+  function lineSubtotal(item) {
+    if (item.line_total !== null && item.line_total !== undefined) return Number(item.line_total) || 0;
+    return (Number(item.price) || 0) * (Number(item.quantity) || 0);
+  }
+
+  function renderMerge(preview, notices) {
+    notices = notices || {};
+    var panel = byId('cart-merge-panel');
+    var applyBtn = byId('cart-merge-apply');
+    var conflictsEl = byId('cart-merge-conflicts');
+    if (!panel) return;
+    if (!preview || preview.already_applied || !preview.source) {
+      panel.classList.add('hidden');
+      if (conflictsEl) {
+        conflictsEl.innerHTML = '';
+        conflictsEl.classList.add('hidden');
+      }
+    } else {
+      panel.classList.remove('hidden');
+      var source = preview.source;
+      byId('cart-merge-title').textContent = source.source_kind === 'Guest'
+        ? 'لديك سلة من قبل تسجيل الدخول'
+        : 'لديك سلة محلية على هذا المتصفح';
+      var sourceCount = (source.items || []).length;
+      var mergedCount = (preview.merged || []).length;
+      byId('cart-merge-text').textContent =
+        'سلة المصدر تحتوي ' + sourceCount + ' صنفًا، وستصبح سلة الحساب ' + mergedCount + ' صنفًا بعد النقل.';
+      var conflicts = preview.conflicts || [];
+      if (conflictsEl) {
+        conflictsEl.innerHTML = '';
+        if (conflicts.length) {
+          conflicts.slice(0, 6).forEach(function (conflict) {
+            var li = document.createElement('li');
+            li.textContent = (conflict.item_code ? conflict.item_code + ': ' : '')
+              + (conflict.message || conflict.code || 'تعارض');
+            conflictsEl.appendChild(li);
+          });
+          conflictsEl.classList.remove('hidden');
+        } else {
+          conflictsEl.classList.add('hidden');
+        }
+      }
+      if (applyBtn) {
+        applyBtn.disabled = busy || !preview.can_apply || !preview.merge_token;
+        applyBtn.classList.toggle('hidden', !preview.can_apply);
+      }
+    }
+
+    if (notices.autoMerged && !shown.autoMerged) {
+      showNotice('تم نقل سلة هذا المتصفح تلقائيًا إلى سلة حسابك.');
+      shown.autoMerged = true;
+    }
+    if (notices.mergeApplied && !shown.merged) {
+      showNotice('تم نقل السلة إلى سلة حسابك.');
+      shown.merged = true;
+    }
+    if (notices.mergeError && notices.mergeError !== shown.mergeError) {
+      showConfirmError(notices.mergeError);
+      shown.mergeError = notices.mergeError;
     }
   }
 
-  function saveCart(items) {
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-    var badge = document.getElementById('cart-count-badge');
-    if (badge) badge.textContent = items.reduce(function (sum, it) { return sum + it.quantity; }, 0);
-  }
+  function render(state) {
+    state = state || store.state || {};
+    var items = state.items || [];
+    var emptyEl = byId('empty-cart');
+    var contentEl = byId('cart-content');
+    var listEl = byId('cart-items-list');
+    var badgeEl = byId('cart-item-count-badge');
+    var clearBtn = byId('clear-cart-btn');
+    var confirmBtn = byId('confirm-order-btn');
+    var confirmLabel = byId('confirm-order-label');
+    var hasPreview = !!(store.preview && store.preview.source);
 
-  function formatPrice(value) {
-    return value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
-  }
-
-  function render() {
-    const items = loadCart();
-    const emptyEl = document.getElementById('empty-cart');
-    const contentEl = document.getElementById('cart-content');
-    const listEl = document.getElementById('cart-items-list');
-    const badgeEl = document.getElementById('cart-item-count-badge');
-    const clearBtn = document.getElementById('clear-cart-btn');
-
-    const totalUnits = items.reduce((sum, it) => sum + it.quantity, 0);
-
-    if (items.length === 0) {
+    if (!items.length) {
       emptyEl.classList.remove('hidden');
       emptyEl.classList.add('flex');
       contentEl.classList.add('hidden');
@@ -173,6 +263,16 @@
       badgeEl.classList.add('hidden');
       clearBtn.classList.add('hidden');
       clearBtn.classList.remove('flex');
+      byId('empty-cart-title').textContent = hasPreview
+        ? 'سلة الحساب فارغة حاليًا'
+        : (state.mode === 'server' ? 'سلة الحساب فارغة حاليًا' : 'سلتك فارغة حاليًا');
+      byId('empty-cart-text').textContent = hasPreview
+        ? 'لديك سلة سابقة يمكن نقلها إلى حسابك من الشريط بالأعلى.'
+        : 'لم تقم بإضافة أي منتجات إلى سلة المشتريات بعد. تصفّح مجموعتنا من المستلزمات والأجهزة الطبية لبدء طلبك.';
+      if (confirmBtn) confirmBtn.disabled = true;
+      if (confirmLabel) confirmLabel.textContent = 'تأكيد الطلب';
+      if (state.error) showConfirmError(state.error);
+      renderMerge(store.preview, store.notices);
       return;
     }
 
@@ -185,228 +285,203 @@
     clearBtn.classList.remove('hidden');
     clearBtn.classList.add('flex');
 
-    const template = document.getElementById('cart-item-template');
+    var template = byId('cart-item-template');
     listEl.innerHTML = '';
-    let subtotal = 0;
+    var subtotal = 0;
 
-    items.forEach((item) => {
-      const lineSubtotal = item.price * item.quantity;
-      subtotal += lineSubtotal;
-
-      const node = template.content.cloneNode(true);
-      const img = node.querySelector('.cart-item-image');
-      img.onerror = function () { this.onerror = null; this.src = '/assets/biozone_web/images/product-placeholder.svg'; };
+    items.forEach(function (item) {
+      subtotal += lineSubtotal(item);
+      var node = template.content.cloneNode(true);
+      var img = node.querySelector('.cart-item-image');
+      img.onerror = function () {
+        this.onerror = null;
+        this.src = '/assets/biozone_web/images/product-placeholder.svg';
+      };
       img.src = item.image || '/assets/biozone_web/images/product-placeholder.svg';
-      img.alt = item.item_name;
+      img.alt = item.item_name || '';
       node.querySelector('.cart-item-category').textContent = item.item_group || '';
-      node.querySelector('.cart-item-name').textContent = item.item_name;
-      node.querySelector('.cart-item-unit-price').textContent = formatPrice(item.price) + (item.uom ? ' / ' + item.uom : '');
-      node.querySelector('.cart-item-qty').textContent = item.quantity + (item.uom ? ' ' + item.uom : '');
-      node.querySelector('.cart-item-subtotal').textContent = formatPrice(lineSubtotal);
+      node.querySelector('.cart-item-name').textContent = item.item_name || item.item_code || '';
+      node.querySelector('.cart-item-unit-price').textContent = item.price === null || item.price === undefined
+        ? 'السعر غير متاح'
+        : formatPrice(item.price) + (item.uom ? ' / ' + item.uom : '');
+      node.querySelector('.cart-item-qty').textContent = (item.quantity || 0) + (item.uom ? ' ' + item.uom : '');
+      node.querySelector('.cart-item-subtotal').textContent = formatPrice(lineSubtotal(item));
 
-      const decBtn = node.querySelector('.cart-item-decrement');
-      decBtn.disabled = item.quantity <= 1;
-      decBtn.addEventListener('click', () => updateQty(item.item_code, item.quantity - 1));
-      node.querySelector('.cart-item-increment').addEventListener('click', () => updateQty(item.item_code, item.quantity + 1));
-      node.querySelector('.cart-item-remove').addEventListener('click', () => removeItem(item.item_code));
+      var issueEl = node.querySelector('.cart-item-issue');
+      if (item.available === false && item.issues && item.issues.length) {
+        issueEl.textContent = item.issues[0].message || 'الصنف غير متاح حاليًا';
+        issueEl.classList.remove('hidden');
+      } else if (item.price === null || item.price === undefined) {
+        issueEl.textContent = 'لا يوجد سعر متاح لهذا الصنف';
+        issueEl.classList.remove('hidden');
+      }
+
+      var decBtn = node.querySelector('.cart-item-decrement');
+      var incBtn = node.querySelector('.cart-item-increment');
+      decBtn.disabled = busy || item.quantity <= 1;
+      decBtn.addEventListener('click', function () { changeQty(item.item_code, item.quantity - 1); });
+      incBtn.addEventListener('click', function () { changeQty(item.item_code, item.quantity + 1); });
+      node.querySelector('.cart-item-remove').addEventListener('click', function () { removeItem(item.item_code); });
 
       listEl.appendChild(node);
     });
 
-    document.getElementById('summary-total-label').textContent = 'الإجمالي (' + totalUnits + ' عنصر)';
-    document.getElementById('summary-total').textContent = formatPrice(subtotal);
+    byId('summary-total-label').textContent = 'الإجمالي (' + (state.total_units || 0) + ' عنصر)';
+    byId('summary-total').textContent = formatPrice(state.net_total || subtotal);
+
+    var valid = state.quote ? state.quote.valid !== false : true;
+    var serverMode = state.mode === 'server';
+    if (confirmBtn) {
+      confirmBtn.disabled = busy || (serverMode ? !valid : !!state.error);
+    }
+    if (confirmLabel) {
+      if (state.mode !== 'server') {
+        confirmLabel.textContent = state.error ? 'السلة غير متاحة مؤقتًا' : 'سجّل الدخول للتأكيد';
+      } else if (!valid) {
+        confirmLabel.textContent = 'راجع الأصناف قبل التأكيد';
+      } else {
+        confirmLabel.textContent = 'تأكيد الطلب';
+      }
+    }
+    if (state.error) showConfirmError(state.error);
+    renderMerge(store.preview, store.notices);
   }
 
-  function updateQty(itemCode, newQty) {
-    let items = loadCart();
-    if (newQty < 1) return;
-    items = items.map((it) => it.item_code === itemCode ? { ...it, quantity: newQty } : it);
-    saveCart(items);
-    render();
+  async function changeQty(itemCode, qty) {
+    if (busy) return;
+    busy = true;
+    render(store.state);
+    try {
+      if (qty <= 0) await store.removeItem(itemCode);
+      else await store.setQty(itemCode, qty);
+    } catch (err) {
+      showConfirmError(formatError(err));
+    } finally {
+      busy = false;
+      render(store.state);
+    }
   }
 
-  function removeItem(itemCode) {
-    let items = loadCart().filter((it) => it.item_code !== itemCode);
-    saveCart(items);
-    render();
+  async function removeItem(itemCode) {
+    if (busy) return;
+    busy = true;
+    render(store.state);
+    try {
+      await store.removeItem(itemCode);
+    } catch (err) {
+      showConfirmError(formatError(err));
+    } finally {
+      busy = false;
+      render(store.state);
+    }
+  }
+
+  async function confirmOrder() {
+    if (busy) return;
+    busy = true;
+    clearConfirmError();
+    render(store.state);
+    try {
+      var result = await store.confirmOrder();
+      var redirect = result.redirect
+        || (result.sales_order ? '/order-confirmed?name=' + encodeURIComponent(result.sales_order) : '/biozone-home');
+      window.location.href = redirect;
+    } catch (err) {
+      if (err && err.code === 'LOGIN_REQUIRED') {
+        window.location.href = '/login';
+        return;
+      }
+      showConfirmError(formatError(err));
+      busy = false;
+      render(store.state);
+    }
+  }
+
+  async function applyMerge() {
+    if (busy || !store.preview) return;
+    busy = true;
+    clearConfirmError();
+    render(store.state);
+    try {
+      await store.transferApply(store.preview);
+      showNotice('تم نقل السلة إلى سلة حسابك.');
+    } catch (err) {
+      showConfirmError(formatError(err));
+    } finally {
+      busy = false;
+      render(store.state);
+    }
   }
 
   function openClearCart() {
-    const m = document.getElementById('clear-cart-modal');
-    m.classList.remove('hidden');
-    m.classList.add('flex');
+    var modal = byId('clear-cart-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
   }
 
   function closeClearCart() {
-    const m = document.getElementById('clear-cart-modal');
-    m.classList.add('hidden');
-    m.classList.remove('flex');
+    var modal = byId('clear-cart-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
   }
 
-  function confirmClearCart() {
-    // تفريغ محلي فقط (نفس مفتاح السلة) — بلا مساس بمسح الخروج أو التأكيد.
-    // idempotent: التكرار على سلة فارغة أثره صفر. التبويبات الأخرى تلتقط
-    // الحدث عبر مستمع storage القائم (render + الشارة + steppers).
-    saveCart([]);
-    render();
-    closeClearCart();
-  }
-
-  document.getElementById('clear-cart-btn').addEventListener('click', openClearCart);
-  document.getElementById('clear-cart-cancel').addEventListener('click', closeClearCart);
-  document.getElementById('clear-cart-confirm').addEventListener('click', confirmClearCart);
-
-  // البند 5: أسعار السلة تُعاد حسابها من السيرفر عند كل فتح للصفحة حسب
-  // فئة الطالب الحالية (زائر/غير مفعّل → الجمهور، مفعّل → فئته) — أسعار
-  // localStorage القديمة (من جلسة/فئة سابقة أو تعديل يدوي) لا تُعتمد أبدًا.
-  // الأصناف التي بلا سعر تُحذف من السلة مع تنبيه. أي فشل في النداء يُبقي
-  // الأسعار المحلية مؤقتًا بدل كسر الصفحة (التأكيد نفسه يعيد الحساب سيرفر-سايد).
-  async function repriceFromServer(items) {
-    const outcome = { items: items, removedCount: 0, meta: null, failed: false };
-    if (items.length === 0) return outcome;
-
-    const codes = [];
-    items.forEach((it) => { if (it.item_code && codes.indexOf(it.item_code) === -1) codes.push(it.item_code); });
-
+  async function confirmClearCart() {
+    if (busy) return;
+    busy = true;
     try {
-      const res = await fetch('/api/method/biozone_web.api.biozone_get_cart_prices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Frappe-CSRF-Token': CSRF_TOKEN,
-        },
-        body: JSON.stringify({ item_codes: codes })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.message || !data.message.prices) throw new Error('reprice failed');
-
-      outcome.meta = data.message;
-      const prices = data.message.prices;
-      const kept = [];
-      items.forEach((it) => {
-        const p = prices[it.item_code];
-        if (p && p.price !== null && p.price !== undefined) {
-          it.price = p.price;
-          // Phase-2: unit always refreshed from server (old lines may
-          // predate units or carry a stale group unit — never trusted).
-          if (p.display_uom) it.uom = p.display_uom;
-          // الصورة من الخادم دائمًا (المصغرة حصرًا — الأصل لا يظهر هنا).
-          if (p.thumbnail) it.image = p.thumbnail;
-          kept.push(it);
-        } else {
-          outcome.removedCount += 1;
-        }
-      });
-      outcome.items = kept;
-    } catch (e) {
-      outcome.failed = true;
-    }
-    return outcome;
-  }
-
-  document.getElementById('confirm-order-btn').addEventListener('click', async () => {
-    const items = loadCart();
-    const errorEl = document.getElementById('confirm-order-error');
-    errorEl.classList.add('hidden');
-    if (items.length === 0) return;
-    // منع النقر المزدوج: تعطيل الزر أثناء الطلب وإعادته عند أي فشل
-    // (الناجح يحوّل لصفحة أخرى فلا حاجة لإعادة التفعيل).
-    const confirmBtn = document.getElementById('confirm-order-btn');
-    confirmBtn.disabled = true;
-
-    // Default user-facing message; replaced only with curated text below.
-    // Raw network / framework text must never reach the page.
-    let failMessage = 'تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى';
-    let failRequestId = '';
-    try {
-      const res = await fetch('/api/method/biozone_web.api.biozone_confirm_order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Frappe-CSRF-Token': CSRF_TOKEN,
-        },
-        body: JSON.stringify({ items })
-      });
-      let data = {};
-      try { data = await res.json(); } catch (e) { data = {}; }
-      failRequestId = (data && data.message && data.message.request_id)
-        || (data && data.request_id) || '';
-      if (!res.ok) {
-        // الرفض التجاري المتوقع يصل 422 + {ok:false, error, error_code}
-        // داخل data.message؛ يُعرض النص المنسق فقط ويُعاد تفعيل الزر.
-        // Never render server internals (exception / traceback / framework
-        // messages). Curated API string only; otherwise local messages
-        // chosen by status, never by parsing error text.
-        const apiError = (data && data.message && typeof data.message.error === 'string')
-          ? data.message.error : '';
-        if (apiError) {
-          failMessage = apiError;
-        } else if (res.status === 403) {
-          // 403 alone does not prove Guest; is_guest is a helper hint only.
-          failMessage = cartIsGuest
-            ? 'سجّل الدخول أولًا لإتمام طلبك'
-            : 'انتهت الجلسة أو لا تملك صلاحية تنفيذ الطلب';
-        } else if (res.status === 400) {
-          // Narrow reading per live evidence (missing/invalid CSRF token);
-          // revisit if the API ever returns other 400 validation errors.
-          failMessage = 'انتهت الجلسة، حدّث الصفحة وحاول مجددًا';
-        }
-        throw new Error('confirm-order failed with status ' + res.status);
-      }
-      localStorage.removeItem(CART_KEY);
-      // البند 1: تحديث الشارة في نفس التبويب فورًا قبل التحويل —
-      // التبويبات الأخرى تلتقط الحدث عبر مستمع storage تلقائيًا
-      // (removeItem يُطلق storage في التبويبات الأخرى).
-      try {
-        var _b = document.getElementById('cart-count-badge');
-        if (_b) _b.textContent = '0';
-      } catch (e) {}
-      window.location.href = (data.message && data.message.redirect) || '/biozone-home';
+      await store.clear();
+      closeClearCart();
+      showNotice('تم إفراغ السلة.');
     } catch (err) {
-      errorEl.textContent = failRequestId
-        ? failMessage + ' (مرجع الطلب: ' + failRequestId + ')'
-        : failMessage;
-      errorEl.classList.remove('hidden');
-      confirmBtn.disabled = false;
-    }
-  });
-
-  render();
-  // إشعار دمج سلة الزائر (قرار السلة المحلية): الهيدر دمجها في مفتاح
-  // الحساب عند التحميل — نعرض التنبيه هنا إن لم تشغله إعادة التسعير.
-  // render() أعلاه قرأ المفتاح النشط بعد الدمج فالأرقام صحيحة.
-  if (window.BZ_CART_MERGED) {
-    var _mn = document.getElementById('cart-reprice-notice');
-    if (_mn && _mn.classList.contains('hidden')) {
-      _mn.textContent = 'دُمجت سلة تصفحك السابقة في سلة حسابك.';
-      _mn.classList.remove('hidden');
+      showConfirmError(formatError(err));
+    } finally {
+      busy = false;
+      render(store.state);
     }
   }
-  // البند 1: إذا تغيّرت السلة من تبويب آخر (كتالوج/سلة ثانية/تصفير بعد
-  // طلب)، أعد العرض فورًا بلا reload.
-  window.addEventListener('storage', function (e) {
-    if (e && e.key === CART_KEY) render();
+
+  byId('clear-cart-btn').addEventListener('click', openClearCart);
+  byId('clear-cart-cancel').addEventListener('click', closeClearCart);
+  byId('clear-cart-confirm').addEventListener('click', confirmClearCart);
+  byId('confirm-order-btn').addEventListener('click', confirmOrder);
+  byId('cart-merge-apply').addEventListener('click', applyMerge);
+  byId('cart-merge-dismiss').addEventListener('click', function () {
+    store.dismissPreview();
+    render(store.state);
   });
-  const repriceConfirmBtn = document.getElementById('confirm-order-btn');
-  repriceFromServer(loadCart()).then((outcome) => {
-    const noticeEl = document.getElementById('cart-reprice-notice');
-    if (outcome.failed) {
-      if (noticeEl) {
-        noticeEl.textContent = 'تعذر تحديث السلة تلقائيًا. إن استمر الخطأ، حدّث الصفحة.';
-        noticeEl.classList.remove('hidden');
-      }
-      if (repriceConfirmBtn) repriceConfirmBtn.disabled = false;
-      return;
-    }
-    cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
-    saveCart(outcome.items);
-    render();
-    if (outcome.removedCount > 0 && noticeEl) {
-      noticeEl.textContent = 'أُزيلت ' + outcome.removedCount + ' أصناف من السلة لعدم توفر سعرها حاليًا.';
-      noticeEl.classList.remove('hidden');
-    }
-    if (repriceConfirmBtn) repriceConfirmBtn.disabled = false;
+
+  window.addEventListener('biozone:cart-changed', function (event) {
+    var detail = event && event.detail ? event.detail : {};
+    render(detail.state || store.state);
   });
+
+  function renderAll(event) {
+    var detail = event && event.detail ? event.detail : {};
+    render(detail.state || store.state);
+    renderMerge(
+      detail.preview !== undefined ? detail.preview : store.preview,
+      detail.notices || store.notices
+    );
+  }
+
+  renderAll();
+
+  async function start() {
+    try {
+      await store.init({ autoMergeLocalAccount: true });
+      renderAll();
+      await store.maybePreviewTransfer();
+      renderAll();
+    } catch (err) {
+      showConfirmError(formatError(err));
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
 })();
 </script>
 

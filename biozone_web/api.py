@@ -33,6 +33,39 @@ def _api_fail(error_code: str, message: str, *, item_code=None, extra=None):
 	return payload
 
 
+def _api_conflict(error_code: str, message: str, *, item_code=None, extra=None):
+	"""تعارض سلة/تسعير متوقع: 409 + request_id بعد rollback صريح."""
+	frappe.db.rollback()
+	frappe.local.response["http_status_code"] = 409
+	payload = {
+		"ok": False,
+		"error": message,
+		"error_code": error_code,
+	}
+	if item_code:
+		payload["item_code"] = item_code
+	if extra:
+		payload.update(extra)
+	payload["request_id"] = get_request_id()
+	return payload
+
+
+def _cart_api_error(exc):
+	if getattr(exc, "status", 422) == 409:
+		return _api_conflict(
+			exc.error_code,
+			exc.message,
+			item_code=getattr(exc, "item_code", None),
+			extra=getattr(exc, "extra", None),
+		)
+	return _api_fail(
+		exc.error_code,
+		exc.message,
+		item_code=getattr(exc, "item_code", None),
+		extra=getattr(exc, "extra", None),
+	)
+
+
 def _fail_store_login():
 	"""رفض دخول المتجر — إرجاع نظيف بلا مغلّف استثناء (نفس نمط
 	 _fail_staff_login): الجسم {"message": النص الواضح} حصرًا مع 401.
@@ -308,8 +341,112 @@ def biozone_get_cart_prices(item_codes):
 	}
 
 
+@frappe.whitelist(methods=["GET", "POST"])
+def biozone_cart_get():
+	from biozone_web.services.cart import CartError, get_cart
+
+	try:
+		return get_cart()
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
 @frappe.whitelist(methods=["POST"])
-def biozone_confirm_order(items):
+def biozone_cart_add(item_code, qty=1, uom=None, cart_version=None):
+	from biozone_web.services.cart import CartError, add_item
+
+	try:
+		return add_item(
+			item_code,
+			qty=qty,
+			uom=uom,
+			cart_version=cart_version,
+		)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_cart_set_qty(item_code, qty, cart_version=None):
+	from biozone_web.services.cart import CartError, set_qty
+
+	try:
+		return set_qty(item_code, qty, cart_version=cart_version)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_cart_remove(item_code, cart_version=None):
+	from biozone_web.services.cart import CartError, remove_item
+
+	try:
+		return remove_item(item_code, cart_version=cart_version)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_cart_clear(cart_version=None):
+	from biozone_web.services.cart import CartError, clear_cart
+
+	try:
+		return clear_cart(cart_version=cart_version)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_cart_transfer_preview(source):
+	from biozone_web.services.cart import CartError, transfer_preview
+
+	try:
+		if isinstance(source, str):
+			source = frappe.parse_json(source)
+		if not isinstance(source, dict):
+			return _api_fail("ITEM_DATA_INVALID", _("بيانات السلة غير صحيحة"))
+		return transfer_preview(
+			source.get("source_uid"),
+			source.get("source_kind"),
+			source_key=source.get("source_key"),
+			items=source.get("items"),
+			target_version=source.get("target_version"),
+		)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_cart_transfer_apply(merge_token, source_fingerprint=None, cart_version=None):
+	from biozone_web.services.cart import CartError, transfer_apply
+
+	try:
+		return transfer_apply(
+			merge_token,
+			source_fingerprint=source_fingerprint,
+			cart_version=cart_version,
+		)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def biozone_checkout_status(checkout_token):
+	from biozone_web.services.cart import CartError, checkout_status
+
+	try:
+		return checkout_status(checkout_token)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+def biozone_confirm_order(
+	checkout_token=None,
+	cart_version=None,
+	quote_fingerprint=None,
+	items=None,
+):
 	"""ينشئ Sales Order من سلة المتجر للمستخدم الحالي.
 
 	الملكية: الطلب يُنشأ داخل نافذة انتحال Administrator مؤقتة
@@ -360,8 +497,45 @@ def biozone_confirm_order(items):
 			frappe.PermissionError,
 		)
 
-	if isinstance(items, str):
-		items = frappe.parse_json(items)
+	if not checkout_token and not items:
+		return _api_fail("CART_EMPTY", _("السلة فارغة"))
+
+	from biozone_web.services.cart import (
+		CartError,
+		checkout_context,
+		mark_checkout_success,
+	)
+
+	try:
+		checkout = checkout_context(
+			checkout_token,
+			cart_version=cart_version,
+			quote_fingerprint=quote_fingerprint,
+		)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+	if checkout.get("already_completed"):
+		receipt = checkout["receipt"]
+		response = frappe.parse_json(receipt.response_snapshot or "{}") or {}
+		response.setdefault("ok", True)
+		response.setdefault("sales_order", receipt.sales_order)
+		response.setdefault(
+			"redirect",
+			f"/order-confirmed?name={receipt.sales_order}",
+		)
+		return response
+
+	cart = checkout["cart"]
+	receipt = checkout["receipt"]
+	items = [
+		{
+			"item_code": line.item_code,
+			"quantity": line.qty,
+			"uom": line.uom,
+		}
+		for line in cart.items
+	]
 
 	if not items:
 		return _api_fail("CART_EMPTY", _("السلة فارغة"))
@@ -794,6 +968,17 @@ def biozone_confirm_order(items):
 						BiozoneConfirmInternalError,
 					)
 
+				_quoted_net = frappe.parse_json(receipt.quote_snapshot or "{}").get(
+					"net_total"
+				)
+				if _quoted_net is not None and quantize_2dp(
+					so.net_total
+				) != quantize_2dp(_quoted_net):
+					return _api_conflict(
+						"PRICE_CHANGED",
+						_("تغيّر سعر أو توفر أحد الأصناف — راجع السلة ثم أعد التأكيد"),
+					)
+
 				# لا commit يدوي هنا: النجاح يُترك لـ Frappe يثبّته
 				# تلقائيًا في نهاية الـ request. الـ commit الوحيد
 				# اليدوي في هذه الدالة هو ثبات Customer فوق (مقصود
@@ -806,6 +991,29 @@ def biozone_confirm_order(items):
 				if attempt == max_attempts - 1:
 					raise
 
+				try:
+					refreshed = checkout_context(
+						checkout_token,
+						cart_version=cart_version,
+						quote_fingerprint=quote_fingerprint,
+					)
+				except CartError as exc:
+					return _cart_api_error(exc)
+
+				if refreshed.get("already_completed"):
+					receipt = refreshed["receipt"]
+					response = frappe.parse_json(receipt.response_snapshot or "{}") or {}
+					response.setdefault("ok", True)
+					response.setdefault("sales_order", receipt.sales_order)
+					response.setdefault(
+						"redirect",
+						f"/order-confirmed?name={receipt.sales_order}",
+					)
+					return response
+
+				receipt = refreshed["receipt"]
+				cart = refreshed["cart"]
+
 				import time
 
 				time.sleep(0.1 * (attempt + 1))
@@ -815,6 +1023,13 @@ def biozone_confirm_order(items):
 				_("تعذر تأكيد الطلب، يرجى المحاولة مرة أخرى"),
 				BiozoneConfirmInternalError,
 			)
+
+		response = {
+			"ok": True,
+			"sales_order": so.name,
+			"redirect": f"/order-confirmed?name={so.name}",
+		}
+		mark_checkout_success(receipt, cart, so.name, response)
 
 		# Phase 1 (ND16/X1): staff bell — last write inside the
 		# transaction, outside the retry loop and the Administrator
@@ -838,11 +1053,7 @@ def biozone_confirm_order(items):
 		# فرضًا — نفس السبب اللي فوق.
 		frappe.flags.ignore_permissions = previous_ignore_permissions
 
-	return {
-		"ok": True,
-		"sales_order": so.name,
-		"redirect": f"/order-confirmed?name={so.name}",
-	}
+	return response
 
 
 def _set_customer_account_type(customer, customer_group):

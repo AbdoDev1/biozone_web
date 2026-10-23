@@ -56,28 +56,56 @@ class TestErrorContract(unittest.TestCase):
 		self.assertEqual(response["error_code"], "CART_EMPTY")
 		self.assertTrue(response["request_id"])
 
+	def test_api_conflict_is_409_and_rolls_back(self):
+		frappe.set_user("Administrator")
+		todo = frappe.get_doc({"doctype": "ToDo", "description": "zz conflict rollback"}).insert(
+			ignore_permissions=True
+		)
+		self.assertTrue(frappe.db.exists("ToDo", todo.name))
+
+		response = api._api_conflict("PRICE_CHANGED", "تغيّر السعر")
+
+		self.assertEqual(frappe.local.response["http_status_code"], 409)
+		self.assertFalse(response["ok"])
+		self.assertEqual(response["error_code"], "PRICE_CHANGED")
+		self.assertTrue(response["request_id"])
+		self.assertFalse(frappe.db.exists("ToDo", todo.name))
+
 	def _first_item_cart(self):
 		item = frappe.get_all("Item", filters={"disabled": 0}, pluck="name", limit=1)
 		if not item:
 			self.skipTest("no enabled Item for confirm validation")
 		return [{"item_code": item[0], "quantity": 1, "uom": ""}]
 
+	def _confirm_args(self):
+		return {
+			"checkout_token": "a" * 32,
+			"cart_version": 1,
+			"quote_fingerprint": "b" * 64,
+		}
+
 	def test_missing_customer_is_422(self):
 		frappe.set_user("Administrator")
 		with patch("biozone_web.utils.find_customer_for_current_user", return_value=None):
-			response = api.biozone_confirm_order(self._first_item_cart())
+			response = api.biozone_confirm_order(**self._confirm_args())
 		self.assertEqual(frappe.local.response["http_status_code"], 422)
 		self.assertFalse(response["ok"])
 		self.assertEqual(response["error_code"], "CUSTOMER_MISSING")
 		self.assertTrue(response["request_id"])
 
 	def test_ineligible_customer_is_422(self):
+		from biozone_web.services.cart import CartError
+
 		frappe.set_user("Administrator")
-		with (
-			patch("biozone_web.utils.find_customer_for_current_user", return_value="__test_customer__"),
-			patch("biozone_web.utils.is_customer_order_eligible", return_value=False),
+		with patch(
+			"biozone_web.services.cart.checkout_context",
+			side_effect=CartError(
+				"CUSTOMER_GROUP_INELIGIBLE",
+				"فئة حسابك غير مفعّلة حاليًا",
+				status=422,
+			),
 		):
-			response = api.biozone_confirm_order(self._first_item_cart())
+			response = api.biozone_confirm_order(**self._confirm_args())
 		self.assertEqual(frappe.local.response["http_status_code"], 422)
 		self.assertFalse(response["ok"])
 		self.assertEqual(response["error_code"], "CUSTOMER_GROUP_INELIGIBLE")

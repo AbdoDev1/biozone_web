@@ -1,0 +1,173 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-10-23 00:00:00.000000",
+ "custom": 1,
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "customer",
+  "cart",
+  "status",
+  "merge_token",
+  "source_uid",
+  "source_kind",
+  "source_key",
+  "column_break_1",
+  "source_fingerprint",
+  "target_version_before",
+  "result_version",
+  "request_id",
+  "applied_on",
+  "section_break_payload",
+  "source_items",
+  "preview",
+  "conflicts",
+  "result_snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "cart",
+   "fieldtype": "Link",
+   "label": "Target Cart",
+   "options": "BZ Cart"
+  },
+  {
+   "default": "Previewed",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Previewed\nApplied\nConflict\nExpired",
+   "reqd": 1
+  },
+  {
+   "fieldname": "merge_token",
+   "fieldtype": "Data",
+   "label": "Merge Token",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "source_uid",
+   "fieldtype": "Data",
+   "label": "Source UID",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "source_kind",
+   "fieldtype": "Select",
+   "label": "Source Kind",
+   "options": "Guest\nLocal Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_key",
+   "fieldtype": "Data",
+   "label": "Source Key"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source_fingerprint",
+   "fieldtype": "Data",
+   "label": "Source Fingerprint",
+   "reqd": 1
+  },
+  {
+   "fieldname": "target_version_before",
+   "fieldtype": "Int",
+   "label": "Target Version Before"
+  },
+  {
+   "fieldname": "result_version",
+   "fieldtype": "Int",
+   "label": "Result Version"
+  },
+  {
+   "fieldname": "request_id",
+   "fieldtype": "Data",
+   "label": "Request ID"
+  },
+  {
+   "fieldname": "applied_on",
+   "fieldtype": "Datetime",
+   "label": "Applied On"
+  },
+  {
+   "fieldname": "section_break_payload",
+   "fieldtype": "Section Break",
+   "label": "Payload"
+  },
+  {
+   "fieldname": "source_items",
+   "fieldtype": "Long Text",
+   "label": "Source Items (JSON)"
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "Long Text",
+   "label": "Preview (JSON)"
+  },
+  {
+   "fieldname": "conflicts",
+   "fieldtype": "Long Text",
+   "label": "Conflicts (JSON)"
+  },
+  {
+   "fieldname": "result_snapshot",
+   "fieldtype": "Long Text",
+   "label": "Result Snapshot (JSON)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biozone Web",
+ "name": "BZ Cart Merge",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

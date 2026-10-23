@@ -11,6 +11,7 @@ order reaching staff prep as a draft.
 """
 
 import unittest
+import uuid
 from unittest.mock import patch
 
 import frappe
@@ -317,11 +318,29 @@ class DiscountBulkSiteCase(unittest.TestCase):
             self.skipTest("no priced item for public group")
         item_code = priced[0]
 
+        if not frappe.db.table_exists("BZ Cart"):
+            self.skipTest("BZ Cart tables absent — run migrate first")
         _name, email = self._make_customer("ord", public)
         prev_user = frappe.session.user
         try:
             frappe.set_user(email)
-            res = biozone_api.biozone_confirm_order(items=[{"item_code": item_code, "quantity": 1}])
+            from biozone_web.services.cart import add_item, clear_cart, get_cart
+
+            state = get_cart()
+            if state["cart"]["items"]:
+                state = clear_cart(cart_version=state["cart"]["version"])
+            version = state["cart"]["version"]
+            state = add_item(
+                item_code,
+                1,
+                uom=(display.get(item_code) or {}).get("uom"),
+                cart_version=version,
+            )
+            res = biozone_api.biozone_confirm_order(
+                checkout_token=uuid.uuid4().hex,
+                cart_version=state["cart"]["version"],
+                quote_fingerprint=state["quote_fingerprint"],
+            )
         finally:
             frappe.set_user(prev_user)
         self.assertTrue(res.get("ok"), res)

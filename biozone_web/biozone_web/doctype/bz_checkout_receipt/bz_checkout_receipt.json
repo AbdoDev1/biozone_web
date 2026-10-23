@@ -1,0 +1,138 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-10-23 00:00:00.000000",
+ "custom": 1,
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "checkout_token",
+  "user",
+  "cart",
+  "status",
+  "cart_version",
+  "quote_fingerprint",
+  "sales_order",
+  "column_break_1",
+  "request_id",
+  "completed_on",
+  "error_code",
+  "section_break_payload",
+  "quote_snapshot",
+  "response_snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "checkout_token",
+   "fieldtype": "Data",
+   "label": "Checkout Token",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "cart",
+   "fieldtype": "Link",
+   "label": "Cart",
+   "options": "BZ Cart"
+  },
+  {
+   "default": "Processing",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Processing\nSuccess\nFailed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cart_version",
+   "fieldtype": "Int",
+   "label": "Cart Version"
+  },
+  {
+   "fieldname": "quote_fingerprint",
+   "fieldtype": "Data",
+   "label": "Quote Fingerprint"
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "options": "Sales Order"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "request_id",
+   "fieldtype": "Data",
+   "label": "Request ID"
+  },
+  {
+   "fieldname": "completed_on",
+   "fieldtype": "Datetime",
+   "label": "Completed On"
+  },
+  {
+   "fieldname": "error_code",
+   "fieldtype": "Data",
+   "label": "Error Code"
+  },
+  {
+   "fieldname": "section_break_payload",
+   "fieldtype": "Section Break",
+   "label": "Payload"
+  },
+  {
+   "fieldname": "quote_snapshot",
+   "fieldtype": "Long Text",
+   "label": "Quote Snapshot (JSON)"
+  },
+  {
+   "fieldname": "response_snapshot",
+   "fieldtype": "Long Text",
+   "label": "Response Snapshot (JSON)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biozone Web",
+ "name": "BZ Checkout Receipt",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
