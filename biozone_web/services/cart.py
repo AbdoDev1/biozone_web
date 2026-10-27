@@ -229,11 +229,25 @@ def cart_is_expired(cart, now=None):
 
 
 def expire_cart(cart):
-    """إنهاء السلة مرة واحدة فقط، مع تفريغ active_key ورفع الإصدار."""
+    """إنهاء السلة مرة واحدة فقط، مع تفريغ active_key ورفع الإصدار.
+
+    يُقفل صف السلة بالاسم (المفتاح الأساسي) ويُعاد قراءته قبل الكتابة،
+    حتى لا يكتب إصدار قديم فوق تعديل متزامن (كمية/إضافة صنف/تعديل نشاط).
+    القفل بالاسم فقط: لا فهارس غير فريدة ولا gap locks.
+    """
     if not cart:
         return False
-    if isinstance(cart, str):
-        cart = frappe.get_doc("BZ Cart", cart)
+    name = cart if isinstance(cart, str) else cart.name
+    if not name:
+        return False
+    locked = frappe.db.sql(
+        "select name from `tabBZ Cart` where name = %s for update",
+        (name,),
+        as_dict=True,
+    )
+    if not locked:
+        return False
+    cart = frappe.get_doc("BZ Cart", name)
     if cart.status != STATUS_ACTIVE:
         return False
     cart.status = STATUS_EXPIRED

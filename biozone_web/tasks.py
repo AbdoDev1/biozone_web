@@ -5,10 +5,15 @@ from biozone_web.services.cart import expire_cart
 RETENTION_DAYS = 7
 EXPIRE_BATCH = 5000
 PURGE_BATCH = 500
+EXPIRE_SAVEPOINT = "bz_expire_cart"
 
 
 def expire_carts():
-    """إنهاء السلال النشطة التي تجاوزت مدة الـ30 يومًا."""
+    """إنهاء السلال النشطة التي تجاوزت مدة الـ30 يومًا.
+
+    عزل لكل سلة: savepoint + try/except + log_error، فلا يوقف فشل سلة
+    واحدة بقية الدفعة. `expire_cart` نفسه يقفل الصف بالاسم.
+    """
     now = frappe.utils.now_datetime()
     names = frappe.get_all(
         "BZ Cart",
@@ -21,10 +26,32 @@ def expire_carts():
         limit=EXPIRE_BATCH,
     )
     expired = 0
+    failed = 0
     for name in names:
-        if expire_cart(name):
-            expired += 1
-    frappe.logger("biozone").info("expire_carts: expired=%s", expired)
+        frappe.db.savepoint(EXPIRE_SAVEPOINT)
+        try:
+            if expire_cart(name):
+                expired += 1
+        except Exception:
+            failed += 1
+            try:
+                frappe.db.rollback(save_point=EXPIRE_SAVEPOINT)
+            except Exception:
+                frappe.logger("biozone").exception(
+                    "expire_carts: savepoint rollback failed for %s", name
+                )
+            try:
+                frappe.log_error(
+                    title=f"expire_carts failed: {name}",
+                    message=frappe.get_traceback(),
+                )
+            except Exception:
+                frappe.logger("biozone").exception(
+                    "expire_carts: log_error failed for %s", name
+                )
+    frappe.logger("biozone").info(
+        "expire_carts: expired=%s failed=%s", expired, failed
+    )
     return expired
 
 
