@@ -6,7 +6,7 @@ from frappe import _
 
 from biozone_web.request_id import get_request_id
 from biozone_web.services.cart import cart_state
-from biozone_web.utils import require_staff_access
+from biozone_web.utils import get_current_domain_role
 
 VIEWER_ROLE = "BZ Cart Viewer"
 ACCESS_LOG_DOCTYPE = "BZ Cart Access Log"
@@ -17,17 +17,32 @@ MAX_SEARCH = 100
 
 
 def require_cart_viewer():
-    require_staff_access()
-    user = frappe.session.user
-    if user == "Administrator":
-        return user
-    roles = set(frappe.get_roles(user))
-    if "System Manager" in roles or VIEWER_ROLE in roles:
-        return user
-    frappe.throw(
-        _("غير مصرح بعرض سلال العملاء"),
-        frappe.PermissionError,
-    )
+	"""Desk-only gate for the cart viewer page and its APIs.
+
+	The viewer page lives at `/app/carts` on the app domain. Website/staff
+	domains must never reach these services, and the role check is repeated
+	server-side on every call (the UI is not trusted).
+	"""
+	if get_current_domain_role() != "app":
+		frappe.throw(_("غير متاح على هذا النطاق"), frappe.PermissionError)
+
+	user = frappe.session.user
+	if not user or user == "Guest":
+		frappe.throw(_("غير مصرح بعرض سلال العملاء"), frappe.PermissionError)
+
+	user_type, enabled = frappe.db.get_value("User", user, ["user_type", "enabled"])
+	if user_type != "System User" or not enabled:
+		frappe.throw(_("غير مصرح بعرض سلال العملاء"), frappe.PermissionError)
+
+	if user == "Administrator":
+		return user
+	roles = set(frappe.get_roles(user))
+	if "System Manager" in roles or VIEWER_ROLE in roles:
+		return user
+	frappe.throw(
+		_("غير مصرح بعرض سلال العملاء"),
+		frappe.PermissionError,
+	)
 
 
 def list_carts(*, status="Active", q="", page=1, page_size=DEFAULT_PAGE_SIZE):
@@ -119,6 +134,10 @@ def list_carts(*, status="Active", q="", page=1, page_size=DEFAULT_PAGE_SIZE):
     for row in rows:
         row["item_count"] = int(row.get("item_count") or 0)
         row["total_units"] = float(row.get("total_units") or 0)
+
+    _log_list_access(
+        status=status, q=q, page=page, page_size=page_size, total=int(total)
+    )
 
     return {
         "carts": rows,
@@ -313,6 +332,33 @@ def _csv_safe(value):
 
 def _log_table_ready():
     return frappe.db.table_exists(ACCESS_LOG_DOCTYPE)
+
+
+def _log_list_access(*, status, q, page, page_size, total):
+    """Decision 10: one audit row per list request, never one per row.
+
+    Best-effort: a failed audit insert must not fail the listing.
+    """
+    if not _log_table_ready():
+        return
+    try:
+        frappe.get_doc(
+            {
+                "doctype": ACCESS_LOG_DOCTYPE,
+                "staff_user": frappe.session.user,
+                "action": "View",
+                "details": (
+                    f"list;status={status or 'All'};q={q};"
+                    f"page={page};page_size={page_size};total={total}"
+                ),
+                "request_id": get_request_id(),
+            }
+        ).insert(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(
+            title="Cart list access log failed",
+            message=frappe.get_traceback(),
+        )
 
 
 def _log_access(cart, action, details=""):

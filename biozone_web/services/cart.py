@@ -18,10 +18,17 @@ SOURCE_UID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 PRICE_LIST = "Standard Selling"
 EXPIRY_DAYS = 30
+SNAPSHOT_TTL_DAYS = 7
+SNAPSHOT_FLAG = "biozone_cart_snapshots_enabled"
+UNDO_TOKEN_RE = re.compile(r"^[0-9a-fA-F]{32,64}$")
 
 STATUS_ACTIVE = "Active"
 STATUS_CONVERTED = "Converted"
 STATUS_EXPIRED = "Expired"
+
+SNAPSHOT_AVAILABLE = "Available"
+SNAPSHOT_RESTORED = "Restored"
+SNAPSHOT_EXPIRED = "Expired"
 
 DUPLICATE_ERRORS = tuple(
     exc
@@ -150,6 +157,405 @@ def _validate_fingerprint(value):
     if not re.fullmatch(r"[0-9a-fA-F]{64}", value):
         raise CartError("CART_QUOTE_INVALID", _("بصمة السعر غير صالحة — حدّث السلة"), status=422)
     return value.lower()
+
+
+def snapshots_enabled():
+    """Feature flag: absent/0/"" means disabled (fail-safe)."""
+    return bool(frappe.utils.cint(frappe.conf.get(SNAPSHOT_FLAG, 0)))
+
+
+def _restore_token_hash(user, token):
+    return hashlib.sha256(f"{user}|{token}".encode("utf-8")).hexdigest()
+
+
+def _snapshot_key(user, cart_name, source_version, reason, item_code=None):
+    raw = "|".join(
+        [
+            str(user or ""),
+            str(cart_name or ""),
+            str(source_version),
+            str(reason or ""),
+            str(item_code or ""),
+        ]
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _snapshot_lines(cart, reason, item_code=None):
+    if reason == "Remove":
+        line = _find_line(cart, item_code)
+        rows = [line] if line else []
+    else:
+        rows = list(cart.items or [])
+    return [
+        {
+            "item_code": (row.item_code or "").strip(),
+            "qty": round(frappe.utils.flt(row.qty), 3),
+            "uom": (row.uom or "").strip(),
+        }
+        for row in rows
+        if (row.item_code or "").strip()
+    ]
+
+
+def _snapshot_payload(snapshot):
+    if not snapshot:
+        return None
+    return {
+        "snapshot": snapshot.name,
+        "reason": snapshot.reason,
+        "scope": snapshot.scope,
+        "expires_on": str(snapshot.expires_on) if snapshot.expires_on else None,
+        "item_count": int(snapshot.item_count or 0),
+        "total_units": float(snapshot.total_units or 0),
+    }
+
+
+def _with_undo(state, snapshot):
+    if snapshot:
+        state["undo"] = _snapshot_payload(snapshot)
+    return state
+
+
+def _get_snapshot_by_key(snapshot_key):
+    name = frappe.db.get_value(
+        "BZ Cart Snapshot", {"snapshot_key": snapshot_key}, "name"
+    )
+    return frappe.get_doc("BZ Cart Snapshot", name) if name else None
+
+
+def _latest_snapshot(user, cart_name, *, now=None):
+    now = now or _now()
+    rows = frappe.get_all(
+        "BZ Cart Snapshot",
+        filters={
+            "source_user": user,
+            "source_cart": cart_name,
+            "status": SNAPSHOT_AVAILABLE,
+            "expires_on": [">", now],
+        },
+        fields=["name", "reason", "scope", "expires_on", "item_count", "total_units"],
+        order_by="created_on desc",
+        limit=1,
+    )
+    return frappe._dict(rows[0]) if rows else None
+
+
+def _insert_snapshot(cart, customer, reason, scope, source_version, item_code=None):
+    lines = _snapshot_lines(cart, reason, item_code)
+    if not lines:
+        return None
+    now = _now()
+    doc = frappe.get_doc(
+        {
+            "doctype": "BZ Cart Snapshot",
+            "snapshot_key": _snapshot_key(
+                frappe.session.user, cart.name, source_version, reason, item_code
+            ),
+            "status": SNAPSHOT_AVAILABLE,
+            "reason": reason,
+            "scope": scope,
+            "source_user": frappe.session.user,
+            "source_customer": customer,
+            "source_cart": cart.name,
+            "source_version": source_version,
+            "items_json": _json(lines),
+            "item_count": len(lines),
+            "total_units": round(sum(row["qty"] for row in lines), 3),
+            "actor": frappe.session.user,
+            "request_id": get_request_id(),
+            "created_on": now,
+            "expires_on": frappe.utils.add_to_date(now, days=SNAPSHOT_TTL_DAYS),
+            "restore_token_hash": None,
+        }
+    )
+    doc.insert(ignore_permissions=True)
+    return doc
+
+
+def _merge_items_into_cart(cart, rows, customer):
+    """Merge normalized lines into a locked cart.
+
+    No save, no commit, no response shaping. Conflicts are collected (not
+    raised) so transfer_apply can turn the first one into a 409 while undo
+    can report the rest as skipped lines.
+    """
+    now = _now()
+    conflicts = []
+    applied = 0
+    for line in rows:
+        code = line["item_code"]
+        uom = (line.get("uom") or "").strip()
+        qty = round(frappe.utils.flt(line.get("qty")), 3)
+        existing = _find_line(cart, code)
+        if existing:
+            if (existing.uom or "").strip() != uom:
+                conflicts.append(
+                    {
+                        "item_code": code,
+                        "code": "TARGET_UOM_CONFLICT",
+                        "message": _("الصنف موجود في سلة الحساب بوحدة مختلفة"),
+                    }
+                )
+                continue
+            new_qty = round(frappe.utils.flt(existing.qty) + qty, 3)
+            if new_qty > MAX_LINE_QTY:
+                conflicts.append(
+                    {
+                        "item_code": code,
+                        "code": "QTY_LIMIT",
+                        "message": _("الكمية أكبر من الحد المسموح"),
+                    }
+                )
+                continue
+            existing.qty = new_qty
+            existing.updated_on = now
+        else:
+            if len(cart.items or []) >= MAX_CART_LINES:
+                conflicts.append(
+                    {
+                        "item_code": code,
+                        "code": "LINE_LIMIT",
+                        "message": _("عدد أصناف السلة أكبر من الحد المسموح"),
+                    }
+                )
+                continue
+            cart.append(
+                "items",
+                {
+                    "item_code": code,
+                    "qty": qty,
+                    "uom": uom,
+                    "added_on": now,
+                    "updated_on": now,
+                },
+            )
+        applied += 1
+    return cart, conflicts, applied
+
+
+_SKIP_REASONS = {
+    "ITEM_NOT_FOUND": "ITEM_NOT_FOUND",
+    "ITEM_DISABLED": "ITEM_DISABLED",
+    "NO_PRICE": "NO_PRICE",
+    "UOM_UNAVAILABLE": "UOM_CONFLICT",
+    "UOM_CHANGED": "UOM_CONFLICT",
+    "SOURCE_UOM_CONFLICT": "UOM_CONFLICT",
+    "QTY_LIMIT": "QTY_CAP",
+    "LINE_LIMIT": "LINE_CAP",
+}
+
+
+def _undo_skips(conflicts):
+    skipped = []
+    seen = set()
+    for conflict in conflicts or []:
+        code = conflict.get("item_code") or ""
+        reason = _SKIP_REASONS.get(
+            conflict.get("code"), conflict.get("code") or "UNAVAILABLE"
+        )
+        key = (code, reason)
+        if key in seen:
+            continue
+        seen.add(key)
+        skipped.append(
+            {
+                "item_code": code,
+                "reason": reason,
+                "message": conflict.get("message") or "",
+            }
+        )
+    return skipped
+
+
+def _cart_was_converted(cart_name):
+    if not cart_name:
+        return False
+    return frappe.db.get_value("BZ Cart", cart_name, "status") == STATUS_CONVERTED
+
+
+def _undo_replay(snapshot, cart, customer):
+    state = cart_state(cart, customer=customer) if cart else {}
+    state.update(
+        {
+            "ok": True,
+            "already_restored": True,
+            "applied_mode": snapshot.restore_mode,
+            "restored_count": int(snapshot.restored_count or 0),
+            "skipped_count": int(snapshot.skipped_count or 0),
+            "skipped": _parse_json(snapshot.skipped_json, []),
+        }
+    )
+    return state
+
+
+def undo(snapshot_name, restore_token, cart_version=None):
+    """Restore a Clear/Remove snapshot into the current Active cart.
+
+    `restore_token` is a client-generated idempotency token (32-64 hex).
+    Its hash is scoped to the user, so a different user replaying the same
+    token cannot read another user's committed result.
+    """
+    customer = require_customer()
+    user = frappe.session.user
+    if not snapshots_enabled():
+        raise CartError("FEATURE_DISABLED", _("التراجع غير متاح حاليًا"), status=404)
+    name = _require_text(snapshot_name, "snapshot", max_length=140)
+    token = _require_text(restore_token, "restore_token", max_length=64)
+    if not UNDO_TOKEN_RE.fullmatch(token):
+        raise CartError("CART_INPUT_INVALID", _("بيانات غير صحيحة في الطلب"), status=422)
+    token_hash = _restore_token_hash(user, token)
+
+    rows = frappe.db.sql(
+        "select name from `tabBZ Cart Snapshot` where name = %s for update",
+        (name,),
+        as_dict=True,
+    )
+    if not rows:
+        raise CartError("SNAPSHOT_NOT_AVAILABLE", _("النسخة غير متاحة للاستعادة"), status=404)
+    snapshot = frappe.get_doc("BZ Cart Snapshot", name)
+    if snapshot.source_user != user:
+        raise CartError("SNAPSHOT_NOT_AVAILABLE", _("النسخة غير متاحة للاستعادة"), status=404)
+
+    cart = get_active_cart(user, for_update=True)
+    if cart is not None and cart.name == snapshot.source_cart:
+        if frappe.db.exists(
+            "BZ Checkout Receipt",
+            {"cart": cart.name, "status": "Processing"},
+        ):
+            raise CartError(
+                "CHECKOUT_IN_PROGRESS",
+                _("طلبك قيد المعالجة — انتظر قليلًا ثم حدّث الصفحة"),
+                status=409,
+            )
+    if snapshot.status == SNAPSHOT_RESTORED:
+        if (snapshot.restore_token_hash or "") == token_hash:
+            return _undo_replay(snapshot, cart, customer)
+        raise CartError(
+            "SNAPSHOT_ALREADY_RESTORED",
+            _("تمت استعادة هذه النسخة بالفعل"),
+            status=409,
+        )
+    if snapshot.status != SNAPSHOT_AVAILABLE:
+        raise CartError("SNAPSHOT_NOT_AVAILABLE", _("النسخة غير متاحة للاستعادة"), status=404)
+    if snapshot.expires_on and frappe.utils.get_datetime(snapshot.expires_on) <= _now():
+        raise CartError("SNAPSHOT_EXPIRED", _("انتهت صلاحية النسخة"), status=422)
+    if (snapshot.source_customer or None) != (customer or None):
+        raise CartError("SNAPSHOT_NOT_AVAILABLE", _("النسخة غير متاحة للاستعادة"), status=404)
+    if cart is None or cart.name != snapshot.source_cart:
+        if cart is None:
+            # Undo may have waited on the checkout row lock, so this
+            # transaction's REPEATABLE-READ view can predate the conversion.
+            # Nothing was written on this path: drop the read-only view and
+            # re-read the status in a fresh transaction for the message.
+            frappe.db.rollback()
+        converted = _cart_was_converted(snapshot.source_cart)
+        raise CartError(
+            "SNAPSHOT_NOT_AVAILABLE",
+            _("هذه السلة تحوّلت إلى طلب ولا يمكن استعادتها.")
+            if converted
+            else _("النسخة غير متاحة للاستعادة"),
+            status=404,
+        )
+
+    if snapshot.scope == "Cart":
+        expected = _validate_cart_version(cart_version)
+        if expected != int(cart.version or 0):
+            error = _conflict_current(
+                cart,
+                customer,
+                _("تغيّرت السلة من جهاز آخر — حدّثها ثم أعد المحاولة"),
+            )
+            error.extra["merge_available"] = True
+            raise error
+    # Line scope ignores cart_version by design: adding a line is safe and
+    # the restore token prevents a double-apply.
+
+    items = _parse_json(snapshot.items_json, [])
+    normalized, conflicts, ctx = _normalize_source_items(items, customer)
+    skipped = _undo_skips(conflicts)
+    available = [line for line in normalized if line.get("available", True)]
+
+    now = _now()
+    if snapshot.scope == "Cart" and not (cart.items or []):
+        applied_mode = "Replace"
+        rows = []
+        for line in available:
+            if len(rows) >= MAX_CART_LINES:
+                skipped.append(
+                    {
+                        "item_code": line["item_code"],
+                        "reason": "LINE_CAP",
+                        "message": _("عدد أصناف السلة أكبر من الحد المسموح"),
+                    }
+                )
+                continue
+            rows.append(
+                {
+                    "item_code": line["item_code"],
+                    "qty": line["qty"],
+                    "uom": line["uom"],
+                    "added_on": now,
+                    "updated_on": now,
+                }
+            )
+        cart.items = []
+        for row in rows:
+            cart.append("items", row)
+        restored = len(rows)
+    else:
+        applied_mode = "Merge"
+        cart, merge_conflicts, restored = _merge_items_into_cart(cart, available, customer)
+        skipped.extend(_undo_skips(merge_conflicts))
+
+    if not restored:
+        raise CartError(
+            "UNDO_NOTHING_RESTORED",
+            _("تعذّر استعادة أي صنف من هذه النسخة"),
+            status=422,
+        )
+
+    _touch(cart, customer)
+    snapshot.status = SNAPSHOT_RESTORED
+    snapshot.restored_on = now
+    snapshot.restored_by = user
+    snapshot.restore_request_id = get_request_id()
+    snapshot.restore_token_hash = token_hash
+    snapshot.restore_mode = applied_mode
+    snapshot.restored_count = restored
+    snapshot.skipped_count = len(skipped)
+    snapshot.skipped_json = _json(skipped)
+    try:
+        snapshot.save(ignore_permissions=True)
+    except DUPLICATE_ERRORS:
+        frappe.db.rollback()
+        locked = frappe.db.sql(
+            "select name from `tabBZ Cart Snapshot` where name = %s for update",
+            (name,),
+            as_dict=True,
+        )
+        snapshot = frappe.get_doc("BZ Cart Snapshot", name) if locked else None
+        if snapshot and (snapshot.restore_token_hash or "") == token_hash:
+            cart = get_active_cart(user, for_update=True)
+            return _undo_replay(snapshot, cart, customer)
+        raise CartError(
+            "UNDO_IN_PROGRESS",
+            _("الاستعادة قيد التنفيذ — أعد المحاولة"),
+            status=409,
+        )
+
+    state = cart_state(cart, customer=customer)
+    state.update(
+        {
+            "ok": True,
+            "already_restored": False,
+            "applied_mode": applied_mode,
+            "restored_count": restored,
+            "skipped_count": len(skipped),
+            "skipped": skipped,
+        }
+    )
+    return state
 
 
 def require_customer():
@@ -643,10 +1049,15 @@ def _validate_new_item(item_code, uom, customer):
     return code, line_uom, ctx
 
 
-def get_cart():
+def get_cart(include_undo=False):
     customer = require_customer()
     cart = get_active_cart()
-    return cart_state(cart, customer=customer)
+    state = cart_state(cart, customer=customer)
+    if include_undo and snapshots_enabled() and cart:
+        snapshot = _latest_snapshot(frappe.session.user, cart.name)
+        if snapshot:
+            state["undo"] = _snapshot_payload(snapshot)
+    return state
 
 
 def add_item(item_code, qty, uom=None, cart_version=None):
@@ -735,16 +1146,28 @@ def remove_item(item_code, cart_version=None):
     customer = require_customer()
     user = frappe.session.user
     code = _require_text(item_code, "item_code", max_length=140)
+    expected = _validate_cart_version(cart_version)
     cart = get_active_cart(user, for_update=True)
     if cart is None:
         raise CartError("CART_EMPTY", _("السلة فارغة"), status=422)
-    _check_version(cart, cart_version, customer)
+    snapshot = None
+    if snapshots_enabled():
+        snapshot = _get_snapshot_by_key(
+            _snapshot_key(user, cart.name, expected, "Remove", code)
+        )
+        if snapshot:
+            return _with_undo(cart_state(cart, customer=customer), snapshot)
+    _check_version(cart, expected, customer)
     line = _find_line(cart, code)
     if not line:
         raise CartError("ITEM_NOT_IN_CART", _("الصنف غير موجود في السلة"), item_code=code)
+    if snapshots_enabled():
+        snapshot = _insert_snapshot(
+            cart, customer, "Remove", "Line", expected, item_code=code
+        )
     cart.remove(line)
     _touch(cart, customer)
-    return cart_state(cart, customer=customer)
+    return _with_undo(cart_state(cart, customer=customer), snapshot)
 
 
 def clear_cart(cart_version=None):
@@ -753,12 +1176,22 @@ def clear_cart(cart_version=None):
     cart = get_active_cart(user, for_update=True)
     if cart is None:
         return cart_state(None, customer=customer)
-    _check_version(cart, cart_version, customer)
+    expected = _validate_cart_version(cart_version)
+    snapshot = None
+    if snapshots_enabled():
+        snapshot = _get_snapshot_by_key(
+            _snapshot_key(user, cart.name, expected, "Clear")
+        )
+        if snapshot:
+            return _with_undo(cart_state(cart, customer=customer), snapshot)
+    _check_version(cart, expected, customer)
     if not cart.items:
         return cart_state(cart, customer=customer)
+    if snapshots_enabled():
+        snapshot = _insert_snapshot(cart, customer, "Clear", "Cart", expected)
     cart.items = []
     _touch(cart, customer)
-    return cart_state(cart, customer=customer)
+    return _with_undo(cart_state(cart, customer=customer), snapshot)
 
 
 def _normalize_source_items(items, customer, *, validate_price=True):
@@ -1156,43 +1589,31 @@ def transfer_apply(merge_token, *, source_fingerprint=None, cart_version=None):
         ]
         cart = _create_cart(user, customer, rows)
     else:
-        for line in normalized:
-            existing = _find_line(cart, line["item_code"])
-            if existing:
-                if (existing.uom or "").strip() != (line["uom"] or "").strip():
-                    raise CartError(
-                        "MERGE_CONFLICT",
-                        _("تعذّر دمج السلة لوجود تعارض في الوحدة"),
-                        status=409,
-                        item_code=line["item_code"],
-                    )
-                new_qty = round(frappe.utils.flt(existing.qty) + line["qty"], 3)
-                if new_qty > MAX_LINE_QTY:
-                    raise CartError(
-                        "MERGE_CONFLICT",
-                        _("تعذّر دمج السلة: الكمية أكبر من الحد المسموح"),
-                        status=409,
-                        item_code=line["item_code"],
-                    )
-                existing.qty = new_qty
-                existing.updated_on = now
-            else:
-                if len(cart.items or []) >= MAX_CART_LINES:
-                    raise CartError(
-                        "MERGE_CONFLICT",
-                        _("تعذّر دمج السلة: عدد الأصناف أكبر من الحد المسموح"),
-                        status=409,
-                    )
-                cart.append(
-                    "items",
-                    {
-                        "item_code": line["item_code"],
-                        "qty": line["qty"],
-                        "uom": line["uom"],
-                        "added_on": now,
-                        "updated_on": now,
-                    },
+        cart, merge_conflicts, _applied = _merge_items_into_cart(
+            cart, normalized, customer
+        )
+        if merge_conflicts:
+            first = merge_conflicts[0]
+            code = first.get("code")
+            if code == "TARGET_UOM_CONFLICT":
+                raise CartError(
+                    "MERGE_CONFLICT",
+                    _("تعذّر دمج السلة لوجود تعارض في الوحدة"),
+                    status=409,
+                    item_code=first.get("item_code"),
                 )
+            if code == "QTY_LIMIT":
+                raise CartError(
+                    "MERGE_CONFLICT",
+                    _("تعذّر دمج السلة: الكمية أكبر من الحد المسموح"),
+                    status=409,
+                    item_code=first.get("item_code"),
+                )
+            raise CartError(
+                "MERGE_CONFLICT",
+                _("تعذّر دمج السلة: عدد الأصناف أكبر من الحد المسموح"),
+                status=409,
+            )
         _touch(cart, customer)
 
     state = cart_state(cart, customer=customer)

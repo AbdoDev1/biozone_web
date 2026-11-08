@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
+  @media (max-width: 767px) {
+    #cart-undo-toast { bottom: calc(env(safe-area-inset-bottom) + 88px); }
+  }
 </style>
 </head>
 <body class="bg-surface text-on-surface min-h-screen flex flex-col">
@@ -95,12 +98,22 @@
   <div class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 p-4" id="clear-cart-modal">
     <div class="w-full max-w-sm rounded-xl bg-surface-container-lowest p-5 shadow-2xl space-y-4">
       <h3 class="text-base font-bold text-on-surface">إفراغ السلة</h3>
-      <p class="text-sm leading-6 text-on-surface-variant">هل تريد حذف كل الأصناف من السلة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+      <p class="text-sm leading-6 text-on-surface-variant">هل تريد حذف كل الأصناف من السلة؟ يمكنك التراجع بعد الإفراغ.</p>
       <div class="flex items-center justify-end gap-2">
-        <button class="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors" id="clear-cart-cancel" type="button">تراجع</button>
+        <button class="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors" id="clear-cart-cancel" type="button">إلغاء</button>
         <button class="px-4 py-2 rounded-full bg-error text-on-error text-sm font-bold hover:opacity-90 transition-opacity" id="clear-cart-confirm" type="button">تأكيد الإفراغ</button>
       </div>
     </div>
+  </div>
+
+  <!-- Toast التراجع بعد الإفراغ/الحذف -->
+  <div class="hidden fixed inset-x-0 bottom-4 z-50 mx-auto w-full max-w-[calc(100vw-2rem)] rounded-xl bg-on-surface p-4 text-surface shadow-2xl" id="cart-undo-toast" role="status" aria-live="polite">
+    <div class="flex items-center gap-3">
+      <p class="flex-1 text-sm font-semibold leading-6" id="cart-undo-toast-text"></p>
+      <button class="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-colors hover:bg-primary-container" id="cart-undo-btn" type="button">تراجع</button>
+      <button class="rounded-full px-4 py-2.5 text-sm font-bold text-surface transition-colors hover:bg-surface/60" id="cart-undo-close" type="button">إغلاق</button>
+    </div>
+    <ul class="mt-2 hidden list-disc space-y-1 pr-5 text-xs text-surface" id="cart-undo-skipped"></ul>
   </div>
 </main>
 
@@ -147,6 +160,9 @@
   var store = window.BiozoneCart;
   if (!store) return;
   var busy = false;
+  var pendingUndo = null;
+  var undoToastTimer = null;
+  var UNDO_TOAST_MS = 12000;
   var shown = { autoMerged: false, merged: false, mergeError: '' };
 
   function byId(id) { return document.getElementById(id); }
@@ -179,6 +195,63 @@
     if (!el) return;
     el.textContent = message;
     el.classList.remove('hidden');
+  }
+
+  function hideUndoToast() {
+    var toast = byId('cart-undo-toast');
+    pendingUndo = null;
+    if (undoToastTimer) {
+      clearTimeout(undoToastTimer);
+      undoToastTimer = null;
+    }
+    if (!toast) return;
+    toast.classList.add('hidden');
+  }
+
+  function showUndoToast(undo, message, skipped) {
+    var toast = byId('cart-undo-toast');
+    var text = byId('cart-undo-toast-text');
+    var list = byId('cart-undo-skipped');
+    var btn = byId('cart-undo-btn');
+    if (!toast || !text || !list || !btn) return;
+    skipped = skipped || [];
+    if ((!undo || !undo.snapshot) && !skipped.length) {
+      hideUndoToast();
+      showNotice(message);
+      return;
+    }
+    if (undo && undo.snapshot) {
+      pendingUndo = undo;
+      btn.classList.remove('hidden');
+    } else {
+      pendingUndo = null;
+      btn.classList.add('hidden');
+    }
+    text.textContent = message || 'تم تنفيذ الإجراء.';
+    list.innerHTML = '';
+    if (skipped.length) {
+      skipped.forEach(function (row) {
+        var li = document.createElement('li');
+        li.textContent = (row.item_code ? row.item_code + ': ' : '')
+          + (row.message || row.reason || '');
+        list.appendChild(li);
+      });
+      list.classList.remove('hidden');
+    } else {
+      list.classList.add('hidden');
+    }
+    toast.classList.remove('hidden');
+    if (undoToastTimer) clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(hideUndoToast, UNDO_TOAST_MS);
+  }
+
+  function undoSuccessMessage(result) {
+    var restored = Number(result && result.restored_count ? result.restored_count : 0);
+    var skipped = Number(result && result.skipped_count ? result.skipped_count : 0);
+    if (skipped > 0) {
+      return 'تمت استعادة ' + restored + ' أصناف، وتُخطّي ' + skipped + '.';
+    }
+    return 'تمت استعادة ' + restored + ' أصناف.';
   }
 
   function lineSubtotal(item) {
@@ -352,8 +425,12 @@
     busy = true;
     render(store.state);
     try {
-      if (qty <= 0) await store.removeItem(itemCode);
-      else await store.setQty(itemCode, qty);
+      if (qty <= 0) {
+        await store.removeItem(itemCode);
+        showUndoToast(store.state.undo, 'تم حذف الصنف.');
+      } else {
+        await store.setQty(itemCode, qty);
+      }
     } catch (err) {
       showConfirmError(formatError(err));
     } finally {
@@ -368,6 +445,7 @@
     render(store.state);
     try {
       await store.removeItem(itemCode);
+      showUndoToast(store.state.undo, 'تم حذف الصنف.');
     } catch (err) {
       showConfirmError(formatError(err));
     } finally {
@@ -431,9 +509,42 @@
     try {
       await store.clear();
       closeClearCart();
-      showNotice('تم إفراغ السلة.');
+      showUndoToast(store.state.undo, 'تم إفراغ السلة.');
     } catch (err) {
       showConfirmError(formatError(err));
+    } finally {
+      busy = false;
+      render(store.state);
+    }
+  }
+
+  async function undoLastChange() {
+    var undo = pendingUndo || store.state.undo;
+    if (busy || !undo || !undo.snapshot) return;
+    busy = true;
+    clearConfirmError();
+    try {
+      var result = await store.undo(undo);
+      hideUndoToast();
+      if (Number(result && result.skipped_count ? result.skipped_count : 0) > 0) {
+        showUndoToast(null, undoSuccessMessage(result), result.skipped || []);
+      } else {
+        showNotice(undoSuccessMessage(result));
+      }
+    } catch (err) {
+      if (err.status === 409 && err.code === 'CART_VERSION_CONFLICT') {
+        showUndoToast(store.state.undo, 'السلة تغيّرت — دمج الأصناف المستعادة؟');
+      } else if (
+        err.code === 'SNAPSHOT_EXPIRED'
+        || err.code === 'SNAPSHOT_NOT_AVAILABLE'
+        || err.code === 'SNAPSHOT_ALREADY_RESTORED'
+        || err.code === 'FEATURE_DISABLED'
+      ) {
+        hideUndoToast();
+        showNotice('انتهت صلاحية النسخة.');
+      } else {
+        showConfirmError(formatError(err));
+      }
     } finally {
       busy = false;
       render(store.state);
@@ -443,6 +554,8 @@
   byId('clear-cart-btn').addEventListener('click', openClearCart);
   byId('clear-cart-cancel').addEventListener('click', closeClearCart);
   byId('clear-cart-confirm').addEventListener('click', confirmClearCart);
+  byId('cart-undo-btn').addEventListener('click', undoLastChange);
+  byId('cart-undo-close').addEventListener('click', hideUndoToast);
   byId('confirm-order-btn').addEventListener('click', confirmOrder);
   byId('cart-merge-apply').addEventListener('click', applyMerge);
   byId('cart-merge-dismiss').addEventListener('click', function () {

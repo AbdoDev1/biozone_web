@@ -7,7 +7,7 @@ from biozone_web.services.login_lock import (
 	login_busy_response,
 	release_login_lock,
 )
-from biozone_web.services.rate_limit import rate_limited
+from biozone_web.services.rate_limit import cart_rate_limited, rate_limited
 
 STORE_LOGIN_FAILED_MESSAGE = "هذا الحساب غير مصرح له بالدخول إلى المتجر"
 
@@ -51,19 +51,23 @@ def _api_conflict(error_code: str, message: str, *, item_code=None, extra=None):
 
 
 def _cart_api_error(exc):
-	if getattr(exc, "status", 422) == 409:
+	status = getattr(exc, "status", 422)
+	if status == 409:
 		return _api_conflict(
 			exc.error_code,
 			exc.message,
 			item_code=getattr(exc, "item_code", None),
 			extra=getattr(exc, "extra", None),
 		)
-	return _api_fail(
+	payload = _api_fail(
 		exc.error_code,
 		exc.message,
 		item_code=getattr(exc, "item_code", None),
 		extra=getattr(exc, "extra", None),
 	)
+	if status != 422:
+		frappe.local.response["http_status_code"] = status
+	return payload
 
 
 def _fail_store_login():
@@ -253,6 +257,7 @@ def biozone_forgot_password(email: str):
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@cart_rate_limited("cart_prices")
 def biozone_get_cart_prices(item_codes):
 	"""أسعار السلة من السيرفر حسب فئة الطالب (البند 5).
 
@@ -342,16 +347,18 @@ def biozone_get_cart_prices(item_codes):
 
 
 @frappe.whitelist(methods=["GET", "POST"])
-def biozone_cart_get():
+@cart_rate_limited("cart_get")
+def biozone_cart_get(include_undo=0):
 	from biozone_web.services.cart import CartError, get_cart
 
 	try:
-		return get_cart()
+		return get_cart(include_undo=frappe.utils.cint(include_undo))
 	except CartError as exc:
 		return _cart_api_error(exc)
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_add")
 def biozone_cart_add(item_code, qty=1, uom=None, cart_version=None):
 	from biozone_web.services.cart import CartError, add_item
 
@@ -367,6 +374,7 @@ def biozone_cart_add(item_code, qty=1, uom=None, cart_version=None):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_set_qty")
 def biozone_cart_set_qty(item_code, qty, cart_version=None):
 	from biozone_web.services.cart import CartError, set_qty
 
@@ -377,6 +385,7 @@ def biozone_cart_set_qty(item_code, qty, cart_version=None):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_remove")
 def biozone_cart_remove(item_code, cart_version=None):
 	from biozone_web.services.cart import CartError, remove_item
 
@@ -387,6 +396,7 @@ def biozone_cart_remove(item_code, cart_version=None):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_clear")
 def biozone_cart_clear(cart_version=None):
 	from biozone_web.services.cart import CartError, clear_cart
 
@@ -397,6 +407,18 @@ def biozone_cart_clear(cart_version=None):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_undo")
+def biozone_cart_undo(snapshot, restore_token, cart_version=None):
+	from biozone_web.services.cart import CartError, undo
+
+	try:
+		return undo(snapshot, restore_token, cart_version=cart_version)
+	except CartError as exc:
+		return _cart_api_error(exc)
+
+
+@frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_transfer_preview")
 def biozone_cart_transfer_preview(source):
 	from biozone_web.services.cart import CartError, transfer_preview
 
@@ -417,6 +439,7 @@ def biozone_cart_transfer_preview(source):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("cart_transfer_apply")
 def biozone_cart_transfer_apply(merge_token, source_fingerprint=None, cart_version=None):
 	from biozone_web.services.cart import CartError, transfer_apply
 
@@ -431,6 +454,7 @@ def biozone_cart_transfer_apply(merge_token, source_fingerprint=None, cart_versi
 
 
 @frappe.whitelist(methods=["GET", "POST"])
+@cart_rate_limited("checkout_status")
 def biozone_checkout_status(checkout_token):
 	from biozone_web.services.cart import CartError, checkout_status
 
@@ -441,6 +465,7 @@ def biozone_checkout_status(checkout_token):
 
 
 @frappe.whitelist(methods=["POST"])
+@cart_rate_limited("confirm_order")
 def biozone_confirm_order(
 	checkout_token=None,
 	cart_version=None,
@@ -3285,6 +3310,21 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 		"confirmed_by": confirmer,
 		"print_time": frappe.utils.now_datetime().strftime("%H:%M - %d/%m/%Y"),
 		"company": si.company,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def staff_cart_list(status="Active", q="", page=1, page_size=20):
+	from biozone_web.services import cart_staff
+
+	return {
+		"ok": True,
+		**cart_staff.list_carts(
+			status=status,
+			q=q,
+			page=page,
+			page_size=page_size,
+		),
 	}
 
 

@@ -18,6 +18,7 @@ plus a site database. Conventions:
   itself stays covered by the manual browser matrix (phase B).
 """
 
+import hashlib
 import unittest
 import uuid
 from unittest.mock import patch
@@ -274,6 +275,12 @@ class LiveConfirmCase(MinOrderDBCase):
         super().setUp()
         self._orders = []
         self._prev_user = frappe.session.user
+        # confirm_order is capped at 10/min per user (rate_limit.CART_LIMITS).
+        # This class runs >10 live confirms for one fixed identity, so without
+        # a reset the later tests see RATE_LIMITED instead of their target
+        # branch. Reset only this test identity's counter, not the limiter.
+        digest = hashlib.sha256(TEST_EMAIL.encode("utf-8")).hexdigest()[:32]
+        frappe.cache.delete_key(f"rl:cart:confirm_order:user:{digest}")
 
     def tearDown(self):
         for name in self._orders:

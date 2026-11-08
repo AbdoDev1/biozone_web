@@ -1,13 +1,13 @@
-import importlib.util
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import frappe
-from frappe.utils.jinja import get_jenv
 
-from biozone_web.services import cart_staff, cart as cart_service
 from biozone_web import tasks
+from biozone_web.services import cart as cart_service
+from biozone_web.services import cart_staff
 
 TEST_EMAIL = "test-cart-staff@example.com"
 TEST_NAME = "Test Cart Staff"
@@ -52,6 +52,18 @@ class TestCartStaffHelpers(unittest.TestCase):
         self.assertIn("Secret Customer", text)
         self.assertIn("10.00", text)
 
+    def test_desk_page_definition_is_standard_and_viewer_visible(self):
+        base = Path(frappe.get_module_path("Biozone Web")) / "page" / "carts"
+        data = json.loads((base / "carts.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["doctype"], "Page")
+        self.assertEqual(data["name"], "carts")
+        self.assertEqual(data["standard"], "Yes")
+        roles = {row["role"] for row in data["roles"]}
+        self.assertIn("BZ Cart Viewer", roles)
+        self.assertIn("System Manager", roles)
+        self.assertTrue((base / "carts.js").is_file())
+        self.assertTrue((base / "carts.css").is_file())
+
 
 class CartStaffDBCase(unittest.TestCase):
     @classmethod
@@ -86,12 +98,12 @@ class CartStaffDBCase(unittest.TestCase):
         self._prev_user = frappe.session.user
         self._prev_form_dict = getattr(frappe.local, "form_dict", None)
         frappe.set_user(TEST_EMAIL)
-        self._staff_patch = patch.object(cart_staff, "require_staff_access", lambda: TEST_EMAIL)
-        self._staff_patch.start()
+        self._domain_patch = patch.object(cart_staff, "get_current_domain_role", lambda: "app")
+        self._domain_patch.start()
         self.cart = self._make_cart()
 
     def tearDown(self):
-        self._staff_patch.stop()
+        self._domain_patch.stop()
         frappe.set_user(self._prev_user)
         frappe.local.form_dict = self._prev_form_dict
         frappe.db.rollback()
@@ -116,14 +128,16 @@ class CartStaffDBCase(unittest.TestCase):
 
     def test_viewer_role_required(self):
         frappe.set_user("Administrator")
-        with patch.object(cart_staff, "require_staff_access", lambda: "Administrator"):
-            self.assertEqual(cart_staff.require_cart_viewer(), "Administrator")
+        self.assertEqual(cart_staff.require_cart_viewer(), "Administrator")
 
         frappe.set_user(TEST_EMAIL)
-        with patch.object(cart_staff, "require_staff_access", lambda: None):
-            with patch.object(cart_staff.frappe, "get_roles", lambda user=None: ["All"]):
-                with self.assertRaises(frappe.PermissionError):
-                    cart_staff.require_cart_viewer()
+        with patch.object(cart_staff.frappe, "get_roles", lambda user=None: ["All"]):
+            with self.assertRaises(frappe.PermissionError):
+                cart_staff.require_cart_viewer()
+
+        with patch.object(cart_staff, "get_current_domain_role", lambda: "store"):
+            with self.assertRaises(frappe.PermissionError):
+                cart_staff.require_cart_viewer()
 
     def test_detail_logs_view_and_copy_csv_log_actions(self):
         state = cart_staff.get_cart_detail(self.cart.name)
@@ -167,31 +181,19 @@ class CartStaffDBCase(unittest.TestCase):
         self.assertEqual(int(before.version or 0), int(after.version or 0))
         self.assertEqual(before.modified, after.modified)
 
-    def test_detail_page_template_renders(self):
-        frappe.local.form_dict = frappe._dict({"cart_name": self.cart.name})
-        path = frappe.get_app_path("biozone_web", "www", "staff", "cart_detail.py")
-        spec = importlib.util.spec_from_file_location("bz_cart_detail_page_test", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        context = frappe._dict()
-        module.get_context(context)
-        template_path = (
-            Path(frappe.get_app_path("biozone_web", "www", "staff")) / "cart-detail.html"
-        )
-        html = get_jenv().from_string(open(template_path).read()).render(**context)
-        self.assertIn("تفاصيل السلة", html)
-        self.assertIn(self.cart.name, html)
+    def test_desk_page_is_synced_and_served(self):
+        from frappe.desk import desk_page
 
-    def test_list_page_accepts_all_tab(self):
-        frappe.local.form_dict = frappe._dict({"st": "All"})
-        path = frappe.get_app_path("biozone_web", "www", "staff", "carts.py")
-        spec = importlib.util.spec_from_file_location("bz_carts_page_test", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        context = frappe._dict()
-        module.get_context(context)
-        self.assertEqual(context.st, "All")
-        self.assertEqual(context.counts["All"], context.total)
+        self.assertTrue(frappe.db.exists("Page", "carts"))
+        doc = desk_page.get("carts")
+        self.assertEqual(doc.name, "carts")
+        self.assertIn("frappe.pages", doc.script or "")
+        self.assertIn("staff_cart_list", doc.script or "")
+
+    def test_list_accepts_all_status(self):
+        data = cart_staff.list_carts(status="All", q=self.cart.name)
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(data["counts"]["All"], 1)
 
     def test_list_filters_status_and_search(self):
         data = cart_staff.list_carts(status="Active", q=self.cart.name)

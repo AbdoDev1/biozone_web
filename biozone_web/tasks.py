@@ -88,6 +88,32 @@ def _purge_access_logs(cutoff):
     return len(names)
 
 
+def purge_cart_snapshots():
+    """Hard-delete expired Clear/Remove snapshots.
+
+    Restored snapshots are kept (audit trail). Recent snapshots stay even if
+    their status is Expired. `frappe.db.delete` bypasses the recycle bin, so
+    no Deleted Document row is created for these short-lived recovery copies.
+    """
+    if not frappe.db.table_exists("BZ Cart Snapshot"):
+        return 0
+    now = frappe.utils.now_datetime()
+    names = frappe.get_all(
+        "BZ Cart Snapshot",
+        filters={
+            "expires_on": ["<=", now],
+            "status": ["!=", "Restored"],
+        },
+        pluck="name",
+        order_by="expires_on asc",
+        limit=PURGE_BATCH,
+    )
+    if not names:
+        return 0
+    frappe.db.delete("BZ Cart Snapshot", {"name": ["in", names]})
+    return len(names)
+
+
 def _purge_converted_carts(cutoff):
     names = frappe.db.sql(
         """

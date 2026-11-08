@@ -42,6 +42,14 @@
     return ACCOUNT_PREFIX + String(user || '').trim().toLowerCase();
   }
 
+  function undoToken() {
+    var token = '';
+    while (token.length < 32) {
+      token += randomId().replace(/[^0-9a-f]/gi, '').toLowerCase();
+    }
+    return token.slice(0, 64);
+  }
+
   function roundQty(value) {
     return Math.round((Number(value) || 0) * 1000) / 1000;
   }
@@ -146,17 +154,24 @@
       item_count: 0,
       loading: false,
       error: null,
-      droppedCount: 0
+      droppedCount: 0,
+      undo: null,
+      skipped: []
     };
   };
 
   CartStore.prototype.configure = function (opts) {
+    var previousUser = this.user;
     opts = opts || {};
     this.user = opts.user || window.BZ_STORE_USER || 'Guest';
     this.isGuest = !this.user || this.user === 'Guest';
     this.key = this.isGuest ? GUEST_KEY : accountKey(this.user);
     this.accountKey = accountKey(this.user);
-    if (this.isGuest) this._localMode = true;
+    if (this.isGuest) {
+      this._localMode = true;
+    } else if (previousUser !== this.user) {
+      this._localMode = false;
+    }
   };
 
   CartStore.prototype.init = function (opts) {
@@ -166,7 +181,7 @@
     this._bind();
     this._initPromise = (async function (self) {
       try {
-        await self.refresh({ silent: true });
+        await self.refresh({ silent: true, includeUndo: !!opts.includeUndo });
       } catch (e) {}
       if (!self.isGuest && opts.autoMergeLocalAccount !== false) {
         await self._autoMergeLocalAccount();
@@ -313,7 +328,9 @@
       item_count: Number(quote.item_count || items.length),
       loading: false,
       error: null,
-      droppedCount: 0
+      droppedCount: 0,
+      undo: data.undo || null,
+      skipped: data.skipped || []
     };
     this._emit();
     return this.state;
@@ -325,7 +342,10 @@
     this.state = Object.assign({}, this.state, { loading: true, error: null });
     this._emit();
     try {
-      var data = await callApi('biozone_cart_get', null, 'GET');
+      var path = opts.includeUndo
+        ? 'biozone_cart_get?include_undo=1'
+        : 'biozone_cart_get';
+      var data = await callApi(path, null, 'GET');
       return this._setServerState(data);
     } catch (err) {
       if (err.code === 'CUSTOMER_MISSING' || err.code === 'CUSTOMER_GROUP_INELIGIBLE') {
@@ -599,6 +619,41 @@
     }
   };
 
+  CartStore.prototype.undo = async function (undoInfo) {
+    if (!undoInfo || !undoInfo.snapshot) {
+      throw new CartApiError(
+        { error: 'لا توجد نسخة للاستعادة', error_code: 'SNAPSHOT_NOT_AVAILABLE' },
+        404
+      );
+    }
+    if (this.isGuest || this._localMode) {
+      throw new CartApiError(
+        { error: 'التراجع متاح بعد تسجيل الدخول فقط', error_code: 'FEATURE_DISABLED' },
+        404
+      );
+    }
+    try {
+      var data = await callApi('biozone_cart_undo', {
+        snapshot: undoInfo.snapshot,
+        restore_token: undoToken(),
+        cart_version: Number(this.state.version || 0)
+      });
+      var state = this._setServerState(data);
+      // _setServerState rebuilds the public state and drops the undo
+      // response counters; the toast reads them from the result.
+      state.restored_count = Number(data.restored_count || 0);
+      state.skipped_count = Number(data.skipped_count || 0);
+      state.already_restored = !!data.already_restored;
+      state.applied_mode = data.applied_mode || null;
+      return state;
+    } catch (err) {
+      if (err.status === 409) {
+        await this.refresh({ silent: true, includeUndo: true });
+      }
+      throw err;
+    }
+  };
+
   CartStore.prototype.getQty = function (itemCode) {
     var items = this.state.items || [];
     for (var i = 0; i < items.length; i += 1) {
@@ -654,7 +709,10 @@
       throw new CartApiError({ error: 'سجّل الدخول أولًا لإتمام طلبك', error_code: 'LOGIN_REQUIRED' }, 401);
     }
     if (this._localMode || this.state.mode !== 'server') {
-      throw new CartApiError({ error: 'تعذر الاتصال بسلة الحساب، حدّث الصفحة وحاول مجددًا', error_code: 'CART_UNAVAILABLE' }, 422);
+      var localError = this.state && this.state.error
+        ? this.state.error
+        : 'تعذر الاتصال بسلة الحساب، حدّث الصفحة وحاول مجددًا';
+      throw new CartApiError({ error: localError, error_code: 'CART_UNAVAILABLE' }, 422);
     }
     var version = Number(this.state.version || 0);
     var fingerprint = this.state.quote_fingerprint;

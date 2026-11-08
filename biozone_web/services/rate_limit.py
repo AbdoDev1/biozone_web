@@ -53,6 +53,64 @@ FAILURE_POLICY = {
 	"biozone_forgot_password": "closed",
 }
 
+# Cart/checkout ceilings (2026-11-06 decision): per user per minute.
+# Guest requests use the Cloudflare-derived IP; authenticated requests never
+# use an IP so a shared tunnel address cannot throttle every customer.
+CART_LIMITS = {
+	"cart_get": 120,
+	"cart_prices": 120,
+	"cart_add": 120,
+	"cart_set_qty": 120,
+	"cart_remove": 60,
+	"cart_clear": 60,
+	"cart_undo": 30,
+	"cart_transfer_preview": 30,
+	"cart_transfer_apply": 30,
+	"checkout_status": 120,
+	"confirm_order": 10,
+}
+CART_WINDOW = 60
+
+
+def _cart_identity():
+	user = getattr(frappe.session, "user", None)
+	if user and user != "Guest":
+		digest = hashlib.sha256(user.encode("utf-8")).hexdigest()[:32]
+		return f"user:{digest}"
+	ip, trusted = get_client_ip()
+	if trusted:
+		return f"ip:{ip}"
+	return f"ip:{FALLBACK_IDENT}"
+
+
+def cart_rate_limited(action):
+	"""Per-user (or per-IP for Guest) cart ceiling.
+
+	Must sit below @frappe.whitelist, like rate_limited. Redis failure is
+	fail-open with a logged trace: ownership/version checks remain the
+	security boundary, and a cache outage must not stop checkout.
+	"""
+
+	limit = CART_LIMITS[action]
+
+	def deco(fn):
+		@wraps(fn)
+		def wrapper(*args, **kwargs):
+			key = f"rl:cart:{action}:{_cart_identity()}"
+			try:
+				if _hit(key, CART_WINDOW) > limit:
+					return _limited_response(CART_WINDOW)
+			except Exception:
+				frappe.log_error(
+					title=f"Cart rate limit backend failed: {action}",
+					message=frappe.get_traceback(),
+				)
+			return fn(*args, **kwargs)
+
+		return wrapper
+
+	return deco
+
 
 def normalize_ip(raw):
 	"""Canonicalize an IP string, or (None, False) when unusable.
