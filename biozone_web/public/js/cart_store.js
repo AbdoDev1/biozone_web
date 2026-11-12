@@ -704,6 +704,55 @@
     return res;
   };
 
+  // PRICE_CHANGED mitigation: after the automatic refresh, retry once only when
+  // the customer-visible quote is still valid and the total is unchanged, so no
+  // order is ever created at a price the customer did not see.
+  CartStore.prototype._confirmRetryState = function (agreedTotal) {
+    if (this.state.mode !== 'server' || this.state.error) return null;
+    var quote = this.state.quote || {};
+    if (quote.valid === false) return null;
+    if (Number(quote.net_total || 0) !== Number(agreedTotal || 0)) return null;
+    var fingerprint = this.state.quote_fingerprint;
+    if (!fingerprint) return null;
+    var version = Number(this.state.version || 0);
+    return {
+      version: version,
+      fingerprint: fingerprint,
+      token: this._checkoutToken(version, fingerprint)
+    };
+  };
+
+  CartStore.prototype._confirmRetrySend = async function (retry) {
+    try {
+      var res = await callApi('biozone_confirm_order', {
+        checkout_token: retry.token,
+        cart_version: retry.version,
+        quote_fingerprint: retry.fingerprint
+      });
+      this._clearCheckoutToken();
+      await this.refresh({ silent: true });
+      return res;
+    } catch (err) {
+      if (err.code === 'CHECKOUT_IN_PROGRESS') {
+        try {
+          var status = await this.checkoutStatus(retry.token);
+          if (status && status.status === 'Success') {
+            return {
+              ok: true,
+              sales_order: status.sales_order,
+              redirect: status.redirect
+            };
+          }
+        } catch (e) {}
+      }
+      if (err.status === 422 || err.status === 409) {
+        this._clearCheckoutToken();
+        await this.refresh({ silent: true });
+      }
+      throw err;
+    }
+  };
+
   CartStore.prototype.confirmOrder = async function () {
     if (this.isGuest) {
       throw new CartApiError({ error: 'سجّل الدخول أولًا لإتمام طلبك', error_code: 'LOGIN_REQUIRED' }, 401);
@@ -720,6 +769,7 @@
       throw new CartApiError({ error: 'حدّث السلة ثم أعد المحاولة', error_code: 'CART_QUOTE_INVALID' }, 422);
     }
     var token = this._checkoutToken(version, fingerprint);
+    var agreedTotal = Number(this.state.net_total || 0);
     try {
       var res = await callApi('biozone_confirm_order', {
         checkout_token: token,
@@ -744,6 +794,10 @@
       } else if (err.code === 'PRICE_CHANGED' || err.code === 'CART_VERSION_CONFLICT') {
         this._clearCheckoutToken();
         await this.refresh({ silent: true });
+        if (err.code === 'PRICE_CHANGED') {
+          var retry = this._confirmRetryState(agreedTotal);
+          if (retry) return this._confirmRetrySend(retry);
+        }
       } else if (err.status === 422 || err.status === 409) {
         this._clearCheckoutToken();
         await this.refresh({ silent: true });
