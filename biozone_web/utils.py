@@ -969,6 +969,21 @@ def get_group_min_order_amount(customer_group):
 	return value
 
 
+def _effective_unit_price(price_list_rate, discount_amount, discount_percentage):
+	"""سعر الوحدة النهائي بنفس ترتيب ERPNext في calculate_item_rate:
+	الخصم يُقرَّب لخانتين أولًا ثم يُطرح، ثم يُقرَّب السعر —
+	راجع taxes_and_totals.py:194-204."""
+	price_list_rate = frappe.utils.flt(price_list_rate)
+	discount_percentage = frappe.utils.flt(discount_percentage)
+	if discount_percentage:
+		discount_amount = frappe.utils.flt(
+			price_list_rate * discount_percentage / 100.0, 2
+		)
+	else:
+		discount_amount = frappe.utils.flt(discount_amount, 2)
+	return frappe.utils.flt(price_list_rate - discount_amount, 2)
+
+
 def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 	"""السعر النهائي (بعد خصم الفئة) لمجموعة أصناف، دفعة واحدة عبر محرك
 	ERPNext الحقيقي — نفس المحرك الذي يسعّر صفوف Sales Order.
@@ -1081,11 +1096,15 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 	for code, row in zip(pricable, engine_out):
 		base = base_map[code]
 		price_list_rate = frappe.utils.flt(row.get("price_list_rate")) or base
-		discount_amount = frappe.utils.flt(row.get("discount_amount"))
+		discount_percentage = frappe.utils.flt(row.get("discount_percentage"))
 		result[code] = {
-			"price": price_list_rate - discount_amount,
+			"price": _effective_unit_price(
+				price_list_rate,
+				row.get("discount_amount"),
+				discount_percentage,
+			),
 			"base_price": base,
-			"discount_percentage": frappe.utils.flt(row.get("discount_percentage")),
+			"discount_percentage": discount_percentage,
 		}
 
 	return result
