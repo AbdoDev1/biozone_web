@@ -62,6 +62,12 @@
     </button>
   </div>
 
+  <!-- سلة الزائر المعلّقة: تظهر للحساب المسجّل فقط، وبنقرة صريحة للمراجعة -->
+  <div class="hidden mb-md flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3" id="guest-merge-banner">
+    <p class="text-sm font-semibold leading-6 text-on-surface" id="guest-merge-banner-text"></p>
+    <button class="rounded-full bg-primary px-5 py-2 text-sm font-bold text-on-primary transition-colors hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-50" id="guest-merge-banner-btn" type="button">مراجعة النقل</button>
+  </div>
+
   <!-- Empty state -->
   <div class="hidden flex-col items-center justify-center rounded-xl border border-outline-variant/50 bg-surface-container-lowest px-6 py-20 text-center shadow-sm" id="empty-cart">
     <div class="flex h-24 w-24 items-center justify-center rounded-full bg-surface-container">
@@ -113,9 +119,15 @@
           <span class="text-base font-bold text-on-surface" id="summary-total-label">الإجمالي</span>
           <span class="text-xl font-extrabold text-primary" id="summary-total">٠٫٠٠ ج.م</span>
         </div>
-        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled>
-          <span class="material-symbols-outlined text-xl">check_circle</span>
-          تأكيد الطلب
+        <div class="hidden mt-3 rounded-lg bg-surface-container px-3 py-2 text-xs font-semibold leading-6 text-on-surface-variant" id="cart-min-order-note" role="status" aria-live="polite"></div>
+        {% if is_guest %}
+        <div class="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-6 text-on-surface" id="guest-cart-note">
+          أنت تتسوق كزائر: الأسعار المعروضة أسعار الجمهور. سجّل الدخول لاحتساب أسعار فئتك، ولنقل هذه السلة إلى حسابك بموافقتك.
+        </div>
+        {% endif %}
+        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled data-guest-label="تسجيل الدخول لإتمام الطلب">
+          <span class="material-symbols-outlined text-xl">{% if is_guest %}login{% else %}check_circle{% endif %}</span>
+          {% if is_guest %}تسجيل الدخول لإتمام الطلب{% else %}تأكيد الطلب{% endif %}
         </button>
         {% if free_shipping_threshold %}
         <p class="mt-3 flex items-start justify-center gap-2 text-center text-sm sm:text-base font-semibold leading-relaxed text-on-surface-variant">
@@ -155,6 +167,29 @@
       <div class="flex items-center justify-end gap-2">
         <button class="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors" id="clear-cart-cancel" type="button">تراجع</button>
         <button class="px-4 py-2 rounded-full bg-error text-on-error text-sm font-bold hover:opacity-90 transition-opacity" id="clear-cart-confirm" type="button">تأكيد الإفراغ</button>
+      </div>
+    </div>
+  </div>
+  <!-- مودال نقل سلة الزائر: معاينة + موافقة صريحة -->
+  <div class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 p-4" id="guest-merge-modal" role="dialog" aria-modal="true" aria-labelledby="guest-merge-title">
+    <div class="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-surface-container-lowest p-5 shadow-2xl">
+      <div>
+        <h3 class="text-lg font-extrabold text-on-surface" id="guest-merge-title">نقل سلة الزائر إلى حسابك</h3>
+        <p class="mt-1 text-sm leading-6 text-on-surface-variant">
+          هذه معاينة لما سيتغيّر. الأسعار والوحدات والتوفر محدّثة الآن من الخادم، وأنت تقرر كل سطر قبل النقل. سلة الحساب لا تتغيّر قبل موافقتك.
+        </p>
+      </div>
+      <div class="hidden rounded-lg border border-error/40 bg-error/5 p-3 text-sm leading-6 text-error" id="guest-merge-load-error" role="alert"></div>
+      <div class="space-y-3" id="guest-merge-rows"></div>
+      <div class="hidden rounded-lg border border-outline-variant/60 bg-surface-container p-3 text-sm leading-6 text-on-surface" id="guest-merge-excluded"></div>
+      <div class="text-sm font-semibold leading-6 text-on-surface" id="guest-merge-limits"></div>
+      <label class="hidden items-start gap-2 rounded-lg border border-outline-variant/60 p-3 text-sm leading-6 text-on-surface" id="guest-merge-ack-wrap">
+        <input class="mt-1" id="guest-merge-ack" type="checkbox">
+        <span id="guest-merge-ack-text"></span>
+      </label>
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+        <button class="rounded-full bg-surface-container px-4 py-2 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container-high" id="guest-merge-later" type="button">لاحقًا</button>
+        <button class="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-on-primary transition-colors hover:bg-primary-container disabled:opacity-50" id="guest-merge-apply" type="button" disabled>نقل إلى سلة حسابي</button>
       </div>
     </div>
   </div>
@@ -198,6 +233,7 @@
 </template>
 
 <script src="/assets/biozone_web/js/cart_checkout_guard.js"></script>
+<script src="/assets/biozone_web/js/guest_cart_merge.js?v=20261120-7"></script>
 <script>
 (function () {
   const CSRF_TOKEN = {{ csrf_token|tojson }};
@@ -205,9 +241,19 @@
   const PRECHECK_TIMEOUT_MS = 30000;
   const CONFIRM_TIMEOUT_MS = 120000;
   const LOCK_WAIT_TIMEOUT_MS = 30000;
-  // سلة محلية لكل حساب مسجل فقط — لا مفتاح للزائر.
-  if (!window.BZ_CART_KEY) { window.location.href = '/login'; return; }
-  const CART_KEY = window.BZ_CART_KEY;
+  // السلة متاحة للزائر أيضًا (مفتاح __guest__): العرض والتعديل مسموحان،
+  // وإتمام الطلب يتطلب دخولًا. نقل سلة الزائر إلى الحساب لا يحدث إلا
+  // بمعاينة وموافقة صريحة بعد الدخول.
+  const IS_GUEST = !window.BZ_STORE_USER || window.BZ_STORE_USER === 'Guest';
+  const STORE_USER = IS_GUEST ? '' : window.BZ_STORE_USER;
+  const CART_KEY = window.BZ_CART_KEY
+    || (window.BzGuestCart ? window.BzGuestCart.GUEST_KEY : 'biozone_cart_items:__guest__');
+  const LOGIN_RETURN_KEY = 'biozone_login_return';
+  // حالة إمكانية النقل تُحسب فور تحميل السكربت — قبل أي شبكة أو تفاعل:
+  // بلا Web Locks يظهر زر النقل معطّلًا والرسالة من أول لحظة.
+  const MERGE_UI = window.BzGuestCart && window.BzGuestCart.mergeUiState
+    ? window.BzGuestCart.mergeUiState()
+    : { available: false, buttonDisabled: true, message: 'نقل سلة الزائر غير متاح على هذا المتصفح.' };
   // Helper hint only: whether the last reprice saw a guest session.
   // Never the sole basis for messaging; HTTP status decides.
   let cartIsGuest = false;
@@ -272,6 +318,10 @@
     var btn = document.getElementById('confirm-order-btn');
     if (!btn || !window.BzCartCheckout) return;
     var content = window.BzCartCheckout.confirmButtonContent(phase);
+    // الزائر لا يؤكد طلبًا: الزر يتحول إلى مدخل تسجيل الدخول مع العودة للسلة.
+    if (IS_GUEST && phase === 'idle') {
+      content = { text: btn.getAttribute('data-guest-label') || 'تسجيل الدخول لإتمام الطلب', icon: 'login', busy: false };
+    }
     btn.innerHTML = '';
     var icon = document.createElement('span');
     icon.className = 'material-symbols-outlined text-xl' + (content.busy ? ' bz-spin' : '');
@@ -300,6 +350,32 @@
 
   function formatPrice(value) {
     return Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  }
+
+  // آخر نتيجة تسعير سيرفر-سايد (بما فيها الحد الأدنى لفئة المستخدم).
+  let lastPriceMeta = null;
+
+  // الحد الأدنى لفئة المستخدم الحالي: عرض فقط، والسلطة النهائية للتأكيد.
+  function renderMinOrder(meta) {
+    var box = document.getElementById('cart-min-order-note');
+    if (!box) return;
+    var limit = meta && meta.min_applies ? Number(meta.min_limit || 0) : 0;
+    if (!limit) {
+      box.textContent = '';
+      box.classList.add('hidden');
+      return;
+    }
+    var total = cartTotal(loadCart());
+    box.textContent = total + 0.005 < limit
+      ? 'الحد الأدنى للطلب لفئتك ' + formatPrice(limit) + ' — إجمالي سلتك الحالي ' + formatPrice(total) + '، ويُتحقق منه عند التأكيد.'
+      : 'الحد الأدنى للطلب لفئتك ' + formatPrice(limit) + '.';
+    box.classList.remove('hidden');
+  }
+
+  // العودة إلى السلة بعد الدخول (يقرأها www/login.html).
+  function goToLoginForCart() {
+    try { sessionStorage.setItem(LOGIN_RETURN_KEY, '/cart'); } catch (e) {}
+    window.location.href = '/login';
   }
 
   // إتمام موحّد: تنظيف المحاولة والسلة والشارة ثم التحويل. يُستخدم بعد
@@ -480,20 +556,26 @@
     if (textEl) textEl.textContent = '';
   }
 
-  function setNotice(message, warning) {
+  // persist=true: إشعار نتيجة النقل — لا يمحوه حدث storage من تبويب آخر
+  // قبل أن يراه المستخدم (يمحوه فقط فعل صريح منه).
+  function setNotice(message, warning, persist) {
     var noticeEl = document.getElementById('cart-reprice-notice');
     if (!noticeEl) return;
     noticeEl.textContent = message;
     noticeEl.classList.toggle('bz-notice-warning', !!warning);
     noticeEl.classList.remove('hidden');
+    noticeEl.setAttribute('data-persist', persist ? '1' : '0');
   }
 
-  function clearNotice() {
+  // opts.fromStorage: تُستدعى من مستمع storage فقط — لا تمس إشعارًا محفوظًا.
+  function clearNotice(opts) {
     var noticeEl = document.getElementById('cart-reprice-notice');
     if (!noticeEl) return;
+    if (opts && opts.fromStorage && noticeEl.getAttribute('data-persist') === '1') return;
     noticeEl.textContent = '';
     noticeEl.classList.remove('bz-notice-warning');
     noticeEl.classList.add('hidden');
+    noticeEl.setAttribute('data-persist', '0');
   }
 
   function render() {
@@ -612,6 +694,7 @@
 
     document.getElementById('summary-total-label').textContent = 'الإجمالي (' + totalUnits + ' عنصر)';
     document.getElementById('summary-total').textContent = formatPrice(subtotal);
+    if (lastPriceMeta) renderMinOrder(lastPriceMeta);
   }
 
   function updateQty(itemCode, newQty) {
@@ -1165,6 +1248,11 @@
 
   document.getElementById('confirm-order-btn').addEventListener('click', async () => {
     if (cartBusy) return;
+    // الزائر: لا تأكيد قبل الدخول — نعود به إلى السلة بعد الدخول.
+    if (IS_GUEST) {
+      goToLoginForCart();
+      return;
+    }
     hideConfirmError();
     hideRefreshHint();
     clearNotice();
@@ -1188,6 +1276,501 @@
     }
   });
 
+  // ===== نقل سلة الزائر إلى سلة الحساب: معاينة + موافقة صريحة =====
+  // لا شيء يُكتب في سلة الحساب قبل «نقل إلى سلة حسابي»، والمسح لا يحدث
+  // إلا بعد نجاح الكتابة. كل الأسعار والوحدات من الخادم الآن.
+  const mergeStore = window.localStorage;
+  let mergeState = null;
+  let mergeBusy = false;
+
+  function mergeEl(id) { return document.getElementById(id); }
+
+  function makeEl(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function pendingGuestCount() {
+    if (!window.BzGuestCart) return 0;
+    return window.BzGuestCart.readItems(mergeStore, window.BzGuestCart.GUEST_KEY).length;
+  }
+
+  function showMergeBanner() {
+    var banner = mergeEl('guest-merge-banner');
+    var text = mergeEl('guest-merge-banner-text');
+    var bannerBtn = mergeEl('guest-merge-banner-btn');
+    if (!banner || !text) return;
+    var pending = !IS_GUEST && window.BzGuestCart
+      && window.BzGuestCart.hasPendingGuestCart(mergeStore, STORE_USER);
+    if (!pending) {
+      banner.classList.add('hidden');
+      banner.classList.remove('flex');
+      return;
+    }
+    if (!MERGE_UI.available) {
+      // لا نوحي بإمكانية النقل: الزر معطّل والسبب ظاهر من أول الصفحة.
+      text.textContent = mergeUnsupportedMessage();
+      if (bannerBtn) bannerBtn.disabled = true;
+    } else {
+      text.textContent = 'لديك سلة كزائر فيها ' + pendingGuestCount()
+        + ' أصناف لم تُنقل بعد إلى حسابك. راجعها قبل أن تنساها.';
+      if (bannerBtn) bannerBtn.disabled = false;
+    }
+    banner.classList.remove('hidden');
+    banner.classList.add('flex');
+  }
+
+  function openMergeModal() {
+    var modal = mergeEl('guest-merge-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeMergeModal() {
+    var modal = mergeEl('guest-merge-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  function setMergeLoading(message) {
+    var limits = mergeEl('guest-merge-limits');
+    if (limits) limits.textContent = message;
+  }
+
+  function showMergeLoadError(message) {
+    var box = mergeEl('guest-merge-load-error');
+    if (!box) return;
+    box.textContent = message;
+    box.classList.remove('hidden');
+  }
+
+  function hideMergeLoadError() {
+    var box = mergeEl('guest-merge-load-error');
+    if (box) box.classList.add('hidden');
+  }
+
+  function renderMergeRows() {
+    var list = mergeEl('guest-merge-rows');
+    if (!list || !mergeState) return;
+    list.innerHTML = '';
+    mergeState.plan.rows.forEach(function (row) {
+      var box = makeEl('div', 'rounded-lg border border-outline-variant/60 p-3');
+      var head = makeEl('div', 'flex flex-wrap items-start justify-between gap-2');
+      var title = makeEl('p', 'text-sm font-bold text-on-surface',
+        (row.item_name || row.item_code) + ' (' + row.item_code + ')');
+      var badgeText = row.kind === 'add' ? 'سيُضاف'
+        : (row.kind === 'qty' ? 'نفس الصنف في سلتك' : 'تعارض وحدة البيع');
+      var badge = makeEl('span',
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold '
+          + (row.kind === 'uom' ? 'bg-error/10 text-error' : 'bg-primary/10 text-primary'),
+        badgeText);
+      head.appendChild(title);
+      head.appendChild(badge);
+      box.appendChild(head);
+
+      var detail;
+      if (row.kind === 'add') {
+        detail = 'الكمية ' + row.quantity + (row.uom ? ' ' + row.uom : '')
+          + ' — سعر الوحدة بعد التحديث ' + formatPrice(row.price);
+        if (Math.abs(Number(row.wasPrice || 0) - Number(row.price || 0)) > 0.005) {
+          detail += ' (كان ' + formatPrice(row.wasPrice) + ')';
+        }
+      } else if (row.kind === 'qty') {
+        detail = 'كمية الحساب ' + row.accountQty + (row.uom ? ' ' + row.uom : '')
+          + ' + كمية الزائر ' + row.guestQty + ' — الناتج حسب اختيارك'
+          + ' — سعر الوحدة بعد التحديث ' + formatPrice(row.price);
+        if (Math.abs(Number(row.accountPrice || 0) - Number(row.price || 0)) > 0.005) {
+          detail += ' (سعر الحساب كان ' + formatPrice(row.accountPrice) + ')';
+        }
+        if (Math.abs(Number(row.wasPrice || 0) - Number(row.price || 0)) > 0.005) {
+          detail += ' (سعر الزائر كان ' + formatPrice(row.wasPrice) + ')';
+        }
+      } else {
+        detail = 'الحساب: ' + row.accountQty + ' ' + row.accountUom
+          + ' — الزائر: ' + row.guestQty + ' ' + row.guestUom
+          + '. الوحدتان مختلفتان فلا تُجمعان تلقائيًا.';
+      }
+      box.appendChild(makeEl('p', 'mt-1 text-xs leading-6 text-on-surface-variant', detail));
+
+      if (row.kind !== 'add') {
+        var select = makeEl('select',
+          'mt-2 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface');
+        var options = row.kind === 'qty'
+          ? [
+              ['sum', 'جمع الكميتين (' + (row.accountQty + row.guestQty) + ' ' + (row.uom || '') + ')'],
+              ['keep_account', 'إبقاء كمية الحساب (' + row.accountQty + ')'],
+              ['use_guest', 'استخدام كمية الزائر (' + row.guestQty + ')']
+            ]
+          : [
+              ['', '— اختر وحدة البيع —'],
+              ['keep_account', 'إبقاء وحدة الحساب (' + row.accountUom + ')'],
+              ['use_guest', 'استخدام وحدة الزائر (' + row.guestUom + ')']
+            ];
+        options.forEach(function (pair) {
+          var opt = makeEl('option', '', pair[1]);
+          opt.value = pair[0];
+          if (pair[0] === row.action) opt.selected = true;
+          if (!pair[0]) opt.disabled = true;
+          select.appendChild(opt);
+        });
+        select.setAttribute('data-item-code', row.item_code);
+        select.addEventListener('change', function () {
+          mergeState.decisions[row.item_code] = this.value;
+          updateMergeFooter();
+        });
+        box.appendChild(select);
+      }
+
+      list.appendChild(box);
+    });
+  }
+
+  function renderMergeExcluded() {
+    var box = mergeEl('guest-merge-excluded');
+    var ackWrap = mergeEl('guest-merge-ack-wrap');
+    var ackText = mergeEl('guest-merge-ack-text');
+    var ack = mergeEl('guest-merge-ack');
+    if (!box || !mergeState) return;
+    var excluded = mergeState.plan.unavailable.concat(mergeState.plan.invalid);
+    if (!excluded.length) {
+      box.classList.add('hidden');
+      if (ackWrap) { ackWrap.classList.add('hidden'); ackWrap.classList.remove('flex'); }
+      if (ack) ack.checked = false;
+      return;
+    }
+    var names = excluded.map(function (row) { return row.item_name || row.item_code; });
+    var shown = names.slice(0, 5).join('، ') + (names.length > 5 ? ' و' + (names.length - 5) + ' أخرى' : '');
+    box.textContent = 'لن تُنقل ' + excluded.length + ' أصناف لأنها غير متاحة أو بياناتها غير صالحة الآن: '
+      + shown + '. تبقى في سلة الزائر حتى تؤكد النقل، ثم تُزال من هذا المتصفح.';
+    box.classList.remove('hidden');
+    if (ackText) {
+      ackText.textContent = 'أوافق على استبعاد ' + excluded.length + ' أصناف غير متاحة من النقل.';
+    }
+    if (ackWrap) {
+      ackWrap.classList.remove('hidden');
+      ackWrap.classList.add('flex');
+    }
+  }
+
+  function mergeUnsupportedMessage() {
+    return MERGE_UI.message;
+  }
+
+  // تهيئة أولية: تعطيل زر النقل وإظهار الرسالة قبل أي محاولة.
+  function initMergeCapability() {
+    if (MERGE_UI.available) return;
+    var applyBtn = mergeEl('guest-merge-apply');
+    var bannerBtn = mergeEl('guest-merge-banner-btn');
+    if (applyBtn) applyBtn.disabled = true;
+    if (bannerBtn) bannerBtn.disabled = true;
+    setMergeLoading(mergeUnsupportedMessage());
+  }
+
+  function updateMergeFooter() {
+    var applyBtn = mergeEl('guest-merge-apply');
+    var limits = mergeEl('guest-merge-limits');
+    var ack = mergeEl('guest-merge-ack');
+    if (!applyBtn || !limits || !mergeState) return;
+
+    // fail-closed: بلا Web Locks لا نقل أصلًا (لا lease، لا كتابة، لا مسح).
+    if (!window.BzGuestCart || typeof window.BzGuestCart.hasWebLocks !== 'function'
+      || !window.BzGuestCart.hasWebLocks()) {
+      limits.textContent = mergeUnsupportedMessage();
+      applyBtn.disabled = true;
+      return;
+    }
+
+    var applied = window.BzGuestCart.applyPlan(
+      mergeState.plan, mergeState.decisions, mergeState.accountItems
+    );
+    var excludedCount = mergeState.plan.unavailable.length + mergeState.plan.invalid.length;
+    var enabled = false;
+
+    if (mergeState.plan.block) {
+      limits.textContent = 'لا يمكن النقل: سيصل عدد أصناف السلة إلى '
+        + mergeState.plan.block.projected + ' والحد الأقصى ' + mergeState.plan.block.max
+        + '. احذف ' + mergeState.plan.block.overflow
+        + ' صنفًا من سلة حسابك ثم أعد المحاولة — لن يُحذف شيء تلقائيًا.';
+    } else if (!applied.ok) {
+      limits.textContent = applied.error === 'unresolved'
+        ? 'اختر وحدة البيع لكل سطر متعارض: '
+          + applied.unresolved.map(function (row) { return row.item_name || row.item_code; }).join('، ')
+        : 'تعذّر تجهيز النقل. حدّث الصفحة ثم حاول مجددًا.';
+    } else {
+      var total = window.BzGuestCart.totalOf(applied.items);
+      var limit = mergeState.meta && mergeState.meta.min_applies
+        ? Number(mergeState.meta.min_limit || 0) : 0;
+      var text = 'إجمالي سلة حسابك بعد النقل: ' + formatPrice(total) + '.';
+      if (limit) {
+        text += total + 0.005 < limit
+          ? ' وهو أقل من الحد الأدنى لفئتك ' + formatPrice(limit) + ' — سيُطلب الوصول إليه قبل التأكيد.'
+          : ' والحد الأدنى لفئتك ' + formatPrice(limit) + ' محقق.';
+      }
+      limits.textContent = text;
+      enabled = true;
+    }
+    if (excludedCount && ack && !ack.checked) enabled = false;
+    applyBtn.disabled = !enabled || mergeBusy;
+  }
+
+  function renderMerge() {
+    if (!mergeState) return;
+    renderMergeRows();
+    renderMergeExcluded();
+    updateMergeFooter();
+  }
+
+  async function openGuestMergePreview() {
+    if (IS_GUEST || !window.BzGuestCart) return;
+    var guestRaw = window.BzGuestCart.readItems(mergeStore, window.BzGuestCart.GUEST_KEY);
+    if (!guestRaw.length || !window.BzGuestCart.hasPendingGuestCart(mergeStore, STORE_USER)) {
+      showMergeBanner();
+      return;
+    }
+    // بلا Web Locks: لا شبكة ولا معاينة — رسالة وزر معطّل فقط.
+    if (!MERGE_UI.available) {
+      openMergeModal();
+      hideMergeLoadError();
+      var unsupportedRows = mergeEl('guest-merge-rows');
+      if (unsupportedRows) unsupportedRows.innerHTML = '';
+      setMergeLoading(mergeUnsupportedMessage());
+      var unsupportedBtn = mergeEl('guest-merge-apply');
+      if (unsupportedBtn) unsupportedBtn.disabled = true;
+      return;
+    }
+    // أول حساب يرى سلة الزائر يصبح مالكها: لا نقل لحساب آخر على جهاز مشترك.
+    window.BzGuestCart.bindOwner(mergeStore, STORE_USER);
+
+    openMergeModal();
+    hideMergeLoadError();
+    var rowsEl = mergeEl('guest-merge-rows');
+    if (rowsEl) rowsEl.innerHTML = '';
+    var excludedEl = mergeEl('guest-merge-excluded');
+    if (excludedEl) excludedEl.classList.add('hidden');
+    var ackWrap = mergeEl('guest-merge-ack-wrap');
+    if (ackWrap) { ackWrap.classList.add('hidden'); ackWrap.classList.remove('flex'); }
+    var applyBtn = mergeEl('guest-merge-apply');
+    if (applyBtn) applyBtn.disabled = true;
+    setMergeLoading('جارٍ تحديث الأسعار والتحقق من التوفر من الخادم...');
+
+    try {
+      var guestMeta = await fetchPriceMeta(guestRaw.map(function (line) {
+        return { item_code: line.item_code, quantity: line.quantity, uom: line.uom || '' };
+      }));
+      var accountRaw = loadCart();
+      var accountMeta = accountRaw.length
+        ? await fetchPriceMeta(accountRaw.map(function (line) {
+            return { item_code: line.item_code, quantity: line.quantity, uom: line.uom || '' };
+          }))
+        : { prices: {}, min_limit: null, min_applies: false };
+      var guestPriced = window.BzGuestCart.priceLines(guestRaw, guestMeta.prices || {});
+      var accountPriced = window.BzGuestCart.priceLines(accountRaw, accountMeta.prices || {});
+      // سلة الحساب نفسها غير موثوقة: إن لم تُسعّر بالكامل لا نبني نتيجة
+      // تُسقط أسطرًا. المستخدم يحدّث الصفحة (التسعير التلقائي يعالجها).
+      if (accountPriced.unavailable.length || accountPriced.invalid.length) {
+        setMergeLoading('');
+        showMergeLoadError('تعذر تسعير بعض أصناف سلة حسابك الحالية. حدّث الصفحة ثم أعد المحاولة — لم يتغير شيء.');
+        return;
+      }
+      mergeState = {
+        plan: window.BzGuestCart.buildPlan({
+          guestLines: guestPriced.lines,
+          unavailable: guestPriced.unavailable,
+          invalid: guestPriced.invalid,
+          accountItems: accountPriced.lines,
+          maxLines: window.BzGuestCart.MAX_LINES
+        }),
+        accountItems: accountPriced.lines,
+        decisions: {},
+        meta: accountMeta && accountMeta.prices ? accountMeta : guestMeta,
+        // لقطة الهوية لحظة فتح المعاينة: تُقارن داخل القفل قبل الكتابة.
+        expected: {
+          guest: window.BzGuestCart.signature(guestRaw),
+          account: window.BzGuestCart.signature(accountRaw),
+          email: STORE_USER
+        }
+      };
+      renderMerge();
+    } catch (e) {
+      setMergeLoading('');
+      showMergeLoadError(e && e.code === 'RATE_LIMITED'
+        ? 'تم تجاوز عدد محاولات التحقق. انتظر قليلًا ثم أعد المحاولة — لم يتغير شيء.'
+        : 'تعذر التحقق من الأسعار الآن. تحقق من اتصالك ثم أعد المحاولة — لم يتغير شيء.');
+    }
+  }
+
+  async function applyGuestMerge() {
+    // fail-closed قبل أي شيء (حتى قبل وجود معاينة): بلا Web Locks لا نقل ولا مسح.
+    if (!window.BzGuestCart || typeof window.BzGuestCart.hasWebLocks !== 'function'
+      || !window.BzGuestCart.hasWebLocks()) {
+      setMergeLoading(mergeUnsupportedMessage());
+      var unsupportedApply = mergeEl('guest-merge-apply');
+      if (unsupportedApply) unsupportedApply.disabled = true;
+      return;
+    }
+    if (!mergeState || mergeBusy) return;
+    var ack = mergeEl('guest-merge-ack');
+    var excludedCount = mergeState.plan.unavailable.length + mergeState.plan.invalid.length;
+    if (excludedCount && ack && !ack.checked) return;
+
+    var plan = mergeState.plan;
+    var decisions = mergeState.decisions;
+    var expected = mergeState.expected;
+    var meta = mergeState.meta;
+    var accountItems = mergeState.accountItems;
+
+    mergeBusy = true;
+    var applyBtn = mergeEl('guest-merge-apply');
+    var laterBtn = mergeEl('guest-merge-later');
+    if (applyBtn) applyBtn.disabled = true;
+    if (laterBtn) laterBtn.disabled = true;
+    setMergeLoading('جارٍ التحقق من السلة لحظة النقل...');
+
+    var result;
+    try {
+      // قفل بين التبويبات + إعادة قراءة المفتاحين داخل القفل. أي اختلاف
+      // في البصمة = لا كتابة ولا مسح، وتُعاد المعاينة على الحالة الجديدة.
+      result = await window.BzGuestCart.commitMerge({
+        storage: mergeStore,
+        guestKey: window.BzGuestCart.GUEST_KEY,
+        accountKey: CART_KEY,
+        expected: expected,
+        buildItems: function () {
+          return window.BzGuestCart.applyPlan(plan, decisions, accountItems);
+        },
+        lock: function (callback) {
+          return window.BzCartCheckout.withCheckoutLock(
+            CART_KEY + ':merge',
+            function (info) {
+              // لا مسار بديل: أي وضع غير Web Locks = رفض (fail-closed).
+              if (!info || info.mode !== 'web-locks' || info.locked !== true) {
+                var lockErr = new Error('web-locks-unavailable');
+                lockErr.code = 'MERGE_LOCK_UNAVAILABLE';
+                throw lockErr;
+              }
+              return callback();
+            },
+            { storage: mergeStore, timeoutMs: LOCK_WAIT_TIMEOUT_MS }
+          );
+        }
+      });
+    } catch (err) {
+      mergeBusy = false;
+      if (laterBtn) laterBtn.disabled = false;
+      if (applyBtn) applyBtn.disabled = false;
+      setMergeLoading('');
+      if (err && err.code === 'CHECKOUT_LOCK_TIMEOUT') {
+        showMergeLoadError('هناك نقل آخر قيد التنفيذ في تبويب آخر. انتظر انتهاءه ثم أعد المحاولة — لم يتغير شيء.');
+      } else if (err && err.code === 'MERGE_LOCK_UNAVAILABLE') {
+        showMergeLoadError(mergeUnsupportedMessage());
+      } else {
+        showMergeLoadError('تعذر إتمام النقل الآن. لم يتغير شيء — حدّث الصفحة ثم حاول مجددًا.');
+      }
+      return;
+    }
+
+    mergeBusy = false;
+    if (laterBtn) laterBtn.disabled = false;
+
+    if (!result.ok) {
+      if (result.reason === 'changed') {
+        // لا كتابة ولا مسح: المعاينة أصبحت قديمة → أعد بنائها على الحالة الآن.
+        closeMergeModal();
+        mergeState = null;
+        showMergeBanner();
+        setNotice(
+          'تغيّرت سلة الحساب أو سلة الزائر أثناء المراجعة — لم يُنقل شيء ولم يُمسح شيء. أُعيدت المعاينة على الحالة الحالية.',
+          true,
+          true
+        );
+        await openGuestMergePreview();
+        return;
+      }
+      if (result.reason === 'storage') {
+        if (applyBtn) applyBtn.disabled = false;
+        showStorageError();
+        setMergeLoading('تعذر تثبيت النقل في هذا المتصفح — لم يُمسح شيء.');
+        return;
+      }
+      // line_cap / unresolved / invalid: الرسالة موجودة في التذييل.
+      updateMergeFooter();
+      return;
+    }
+
+    if (result.recovered) {
+      mergeState = null;
+      closeMergeModal();
+      showMergeBanner();
+      lastPriceMeta = meta || null;
+      try {
+        var recovered = await repriceFromServer(loadCart());
+        if (!recovered.failed && saveCart(recovered.items)) {
+          lastPriceMeta = recovered.meta || lastPriceMeta;
+        }
+      } catch (e) {}
+      render();
+      setNotice(
+        'أُكمل تنظيف نقلة سابقة كانت سلة الحساب قد كُتبت لها بالفعل — لم تُجمع الكميات مرتين.'
+          + (result.cleared ? '' : ' تعذر مسح نسخة الزائر من هذا المتصفح، لكنها لن تُعرض للنقل مرة أخرى.'),
+        !result.cleared,
+        true
+      );
+      return;
+    }
+
+    var stats = window.BzGuestCart.summarize(plan);
+    mergeState = null;
+    closeMergeModal();
+    showMergeBanner();
+    if (window.BzCartCheckout && window.BzCartCheckout.rotateCartInstance) {
+      cartInstance = window.BzCartCheckout.rotateCartInstance(window.localStorage, CART_KEY, null);
+    }
+
+    // تحديث الأسعار/الحد الأدنى للحساب بعد النقل (السيرفر هو السلطة).
+    lastPriceMeta = meta || null;
+    try {
+      var fresh = await repriceFromServer(loadCart());
+      if (!fresh.failed) {
+        if (saveCart(fresh.items)) lastPriceMeta = fresh.meta || lastPriceMeta;
+      }
+    } catch (e) {}
+    render();
+
+    setNotice(
+      'تم نقل سلة الزائر: ' + stats.added + ' صنفًا جديدًا، ' + stats.merged + ' كمية مدموجة'
+        + (stats.conflicts ? '، و' + stats.conflicts + ' تعارض وحدة حسمته بنفسك' : '')
+        + (stats.excluded ? '، واستُبعد ' + stats.excluded + ' صنفًا غير متاح' : '')
+        + '.'
+        + (result.cleared ? '' : ' تعذر مسح نسخة الزائر من هذا المتصفح، لكنها لن تُعرض للنقل مرة أخرى.'),
+      !result.cleared,
+      true
+    );
+  }
+
+  function initGuestMerge() {
+    showMergeBanner();
+    if (IS_GUEST || !window.BzGuestCart) return;
+    // لا فتح تلقائي لمودال نقل غير متاح على هذا المتصفح.
+    if (!MERGE_UI.available) return;
+    if (window.BzGuestCart.hasPendingGuestCart(mergeStore, STORE_USER)) {
+      openGuestMergePreview();
+    }
+  }
+
+  var mergeBannerBtn = mergeEl('guest-merge-banner-btn');
+  if (mergeBannerBtn) mergeBannerBtn.addEventListener('click', openGuestMergePreview);
+  var mergeLaterBtn = mergeEl('guest-merge-later');
+  if (mergeLaterBtn) mergeLaterBtn.addEventListener('click', closeMergeModal);
+  var mergeApplyBtn = mergeEl('guest-merge-apply');
+  if (mergeApplyBtn) mergeApplyBtn.addEventListener('click', applyGuestMerge);
+  var mergeAck = mergeEl('guest-merge-ack');
+  if (mergeAck) mergeAck.addEventListener('change', updateMergeFooter);
+
+  initMergeCapability();
   render();
   // البند 1: إذا تغيّرت السلة من تبويب آخر (كتالوج/سلة ثانية/تصفير بعد
   // طلب)، أعد العرض فورًا بلا reload.
@@ -1197,7 +1780,8 @@
       cartRevision.bump();
       hideConfirmError();
       hideRefreshHint();
-      clearNotice();
+      // لا يمحو إشعار نتيجة النقل قبل أن يراه المستخدم.
+      clearNotice({ fromStorage: true });
       clearMarks();
       render();
       if (cartBusy) {
@@ -1219,6 +1803,7 @@
       return;
     }
     cartIsGuest = !!(outcome.meta && outcome.meta.is_guest);
+    lastPriceMeta = outcome.meta || null;
     if (!saveCart(outcome.items)) {
       // Storage refused the refreshed prices: keep what is actually stored
       // and let the next confirm attempt re-verify before submitting.
@@ -1226,6 +1811,7 @@
       return;
     }
     render();
+    renderMinOrder(lastPriceMeta);
     if (outcome.removedCount > 0) {
       setNotice(
         'أُزيلت ' + outcome.removedCount + ' أصناف من السلة لعدم توفر سعرها حاليًا.'
@@ -1235,6 +1821,9 @@
       );
     }
     if (repriceConfirmBtn) repriceConfirmBtn.disabled = false;
+  }).finally(function () {
+    // بعد تسعير السلة الحالية: أظهر سلة الزائر المعلّقة (إن وُجدت) بمعاينة.
+    initGuestMerge();
   });
 })();
 </script>

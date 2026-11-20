@@ -107,7 +107,41 @@
 <a class="text-primary font-bold hover:underline" href="/biozone-home">← العودة إلى المتجر</a>
 </p>
 </main>
+<script src="/assets/biozone_web/js/guest_cart_merge.js?v=20261120-7"></script>
 <script>
+        const LOGIN_RETURN_KEY = 'biozone_login_return';
+
+        // مسار محلي فقط: لا تحويل خارجي عبر قيمة مخزّنة.
+        function safeLocalPath(value) {
+            if (typeof value !== 'string') return '';
+            if (value.charAt(0) !== '/') return '';
+            if (value.charAt(1) === '/' || value.charAt(1) === '\\') return '';
+            return value;
+        }
+
+        function takeLoginReturn() {
+            try {
+                const value = safeLocalPath(sessionStorage.getItem(LOGIN_RETURN_KEY) || '');
+                sessionStorage.removeItem(LOGIN_RETURN_KEY);
+                return value;
+            } catch (e) {
+                return '';
+            }
+        }
+
+        // بعد الدخول: العودة إلى السلة إن جاء المستخدم منها، أو إلى السلة
+        // إن كانت هناك سلة زائر معلّقة لم تُنقل بعد (تُعرض معاينتها هناك).
+        function postLoginTarget(email, homePage) {
+            const back = takeLoginReturn();
+            if (back) return back;
+            try {
+                if (window.BzGuestCart && window.BzGuestCart.hasPendingGuestCart(window.localStorage, email)) {
+                    return '/cart';
+                }
+            } catch (e) {}
+            return homePage || '/biozone-home';
+        }
+
         function switchTab(tab) {
             const loginForm = document.getElementById('form-login');
             const signupForm = document.getElementById('form-signup');
@@ -318,7 +352,7 @@
                     pwd: pwd,
                     remember_me: document.getElementById('login-remember').checked ? 1 : 0
                 });
-                window.location.href = result.home_page || '/biozone-home';
+                window.location.href = postLoginTarget(email, result.home_page);
             } catch (err) {
                 loginBtn.disabled = false;
                 // Wrong credentials stay uniform (no account enumeration);
@@ -369,7 +403,7 @@
                     phone: phone,
                     pwd: pwd
                 });
-                window.location.href = result.home_page || '/biozone-home';
+                window.location.href = postLoginTarget(email, result.home_page);
             } catch (err) {
                 signupBtn.disabled = false;
                 // Never surface "email already registered": the API text is

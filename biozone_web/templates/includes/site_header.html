@@ -106,13 +106,17 @@
 </form>
 {% endif %}
 <script>
-  // سلة محلية لكل حساب مسجل فقط (قرار المالك 2026-11-18):
-  // لا سلة للزائر — الإضافة تُوقَف وتُوجَّه للدخول. مفتاح مستقل لكل بريد.
-  // بلا سلة خادم وبلا عبور أجهزة؛ الأسعار والتحقق سيرفر-سايد دائمًا.
+  // سلة محلية لكل زائر/حساب في نفس مساحة المفاتيح: مفتاح ثابت للزائر
+  // (__guest__) ومفتاح مستقل لكل بريد للحساب. لا سلة خادم وبلا عبور
+  // أجهزة؛ الأسعار والتحقق سيرفر-سايد دائمًا، ونقل سلة الزائر إلى الحساب
+  // لا يحدث إلا بموافقة صريحة بعد الدخول (public/js/guest_cart_merge.js).
   window.BZ_STORE_USER = {{ store_user|default('Guest')|tojson }};
   function bzAccountKey(user) { return 'biozone_cart_items:' + String(user || '').trim().toLowerCase(); }
-  window.BZ_CART_KEY = (window.BZ_STORE_USER && window.BZ_STORE_USER !== 'Guest')
-    ? bzAccountKey(window.BZ_STORE_USER) : null;
+  window.BZ_GUEST_CART_KEY = bzAccountKey('__guest__');
+  window.BZ_CART_IS_GUEST = !window.BZ_STORE_USER || window.BZ_STORE_USER === 'Guest';
+  window.BZ_CART_KEY = window.BZ_CART_IS_GUEST
+    ? window.BZ_GUEST_CART_KEY
+    : bzAccountKey(window.BZ_STORE_USER);
   // Keeps the header cart badge in sync with the client-side cart
   // (see /cart's own script for the full read/write logic and the
   // localStorage key this depends on).

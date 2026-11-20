@@ -132,6 +132,7 @@ def _fail_staff_login():
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limited("biozone_staff_login")
 def staff_login(usr=None, pwd=None):
 	"""دخول الستاف عبر نطاق staff فقط — System Users دون غيرهم.
 

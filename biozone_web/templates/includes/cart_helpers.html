@@ -3,16 +3,10 @@
      localStorage key/shape as /cart's own script — see cart.html for
      the full read/render logic. -->
 <script>
-  // سلة محلية لكل حساب مسجل فقط: الهيدر يمرر مفتاح الحساب للداخل،
-  // وnull للزائر. لا مفتاح زائر مشترك بعد اليوم.
+  // سلة محلية للزائر وللحساب معًا: الزائر يضيف ويعدّل بحرية على مفتاحه
+  // (BZ_GUEST_CART_KEY)، والنقل إلى سلة حسابه لا يحدث إلا بموافقته بعد
+  // الدخول (public/js/guest_cart_merge.js). لا سلة خادم.
   const CART_STORAGE_KEY = window.BZ_CART_KEY;
-
-  // الزائر لا يملك سلة: أي محاولة إضافة تُوقَف وتُوجَّه لتسجيل الدخول.
-  function bzRequireLogin() {
-    if (CART_STORAGE_KEY) return true;
-    window.location.href = '/login';
-    return false;
-  }
 
   function showStorageError() {
     if (window.BzNotify) {
@@ -39,7 +33,6 @@
   const CART_MAX_LINES = 200;
 
   function addToCart(itemCode, itemName, itemGroup, price, buttonEl, uom) {
-    if (!bzRequireLogin()) return;
     let items = [];
     try {
       items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
@@ -169,7 +162,6 @@
   }
 
   function changeCatalogCartQty(el, delta) {
-    if (!bzRequireLogin()) return;
     const itemCode = el.dataset.itemCode;
     const itemName = el.dataset.itemName;
     const itemGroup = el.dataset.itemGroup;

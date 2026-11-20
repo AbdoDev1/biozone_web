@@ -1,5 +1,13 @@
 'use strict';
 
+// ملاحظة بيئية موثّقة (2026-11-20): على Node >= 22 يوجد globalThis.navigator
+// وnavigator.locks (Web Locks)، فيسلك withCheckoutLock مسار Web Locks
+// الحقيقي ويتخطى مسار الـlease الذي يختبره testLockTimeout — فتفشل
+// "a held lock must not be entered" في Node 24 رغم أن السلوك في المتصفح
+// صحيح (والاختبار يمر على Node 18/20 بدون shim).
+// التشغيل الموثّق على Node 24 (يجب أن يمر):
+//   node -e "Object.defineProperty(globalThis,'navigator',{value:undefined,configurable:true}); require('./biozone_web/tests/test_cart_checkout_guard.js')"
+// هذه ليست إصلاحًا للتست ولا تغييرًا في السلوك — توثيق فقط.
 const assert = require('node:assert');
 const guard = require('../public/js/cart_checkout_guard.js');
 

@@ -36,6 +36,9 @@ SERVICE_UNAVAILABLE_MESSAGE = "الخدمة مشغولة مؤقتًا، يرجى
 # (limit, window_seconds) -- starting values, tunable without shape change.
 LIMITS = {
 	"biozone_login": {"ip": (20, 3600)},
+	# دخول الموظفين: بكت IP مستقل عن المتجر (حتى لا يستهلك موظفٌ حصة عملاء)،
+	# ويُعرض عدّاده في صفحة /staff/login عند 429.
+	"biozone_staff_login": {"ip": (20, 3600)},
 	"biozone_sign_up": {"ip": (10, 3600)},
 	"biozone_forgot_password": {"ip": (5, 3600), "email": (3, 3600)},
 	# تكلفة تسعير عالية + متاح للضيف: حدّ IP سخي للتصفح الطبيعي، وحدّ
@@ -107,11 +110,48 @@ def _hit(namespaced_key, ttl):
 	return int(frappe.cache.incrby(full_key, 1))
 
 
+def _remaining_ttl(namespaced_key, window):
+	"""الثواني المتبقية فعلًا على نافذة العدّاد (لا طول النافذة).
+
+	العميل يعرض retry_after كما هو، فإرجاع 3600 دائمًا كان يقول «ساعة»
+	حتى لو بقي دقيقة. أي فشل/قيمة غير صالحة → نافذة كاملة (سلوك آمن).
+	"""
+	try:
+		full_key = frappe.cache.make_key(namespaced_key)
+		ttl = int(frappe.cache.ttl(full_key))
+	except Exception:
+		return window
+	if ttl <= 0 or ttl > window:
+		return window
+	return ttl
+
+
+def _fallback_limit(fn_name):
+	"""حدّ بكت السقف للطلبات غير الموثوقة المصدر (بلا هيدر Cloudflare).
+
+	الافتراضي الصارم يبقى كما هو (5/ساعة) أيضًا في الإنتاج. يمكن لموقع
+	تطوير رفعه صراحةً عبر site_config:
+	    "biozone_rate_limit_fallback": {"biozone_login": 10}
+	لا يعمل هذا التجاوز إلا إذا كُتب في إعداد الموقع — لا قيمة افتراضية جديدة.
+	"""
+	limit, ttl = FALLBACK_OVERRIDES.get(fn_name, FALLBACK_LIMIT)
+	try:
+		overrides = frappe.get_conf().get("biozone_rate_limit_fallback") or {}
+		if isinstance(overrides, dict) and fn_name in overrides:
+			value = int(overrides[fn_name])
+			if value > 0:
+				limit = value
+	except Exception:
+		pass
+	return limit, ttl
+
+
 def check_rate_limit(fn_name, email=None, user=None):
 	"""Decide a request: ("allow"|"deny"|"unavailable", retry_after).
 
-	"deny" carries the window seconds as retry_after. "unavailable" means
-	the Redis backend itself failed (policy applied by the caller).
+	"deny" carries the **remaining** seconds of the window as retry_after
+	(العميل يعرضه للمستخدم كما هو). "unavailable" means the Redis backend
+	itself failed (policy applied by the caller).
 	Counters are only those configured for the endpoint: some endpoints
 	key by IP (guest-facing), others by user (authenticated actions).
 	"""
@@ -123,7 +163,7 @@ def check_rate_limit(fn_name, email=None, user=None):
 			limit, ttl = cfg["ip"]
 			ident = ip
 		else:
-			limit, ttl = FALLBACK_OVERRIDES.get(fn_name, FALLBACK_LIMIT)
+			limit, ttl = _fallback_limit(fn_name)
 			ident = FALLBACK_IDENT
 		counters.append((f"rl:{fn_name}:ip:{ident}", limit, ttl))
 	if user and "user" in cfg:
@@ -135,7 +175,7 @@ def check_rate_limit(fn_name, email=None, user=None):
 	try:
 		for key, limit, ttl in counters:
 			if _hit(key, ttl) > limit:
-				return "deny", ttl
+				return "deny", _remaining_ttl(key, ttl)
 		return "allow", 0
 	except Exception:
 		frappe.log_error(

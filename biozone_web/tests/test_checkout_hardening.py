@@ -285,6 +285,7 @@ class TestRateLimitConfig(unittest.TestCase):
 		with (
 			patch.object(rate_limit, "get_client_ip", return_value=(None, False)),
 			patch.object(rate_limit, "_hit", return_value=301),
+			patch.object(rate_limit, "_remaining_ttl", return_value=3600),
 		):
 			decision, retry = rate_limit.check_rate_limit("biozone_get_cart_prices")
 		self.assertEqual(decision, "deny")
@@ -296,12 +297,64 @@ class TestRateLimitConfig(unittest.TestCase):
 		with (
 			patch.object(rate_limit, "get_client_ip", return_value=("1.2.3.4", True)),
 			patch.object(rate_limit, "_hit", return_value=61),
+			patch.object(rate_limit, "_remaining_ttl", return_value=3600),
 		):
 			decision, retry = rate_limit.check_rate_limit(
 				"biozone_confirm_order", user="u@example.com"
 			)
 		self.assertEqual(decision, "deny")
 		self.assertEqual(retry, 3600)
+
+	def test_staff_login_has_its_own_ip_bucket(self):
+		from biozone_web.services import rate_limit
+
+		self.assertIn("biozone_staff_login", rate_limit.LIMITS)
+		self.assertEqual(list(rate_limit.LIMITS["biozone_staff_login"]), ["ip"])
+
+	def test_deny_returns_remaining_window_not_full_window(self):
+		"""retry_after يجب أن يكون المتبقي الفعلي حتى تعرض الواجهة العدّاد الحقيقي."""
+		from biozone_web.services import rate_limit
+
+		with (
+			patch.object(rate_limit, "get_client_ip", return_value=(None, False)),
+			patch.object(rate_limit, "_fallback_limit", return_value=(5, 3600)),
+			patch.object(rate_limit, "_hit", return_value=6),
+			patch.object(rate_limit, "_remaining_ttl", return_value=900),
+		):
+			decision, retry = rate_limit.check_rate_limit("biozone_login")
+		self.assertEqual(decision, "deny")
+		self.assertEqual(retry, 900)
+
+	def test_remaining_ttl_clamps_invalid_values(self):
+		from biozone_web.services import rate_limit
+
+		with patch.object(rate_limit.frappe.cache, "ttl", return_value=125):
+			self.assertEqual(rate_limit._remaining_ttl("rl:x:ip:y", 3600), 125)
+		with patch.object(rate_limit.frappe.cache, "ttl", return_value=-2):
+			self.assertEqual(rate_limit._remaining_ttl("rl:x:ip:y", 3600), 3600)
+		with patch.object(rate_limit.frappe.cache, "ttl", return_value=99999):
+			self.assertEqual(rate_limit._remaining_ttl("rl:x:ip:y", 3600), 3600)
+
+	def test_dev_fallback_override_only_via_site_config(self):
+		from biozone_web.services import rate_limit
+
+		with patch.object(rate_limit.frappe, "get_conf", return_value={}):
+			limit, ttl = rate_limit._fallback_limit("biozone_login")
+		self.assertEqual((limit, ttl), (5, 3600), "الافتراضي يبقى صارمًا")
+
+		with patch.object(
+			rate_limit.frappe,
+			"get_conf",
+			return_value={"biozone_rate_limit_fallback": {"biozone_login": 10}},
+		):
+			limit, _ttl = rate_limit._fallback_limit("biozone_login")
+		self.assertEqual(limit, 10)
+
+	def test_remaining_ttl_reads_redis_key(self):
+		from biozone_web.services import rate_limit
+
+		with patch.object(rate_limit.frappe.cache, "ttl", return_value=125):
+			self.assertEqual(rate_limit._remaining_ttl("rl:x:ip:y", 3600), 125)
 
 
 class TestUnitsBatchResolution(unittest.TestCase):
