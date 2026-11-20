@@ -10,10 +10,10 @@
  "field_order": [
   "checkout_token",
   "user",
-  "cart",
   "status",
   "cart_version",
   "quote_fingerprint",
+  "cart_instance",
   "sales_order",
   "column_break_1",
   "request_id",
@@ -43,12 +43,6 @@
    "search_index": 1
   },
   {
-   "fieldname": "cart",
-   "fieldtype": "Link",
-   "label": "Cart",
-   "options": "BZ Cart"
-  },
-  {
    "default": "Processing",
    "fieldname": "status",
    "fieldtype": "Select",
@@ -67,6 +61,13 @@
    "fieldname": "quote_fingerprint",
    "fieldtype": "Data",
    "label": "Quote Fingerprint"
+  },
+  {
+   "description": "هوية دورة السلة (تبويبات المتصفح) — ليست بديلًا عن checkout_token",
+   "fieldname": "cart_instance",
+   "fieldtype": "Data",
+   "label": "Cart Instance",
+   "search_index": 1
   },
   {
    "fieldname": "sales_order",
@@ -112,7 +113,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-23 00:00:00.000000",
+ "modified": "2026-11-20 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Biozone Web",
  "name": "BZ Checkout Receipt",

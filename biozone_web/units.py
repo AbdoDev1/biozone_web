@@ -75,12 +75,13 @@ def _item_unit_data(codes):
 	return out
 
 
-def resolve_item_display(item_code, customer_group=None, _cache=None):
+def resolve_item_display(item_code, customer_group=None, _cache=None, _mode=None):
 	"""Resolve the display unit for one item + group.
 
 	Returns {ok, uom, factor, min_qty, kind, displayable, reason}.
 	displayable=False means: configured large but no valid conversion —
 	the item must be hidden with a setup message, never priced by guess.
+	_mode lets a batch caller pass the group display unit once (CR-06).
 	"""
 	data = (_cache or {}).get(item_code)
 	if data is None:
@@ -93,15 +94,17 @@ def resolve_item_display(item_code, customer_group=None, _cache=None):
 	elif override == "large_only":
 		kind = "large"
 	else:
-		from biozone_web.utils import get_customer_price_group
+		kind = _mode
+		if kind is None:
+			from biozone_web.utils import get_customer_price_group
 
-		group = customer_group
-		if group is None:
-			try:
-				group = get_customer_price_group()
-			except Exception:
-				group = None
-		kind = get_group_display_unit(group)
+			group = customer_group
+			if group is None:
+				try:
+					group = get_customer_price_group()
+				except Exception:
+					group = None
+			kind = get_group_display_unit(group)
 	if kind == "large":
 		# A genuine large unit must differ from the stock unit: ERPNext
 		# auto-creates a trivial (stock_uom, 1) row for every item, which
@@ -169,10 +172,28 @@ def resolve_item_uom_factor(item_code, uom, _cache=None):
 
 
 def resolve_items_display(codes, customer_group=None):
-	"""Batch version (one batched read for all items)."""
+	"""Batch version (one batched read for all items).
+
+	CR-06: the group display unit is resolved once per batch instead of
+	once per item, so a 500-line cart does not repeat Customer Group reads.
+	"""
 	data = _item_unit_data(codes)
+	group = customer_group
+	needs_mode = any(
+		(d or {}).get("override") not in ("small_only", "large_only")
+		for d in data.values()
+	)
+	if needs_mode and group is None:
+		try:
+			from biozone_web.utils import get_customer_price_group
+
+			group = get_customer_price_group()
+		except Exception:
+			group = None
+	mode = get_group_display_unit(group) if needs_mode else None
 	return {
-		code: resolve_item_display(code, customer_group, _cache=data) for code in (codes or [])
+		code: resolve_item_display(code, group, _cache=data, _mode=mode)
+		for code in (codes or [])
 	}
 
 

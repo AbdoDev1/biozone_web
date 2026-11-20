@@ -18,15 +18,14 @@ plus a site database. Conventions:
   itself stays covered by the manual browser matrix (phase B).
 """
 
-import hashlib
 import unittest
-import uuid
 from unittest.mock import patch
 
 import frappe
 
 from biozone_web import api as biozone_api
 from biozone_web import utils as biozone_utils
+from biozone_web.services.checkout import build_checkout_quote, quote_contract_fields
 from biozone_web.utils import (
     MinOrderConfigError,
     customer_group_has_min_order_field,
@@ -195,8 +194,6 @@ class LiveConfirmCase(MinOrderDBCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        if not frappe.db.table_exists("BZ Cart"):
-            raise unittest.SkipTest("BZ Cart tables absent — run migrate first")
         from biozone_web.units import resolve_items_display
         from biozone_web.utils import (
             create_customer_for_user,
@@ -274,15 +271,18 @@ class LiveConfirmCase(MinOrderDBCase):
     def setUp(self):
         super().setUp()
         self._orders = []
+        self._receipts = []
         self._prev_user = frappe.session.user
-        # confirm_order is capped at 10/min per user (rate_limit.CART_LIMITS).
-        # This class runs >10 live confirms for one fixed identity, so without
-        # a reset the later tests see RATE_LIMITED instead of their target
-        # branch. Reset only this test identity's counter, not the limiter.
-        digest = hashlib.sha256(TEST_EMAIL.encode("utf-8")).hexdigest()[:32]
-        frappe.cache.delete_key(f"rl:cart:confirm_order:user:{digest}")
 
     def tearDown(self):
+        for token in self._receipts:
+            name = frappe.db.get_value(
+                "BZ Checkout Receipt", {"checkout_token": token}, "name"
+            )
+            if name:
+                frappe.delete_doc(
+                    "BZ Checkout Receipt", name, force=True, ignore_permissions=True
+                )
         for name in self._orders:
             if frappe.db.exists("Sales Order", name):
                 frappe.delete_doc("Sales Order", name, force=True)
@@ -298,27 +298,9 @@ class LiveConfirmCase(MinOrderDBCase):
         super().tearDown()
 
     def _confirm_as_customer(self, items):
-        from biozone_web.services.cart import add_item, clear_cart, get_cart
-
         frappe.set_user(TEST_EMAIL)
         try:
-            state = get_cart()
-            if state["cart"]["items"]:
-                state = clear_cart(cart_version=state["cart"]["version"])
-            version = state["cart"]["version"]
-            for it in items:
-                state = add_item(
-                    it["item_code"],
-                    it["quantity"],
-                    uom=it.get("uom"),
-                    cart_version=version,
-                )
-                version = state["cart"]["version"]
-            return biozone_api.biozone_confirm_order(
-                checkout_token=uuid.uuid4().hex,
-                cart_version=state["cart"]["version"],
-                quote_fingerprint=state["quote_fingerprint"],
-            )
+            return biozone_api.biozone_confirm_order(items)
         finally:
             frappe.set_user(self._prev_user)
 
@@ -334,6 +316,144 @@ class LiveConfirmCase(MinOrderDBCase):
             limit_page_length=200,
         )
         return [r.method for r in rows if "min-order" in (r.method or "")]
+
+    def _checkout_quote(self, qty):
+        items = self._cart(qty)
+        quote = build_checkout_quote(
+            [
+                {
+                    "item_code": it["item_code"],
+                    "quantity": it["quantity"],
+                    "uom": it["uom"],
+                }
+                for it in items
+            ],
+            customer=self.customer,
+            customer_group=self.group,
+            **quote_contract_fields(),
+        )
+        return items, quote
+
+    def _confirm_with_meta(self, items, token, fingerprint):
+        frappe.set_user(TEST_EMAIL)
+        try:
+            return biozone_api.biozone_confirm_order(
+                items,
+                checkout_token=token,
+                quote_fingerprint=fingerprint,
+            )
+        finally:
+            frappe.set_user(self._prev_user)
+
+    def test_idempotent_same_token_replays_same_order(self):
+        """LCH-1: same token+fingerprint creates one SO and replays it."""
+        self._set_limit(self.group, 0)
+        items, quote = self._checkout_quote(1)
+        self.assertFalse(quote["issues"])
+        token = frappe.generate_hash(length=32)
+        self._receipts.append(token)
+        before = frappe.db.count("Sales Order", {"customer": self.customer})
+
+        frappe.local.response = {}
+        first = self._confirm_with_meta(items, token, quote["fingerprint"])
+        self.assertTrue(first.get("ok"), first)
+        self._orders.append(first["sales_order"])
+        frappe.db.commit()
+        self.assertEqual(
+            frappe.db.count("Sales Order", {"customer": self.customer}), before + 1
+        )
+
+        frappe.local.response = {}
+        second = self._confirm_with_meta(items, token, quote["fingerprint"])
+        self.assertTrue(second.get("ok"), second)
+        self.assertEqual(second["sales_order"], first["sales_order"])
+        self.assertEqual(
+            frappe.db.count("Sales Order", {"customer": self.customer}), before + 1
+        )
+
+        receipt_name = frappe.db.get_value(
+            "BZ Checkout Receipt", {"checkout_token": token}, "name"
+        )
+        receipt = frappe.get_doc("BZ Checkout Receipt", receipt_name)
+        self.assertEqual(receipt.status, "Success")
+        self.assertEqual(receipt.sales_order, first["sales_order"])
+
+    def test_idempotent_same_token_different_payload_conflicts(self):
+        """LCH-1: reusing a token for a different snapshot is rejected."""
+        self._set_limit(self.group, 0)
+        items_one, quote_one = self._checkout_quote(1)
+        token = frappe.generate_hash(length=32)
+        self._receipts.append(token)
+
+        frappe.local.response = {}
+        first = self._confirm_with_meta(items_one, token, quote_one["fingerprint"])
+        self.assertTrue(first.get("ok"), first)
+        self._orders.append(first["sales_order"])
+        frappe.db.commit()
+
+        items_two, quote_two = self._checkout_quote(2)
+        self.assertNotEqual(quote_one["fingerprint"], quote_two["fingerprint"])
+        before = frappe.db.count("Sales Order", {"customer": self.customer})
+
+        frappe.local.response = {}
+        second = self._confirm_with_meta(items_two, token, quote_two["fingerprint"])
+        self.assertFalse(second.get("ok"))
+        self.assertEqual(second.get("error_code"), "CHECKOUT_TOKEN_CONFLICT")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 409)
+        self.assertTrue(second.get("already_created"))
+        self.assertEqual(second.get("sales_order"), first["sales_order"])
+        self.assertEqual(
+            second.get("redirect"), f"/order-confirmed?name={first['sales_order']}"
+        )
+        self.assertEqual(
+            frappe.db.count("Sales Order", {"customer": self.customer}), before
+        )
+
+    def test_failed_receipt_reused_with_new_fingerprint(self):
+        """A failed receipt must not block a retry at the current price."""
+        self._set_limit(self.group, 0)
+        items, quote = self._checkout_quote(1)
+        token = frappe.generate_hash(length=32)
+        self._receipts.append(token)
+        frappe.get_doc(
+            {
+                "doctype": "BZ Checkout Receipt",
+                "checkout_token": token,
+                "user": TEST_EMAIL,
+                "status": "Failed",
+                "quote_fingerprint": "0" * 64,
+                "error_code": "TEST",
+            }
+        ).insert(ignore_permissions=True)
+
+        frappe.local.response = {}
+        result = self._confirm_with_meta(items, token, quote["fingerprint"])
+        self.assertTrue(result.get("ok"), result)
+        self._orders.append(result["sales_order"])
+        receipt = frappe.get_doc("BZ Checkout Receipt", {"checkout_token": token})
+        self.assertEqual(receipt.status, "Success")
+        self.assertEqual(receipt.quote_fingerprint, quote["fingerprint"])
+        self.assertEqual(receipt.sales_order, result["sales_order"])
+
+    def test_idempotent_wrong_fingerprint_rejected_before_insert(self):
+        """LCH-2: a stale quote fingerprint never creates an order."""
+        self._set_limit(self.group, 0)
+        items, _quote = self._checkout_quote(1)
+        token = frappe.generate_hash(length=32)
+        self._receipts.append(token)
+        before = frappe.db.count("Sales Order", {"customer": self.customer})
+
+        frappe.local.response = {}
+        result = self._confirm_with_meta(items, token, "0" * 64)
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("error_code"), "PRICE_CHANGED")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 409)
+        self.assertEqual(
+            frappe.db.count("Sales Order", {"customer": self.customer}), before
+        )
+        self.assertFalse(
+            frappe.db.exists("BZ Checkout Receipt", {"checkout_token": token})
+        )
 
     def test_t_div_accept_path_no_false_positive(self):
         """T-div: tiny limit + real carts must accept (precalc matched insert)."""
@@ -433,7 +553,7 @@ class LiveConfirmCase(MinOrderDBCase):
         frappe.set_user("Guest")
         try:
             with self.assertRaises(frappe.PermissionError):
-                biozone_api.biozone_confirm_order()
+                biozone_api.biozone_confirm_order(self._cart(1))
         finally:
             frappe.set_user(self._prev_user)
         frappe.local.response = {}

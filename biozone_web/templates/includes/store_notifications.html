@@ -1,0 +1,316 @@
+{# Shared store notification layer (toast) — display only.
+
+   Binding rules:
+   - Every message goes through textContent; there is no HTML sink here.
+   - The toast layer never decides business semantics: callers pass an
+     already-curated safe string and a type. API error-code mapping lives
+     in the calling page (allowlisted codes only).
+   - Errors that block an action (order confirmation, form submit) keep
+     their persistent inline message near the action. Toast is used only
+     for transient success/info/warning and for failures with no inline
+     home (e.g. localStorage write failure).
+   - Auto-dismiss applies to success/info only. Errors are persistent by
+     default and are closed manually.
+   - A visible toast with the same type+title+message+key is reused instead
+     of duplicated; dismissal frees the slot for a later genuine event.
+   - Timers pause on hover/focus; prefers-reduced-motion disables motion;
+     max 3 visible, transient toasts evicted before persistent errors.
+   - Fixed at top-center, RTL, below the sticky header (z-index 90), and
+     the stack itself never intercepts pointer events.
+
+   API:
+     BzNotify.success(message, opts)
+     BzNotify.info(message, opts)
+     BzNotify.warning(message, opts)
+     BzNotify.error(message, opts)
+     BzNotify.show(type, message, opts)
+     BzNotify.dismiss(element)
+   opts = {title, duration, persistent, key}
+#}
+<div class="bz-notify-region" dir="rtl" id="bz-notify-region" aria-label="إشعارات المتجر" aria-live="off"></div>
+<style>
+  .bz-notify-region {
+    position: fixed;
+    top: 84px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(560px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    pointer-events: none;
+    direction: rtl;
+  }
+  .bz-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: #ffffff;
+    color: #0b1c30;
+    box-shadow: 0 10px 30px rgba(11, 28, 48, 0.18);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: right;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .bz-toast--success { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+  .bz-toast--info    { background: #eff4ff; border-color: #bcc9c6; color: #0b1c30; }
+  .bz-toast--warning { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .bz-toast--error   { background: #ffdad6; border-color: #ba1a1a; color: #93000a; }
+  .bz-toast.is-hiding { opacity: 0; transform: translateY(-6px); }
+  .bz-toast__icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .bz-toast--success .bz-toast__icon { background: #059669; color: #ffffff; }
+  .bz-toast--info .bz-toast__icon    { background: #00685f; color: #ffffff; }
+  .bz-toast--warning .bz-toast__icon { background: #d97706; color: #ffffff; }
+  .bz-toast--error .bz-toast__icon   { background: #ba1a1a; color: #ffffff; }
+  .bz-toast__body { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .bz-toast__title { display: block; font-weight: 700; }
+  .bz-toast__message { display: block; }
+  .bz-toast__message:empty { display: none; }
+  .bz-toast__close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    margin: -4px -4px 0 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: currentColor;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.75;
+  }
+  .bz-toast__close:hover,
+  .bz-toast__close:focus-visible { opacity: 1; background: rgba(11, 28, 48, 0.08); outline: none; }
+  .bz-toast__close:focus-visible { box-shadow: 0 0 0 2px currentColor; }
+  @media (max-width: 480px) {
+    .bz-notify-region { top: 80px; width: calc(100vw - 16px); max-width: calc(100vw - 16px); }
+    .bz-toast { font-size: 13px; padding: 10px 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bz-toast { transition: none; }
+    .bz-toast.is-hiding { transform: none; }
+  }
+</style>
+<script>
+(function () {
+  'use strict';
+
+  if (window.BzNotify) return;
+
+  var MAX_VISIBLE = 3;
+
+  var TYPE_CONFIG = {
+    success: { badge: '✓', role: 'status', live: 'polite', duration: 3200, title: 'تم' },
+    info:    { badge: 'i', role: 'status', live: 'polite', duration: 4500, title: 'معلومة' },
+    warning: { badge: '!', role: 'alert', live: 'assertive', duration: 6000, title: 'تنبيه' },
+    error:   { badge: '!', role: 'alert', live: 'assertive', duration: 0, title: 'تعذر إكمال العملية' }
+  };
+
+  function toText(value) {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return '';
+    try { return String(value); } catch (e) { return ''; }
+  }
+
+  function normalizeType(type) {
+    return Object.prototype.hasOwnProperty.call(TYPE_CONFIG, type) ? type : 'info';
+  }
+
+  function reducedMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getRegion() {
+    var region = document.getElementById('bz-notify-region');
+    if (region) return region;
+    // Defensive only: the partial ships its own region. Calls must never throw.
+    region = document.createElement('div');
+    region.id = 'bz-notify-region';
+    region.className = 'bz-notify-region';
+    region.setAttribute('dir', 'rtl');
+    region.setAttribute('aria-live', 'off');
+    region.setAttribute('aria-label', 'إشعارات المتجر');
+    document.body.appendChild(region);
+    return region;
+  }
+
+  function clearTimer(toast) {
+    if (toast && toast._bzToastTimer) {
+      window.clearTimeout(toast._bzToastTimer);
+      toast._bzToastTimer = 0;
+    }
+  }
+
+  function dismiss(toast) {
+    if (!toast || !toast.parentNode) return;
+    clearTimer(toast);
+    if (reducedMotion()) {
+      toast.remove();
+      return;
+    }
+    toast.classList.add('is-hiding');
+    window.setTimeout(function () { toast.remove(); }, 200);
+  }
+
+  function evictForRoom(region) {
+    // Keep persistent errors on screen as long as possible: evict the
+    // oldest transient toast first, and fall back to the first child.
+    var candidate = null;
+    for (var i = 0; i < region.children.length; i += 1) {
+      var child = region.children[i];
+      if (child.getAttribute('data-bz-toast') !== 'error') {
+        candidate = child;
+        break;
+      }
+    }
+    if (!candidate) candidate = region.firstChild;
+    if (!candidate) return;
+    clearTimer(candidate);
+    candidate.remove();
+  }
+
+  function armTimer(toast, duration) {
+    var remaining = duration;
+    var startedAt = Date.now();
+
+    function done() {
+      toast._bzToastTimer = 0;
+      dismiss(toast);
+    }
+    toast._bzToastTimer = window.setTimeout(done, remaining);
+
+    function pause() {
+      if (!toast._bzToastTimer) return;
+      window.clearTimeout(toast._bzToastTimer);
+      toast._bzToastTimer = 0;
+      remaining -= Date.now() - startedAt;
+      if (remaining < 0) remaining = 0;
+    }
+    function resume() {
+      if (toast._bzToastTimer || !toast.isConnected) return;
+      startedAt = Date.now();
+      toast._bzToastTimer = window.setTimeout(done, remaining);
+    }
+
+    toast.addEventListener('mouseenter', pause);
+    toast.addEventListener('mouseleave', resume);
+    toast.addEventListener('focusin', pause);
+    toast.addEventListener('focusout', resume);
+  }
+
+  function show(type, message, options) {
+    options = options || {};
+    type = normalizeType(type);
+    message = toText(message);
+    if (!message) return null;
+
+    var cfg = TYPE_CONFIG[type];
+    var title = toText(options.title);
+    if (title === '') title = cfg.title;
+
+    var dedupeKey = (options.key ? toText(options.key) : '') + '\n' + type + '\n' + title + '\n' + message;
+
+    var persistent = options.persistent === true || type === 'error';
+    var duration = 0;
+    if (!persistent) {
+      var requested = Number(options.duration);
+      duration = (isFinite(requested) && requested > 0) ? requested : cfg.duration;
+    }
+
+    var region = getRegion();
+    // Reuse an identical visible toast instead of stacking duplicates.
+    for (var j = 0; j < region.children.length; j += 1) {
+      if (region.children[j].getAttribute('data-bz-key') === dedupeKey) {
+        return region.children[j];
+      }
+    }
+    while (region.children.length >= MAX_VISIBLE) {
+      evictForRoom(region);
+    }
+
+    var toast = document.createElement('div');
+    toast.className = 'bz-toast bz-toast--' + type;
+    toast.setAttribute('role', cfg.role);
+    toast.setAttribute('aria-live', cfg.live);
+    toast.setAttribute('aria-atomic', 'true');
+    toast.setAttribute('data-bz-toast', type);
+    toast.setAttribute('data-bz-key', dedupeKey);
+
+    var icon = document.createElement('span');
+    icon.className = 'bz-toast__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = cfg.badge;
+
+    var body = document.createElement('div');
+    body.className = 'bz-toast__body';
+
+    var titleEl = document.createElement('span');
+    titleEl.className = 'bz-toast__title';
+    titleEl.textContent = title;
+
+    var messageEl = document.createElement('span');
+    messageEl.className = 'bz-toast__message';
+    messageEl.textContent = message;
+
+    body.appendChild(titleEl);
+    body.appendChild(messageEl);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'bz-toast__close';
+    closeBtn.setAttribute('aria-label', 'إغلاق الإشعار');
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function () { dismiss(toast); });
+
+    toast.addEventListener('keydown', function (event) {
+      if (event && event.key === 'Escape') dismiss(toast);
+    });
+
+    toast.appendChild(icon);
+    toast.appendChild(body);
+    toast.appendChild(closeBtn);
+    region.appendChild(toast);
+
+    if (duration > 0) armTimer(toast, duration);
+    return toast;
+  }
+
+  var api = {
+    show: show,
+    success: function (message, options) { return show('success', message, options); },
+    info: function (message, options) { return show('info', message, options); },
+    warning: function (message, options) { return show('warning', message, options); },
+    error: function (message, options) { return show('error', message, options); },
+    dismiss: dismiss
+  };
+
+  window.BzNotify = Object.freeze(api);
+})();
+</script>

@@ -1,73 +1,156 @@
-<div class="fixed bottom-6 inset-x-0 flex justify-center z-[60] pointer-events-none" id="cart-toast-wrap">
-  <div class="hidden bg-on-surface text-surface text-sm font-bold px-5 py-3 rounded-full shadow-lg items-center gap-2 transition-opacity duration-300" id="cart-toast">
-    <span class="material-symbols-outlined text-lg text-primary-fixed" id="cart-toast-icon">check_circle</span>
-    <span id="cart-toast-text"></span>
-  </div>
-</div>
+<!-- Shared "add to cart" helper. Include once near the end of any page
+     with product cards that call addToCart(). Uses the same
+     localStorage key/shape as /cart's own script — see cart.html for
+     the full read/render logic. -->
 <script>
-(function () {
-  var cartToastTimeout;
+  // سلة محلية لكل حساب مسجل فقط: الهيدر يمرر مفتاح الحساب للداخل،
+  // وnull للزائر. لا مفتاح زائر مشترك بعد اليوم.
+  const CART_STORAGE_KEY = window.BZ_CART_KEY;
 
-  function store() {
-    return window.BiozoneCart || null;
+  // الزائر لا يملك سلة: أي محاولة إضافة تُوقَف وتُوجَّه لتسجيل الدخول.
+  function bzRequireLogin() {
+    if (CART_STORAGE_KEY) return true;
+    window.location.href = '/login';
+    return false;
   }
 
-  function showCartToast(message, isError) {
-    var toast = document.getElementById('cart-toast');
-    var text = document.getElementById('cart-toast-text');
-    var icon = document.getElementById('cart-toast-icon');
-    if (!toast || !text) return;
-    text.textContent = message;
-    if (icon) icon.textContent = isError ? 'error' : 'check_circle';
-    toast.classList.remove('hidden');
-    toast.classList.add('flex');
-    clearTimeout(cartToastTimeout);
-    cartToastTimeout = setTimeout(function () {
-      toast.classList.add('hidden');
-      toast.classList.remove('flex');
-    }, 2400);
-  }
-
-  async function addToCart(itemCode, itemName, itemGroup, price, buttonEl, uom, image) {
-    var api = store();
-    if (!api) return;
-    var original = buttonEl ? buttonEl.innerHTML : '';
-    if (buttonEl) {
-      buttonEl.disabled = true;
-      buttonEl.innerHTML = '<span class="material-symbols-outlined text-[18px]">hourglass_top</span> جارٍ الإضافة';
+  function showStorageError() {
+    if (window.BzNotify) {
+      window.BzNotify.error(
+        'تعذر حفظ السلة في هذا المتصفح. تحقق من السماح بالتخزين المحلي ومن توفر مساحة، ثم حاول مجددًا.',
+        { title: 'تعذر حفظ السلة', key: 'cart-storage' }
+      );
     }
+  }
+
+  // Returns true only when the cart was actually persisted. The caller
+  // must not update the badge/stepper or show a success toast when false.
+  function persistCart(items) {
     try {
-      await api.addItem(itemCode, 1, uom, {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      return true;
+    } catch (e) {
+      showStorageError();
+      return false;
+    }
+  }
+
+  // سقف تجاري معتمد (2026-11-20): 200 صنفًا لكل سلة — مطابق لحد الخادم.
+  const CART_MAX_LINES = 200;
+
+  function addToCart(itemCode, itemName, itemGroup, price, buttonEl, uom) {
+    if (!bzRequireLogin()) return;
+    let items = [];
+    try {
+      items = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
+    } catch (e) {
+      items = [];
+    }
+
+    const existing = items.find((it) => it.item_code === itemCode);
+    if (!existing && items.length >= CART_MAX_LINES) {
+      if (window.BzNotify) {
+        window.BzNotify.error(
+          'وصلت السلة إلى الحد الأقصى ' + CART_MAX_LINES +
+            ' صنفًا. أزل بعض الأصناف قبل إضافة أصناف جديدة.',
+          { title: 'السلة ممتلئة', key: 'cart-line-limit' }
+        );
+      }
+      return;
+    }
+    if (existing) {
+      existing.quantity += 1;
+      if (uom) existing.uom = uom;
+    } else {
+      items.push({
+        item_code: itemCode,
         item_name: itemName,
         item_group: itemGroup,
         price: price,
-        image: image
+        image: '',
+        quantity: 1,
+        uom: uom || '',
       });
-      showCartToast((itemName || 'الصنف') + ' أُضيف إلى السلة');
-      if (buttonEl) {
-        buttonEl.innerHTML = '<span class="material-symbols-outlined text-[18px]">check</span> أُضيف';
-      }
-    } catch (err) {
-      showCartToast(err.message || 'تعذر إضافة الصنف إلى السلة', true);
-      if (buttonEl) buttonEl.innerHTML = original;
-    } finally {
-      if (buttonEl) {
-        setTimeout(function () {
-          buttonEl.disabled = false;
-          buttonEl.innerHTML = original;
-        }, 1200);
-      }
+    }
+
+    if (!persistCart(items)) return;
+
+    const badge = document.getElementById('cart-count-badge');
+    if (badge) {
+      badge.textContent = items.reduce((sum, it) => sum + it.quantity, 0);
+    }
+
+    showCartToast(itemName + ' أُضيف إلى السلة');
+
+    if (buttonEl) {
+      const original = buttonEl.innerHTML;
+      buttonEl.innerHTML = '<span class="material-symbols-outlined text-[18px]">check</span> أُضيف';
+      setTimeout(() => { buttonEl.innerHTML = original; }, 1200);
     }
   }
 
+  function showCartToast(message) {
+    if (window.BzNotify) {
+      window.BzNotify.success(message, { title: 'تمت الإضافة' });
+    }
+  }
+
+  // Stepper (+/-) controls for product cards in the store (/catalog),
+  // matching the same quantity-stepper style used on the /cart page
+  // itself. Each card starts as a plain "add to cart" button; once the
+  // item has a quantity in the cart it switches to a live +/- stepper
+  // reflecting that quantity, staying in sync with localStorage.
+  function getCartItemsList() {
+    if (!CART_STORAGE_KEY) return [];
+    try {
+      return JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCartItemsList(items) {
+    if (!CART_STORAGE_KEY) return false;
+    if (!persistCart(items)) return false;
+    const badge = document.getElementById('cart-count-badge');
+    if (badge) {
+      badge.textContent = items.reduce((sum, it) => sum + it.quantity, 0);
+    }
+    return true;
+  }
+
+  function refreshCartBadgeFromStorage() {
+    try {
+      var list = CART_STORAGE_KEY
+        ? (JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || [])
+        : [];
+      var badge = document.getElementById('cart-count-badge');
+      if (badge) badge.textContent = list.reduce(function (sum, it) { return sum + (it.quantity || 0); }, 0);
+    } catch (e) {}
+  }
+
+  function refreshAllCatalogControls() {
+    document.querySelectorAll('.catalog-cart-control').forEach(renderCatalogCartControl);
+    refreshCartBadgeFromStorage();
+  }
+
+  // البند 1: مزامنة فورية بين التبويبات — أي تغيير في مفتاح السلة
+  // (إضافة/تصفير بعد طلب ناجح) يحدّث stepper الكتالوج والشارة بلا reload.
+  // ملاحظة: حدث storage يُطلق في التبويبات الأخرى فقط، لا في نفس التبويب
+  // الذي كتب — لذا كل كتابة محلية تحدّث واجهتها مباشرة أيضًا.
+  window.addEventListener('storage', function (e) {
+    if (!e || !CART_STORAGE_KEY) return;
+    if (e.key === CART_STORAGE_KEY) refreshAllCatalogControls();
+  });
+
   function renderCatalogCartControl(el) {
-    var api = store();
-    if (!api) return;
-    var itemCode = el.dataset.itemCode;
-    var qty = api.getQty(itemCode);
-    var addBtn = el.querySelector('.catalog-add-btn');
-    var stepper = el.querySelector('.catalog-stepper');
-    var qtyEl = el.querySelector('.catalog-qty');
+    const itemCode = el.dataset.itemCode;
+    const items = getCartItemsList();
+    const existing = items.find((it) => it.item_code === itemCode);
+    const qty = existing ? existing.quantity : 0;
+    const addBtn = el.querySelector('.catalog-add-btn');
+    const stepper = el.querySelector('.catalog-stepper');
+    const qtyEl = el.querySelector('.catalog-qty');
 
     if (qty > 0) {
       if (addBtn) addBtn.classList.add('hidden');
@@ -85,95 +168,62 @@
     }
   }
 
-  function refreshAllCatalogControls() {
-    document.querySelectorAll('.catalog-cart-control').forEach(renderCatalogCartControl);
-    var api = store();
-    if (api) api.updateBadge();
-  }
+  function changeCatalogCartQty(el, delta) {
+    if (!bzRequireLogin()) return;
+    const itemCode = el.dataset.itemCode;
+    const itemName = el.dataset.itemName;
+    const itemGroup = el.dataset.itemGroup;
+    const price = parseFloat(el.dataset.itemPrice) || 0;
+    const uom = el.dataset.itemUom || '';
+    const image = el.dataset.itemImage || '';
 
-  async function changeCatalogCartQty(el, delta) {
-    var api = store();
-    if (!api) return;
-    var itemCode = el.dataset.itemCode;
-    var itemName = el.dataset.itemName;
-    var itemGroup = el.dataset.itemGroup;
-    var price = parseFloat(el.dataset.itemPrice) || 0;
-    var uom = el.dataset.itemUom || '';
-    var image = el.dataset.itemImage || '';
-    var qty = api.getQty(itemCode);
-    var next = qty + delta;
+    let items = getCartItemsList();
+    const idx = items.findIndex((it) => it.item_code === itemCode);
+    const added = idx === -1 && delta > 0;
 
-    try {
-      if (qty === 0 && delta > 0) {
-        await api.addItem(itemCode, 1, uom, {
+    if (idx === -1) {
+      if (delta > 0) {
+        items.push({
+          item_code: itemCode,
           item_name: itemName,
           item_group: itemGroup,
           price: price,
-          image: image
+          image: image,
+          quantity: 1,
+          uom: uom,
         });
-        showCartToast((itemName || 'الصنف') + ' أُضيف إلى السلة');
-      } else if (next <= 0) {
-        await api.removeItem(itemCode);
-      } else {
-        await api.setQty(itemCode, next);
       }
-    } catch (err) {
-      showCartToast(err.message || 'تعذر تحديث السلة', true);
+    } else {
+      items[idx].quantity += delta;
+      if (uom) items[idx].uom = uom;
+      if (items[idx].quantity <= 0) {
+        items.splice(idx, 1);
+      }
+    }
+
+    if (!saveCartItemsList(items)) {
+      // Storage refused the write: keep the UI in sync with what is actually
+      // persisted, and never show a success toast for a failed add.
+      refreshAllCatalogControls();
+      return;
     }
     refreshAllCatalogControls();
+    if (added) showCartToast(itemName + ' أُضيف إلى السلة');
   }
 
   function initCatalogCartControls() {
-    document.querySelectorAll('.catalog-cart-control').forEach(function (el) {
+    document.querySelectorAll('.catalog-cart-control').forEach((el) => {
       renderCatalogCartControl(el);
-      if (el.dataset.bzCartBound === '1') return;
-      el.dataset.bzCartBound = '1';
-      var addBtn = el.querySelector('.catalog-add-btn');
-      var incBtn = el.querySelector('.catalog-increment');
-      var decBtn = el.querySelector('.catalog-decrement');
-      if (addBtn) {
-        addBtn.addEventListener('click', function () {
-          addToCart(
-            el.dataset.itemCode,
-            el.dataset.itemName,
-            el.dataset.itemGroup,
-            parseFloat(el.dataset.itemPrice) || 0,
-            addBtn,
-            el.dataset.itemUom || '',
-            el.dataset.itemImage || ''
-          );
-        });
-      }
-      if (incBtn) incBtn.addEventListener('click', function () { changeCatalogCartQty(el, 1); });
-      if (decBtn) decBtn.addEventListener('click', function () { changeCatalogCartQty(el, -1); });
+
+      const addBtn = el.querySelector('.catalog-add-btn');
+      const incBtn = el.querySelector('.catalog-increment');
+      const decBtn = el.querySelector('.catalog-decrement');
+
+      if (addBtn) addBtn.addEventListener('click', () => changeCatalogCartQty(el, 1));
+      if (incBtn) incBtn.addEventListener('click', () => changeCatalogCartQty(el, 1));
+      if (decBtn) decBtn.addEventListener('click', () => changeCatalogCartQty(el, -1));
     });
   }
 
-  window.addToCart = addToCart;
-  window.showCartToast = showCartToast;
-  window.renderCatalogCartControl = renderCatalogCartControl;
-  window.changeCatalogCartQty = changeCatalogCartQty;
-  window.initCatalogCartControls = initCatalogCartControls;
-  window.refreshAllCatalogControls = refreshAllCatalogControls;
-
-  window.addEventListener('biozone:cart-changed', refreshAllCatalogControls);
-  window.addEventListener('storage', function (e) {
-    if (!e) return;
-    if (e.key === 'biozone_cart_items' || (e.key && e.key.indexOf('biozone_cart_items:') === 0)) {
-      refreshAllCatalogControls();
-    }
-  });
-
-  function start() {
-    initCatalogCartControls();
-    var api = store();
-    if (api) api.init({ autoMergeLocalAccount: true }).then(refreshAllCatalogControls);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start);
-  } else {
-    start();
-  }
-})();
+  document.addEventListener('DOMContentLoaded', initCatalogCartControls);
 </script>

@@ -1,0 +1,83 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:cycle_key",
+ "creation": "2026-11-20 16:30:00.000000",
+ "custom": 1,
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "cycle_key",
+  "user",
+  "cart_instance",
+  "quote_fingerprint",
+  "sales_order",
+  "completed_on"
+ ],
+ "fields": [
+  {
+   "description": "sha256(user|cart_instance) — المفتاح الفريد الذرّي لدورة السلة",
+   "fieldname": "cycle_key",
+   "fieldtype": "Data",
+   "label": "Cycle Key",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "cart_instance",
+   "fieldtype": "Data",
+   "label": "Cart Instance",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "quote_fingerprint",
+   "fieldtype": "Data",
+   "label": "Quote Fingerprint"
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "options": "Sales Order"
+  },
+  {
+   "fieldname": "completed_on",
+   "fieldtype": "Datetime",
+   "label": "Completed On"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-20 16:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biozone Web",
+ "name": "BZ Checkout Claim",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

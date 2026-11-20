@@ -69,7 +69,7 @@
         {% set bz_bell_mode = "customer" %}
         {% set bz_bell_count = notif_unread_count | default(0) %}
         {% include "biozone_web/templates/includes/bell.html" %}
-        <a href="/login" title="تسجيل خروج" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center" onclick="event.preventDefault(); try { localStorage.setItem('biozone_cart_logout_ts', String(Date.now())); } catch (e) {} fetch('/api/method/logout', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''}, body: '{}'}).finally(function() { window.location.href = '/login'; });">
+        <a href="/login" title="تسجيل خروج" class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center" onclick="event.preventDefault(); fetch('/api/method/logout', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': (window.frappe && window.frappe.csrf_token) || ''}, body: '{}'}).finally(function() { window.location.href = '/login'; });">
           <span class="material-symbols-outlined">logout</span>
         </a>
         <script>window.frappe = window.frappe || {};</script>
@@ -105,16 +105,35 @@
   </div>
 </form>
 {% endif %}
-<script src="/assets/biozone_web/js/cart_store.js"></script>
 <script>
+  // سلة محلية لكل حساب مسجل فقط (قرار المالك 2026-11-18):
+  // لا سلة للزائر — الإضافة تُوقَف وتُوجَّه للدخول. مفتاح مستقل لكل بريد.
+  // بلا سلة خادم وبلا عبور أجهزة؛ الأسعار والتحقق سيرفر-سايد دائمًا.
   window.BZ_STORE_USER = {{ store_user|default('Guest')|tojson }};
-  window.BZ_CSRF_TOKEN = {{ csrf_token|default('', true)|tojson }};
-  var BZ_GUEST_KEY = 'biozone_cart_items';
   function bzAccountKey(user) { return 'biozone_cart_items:' + String(user || '').trim().toLowerCase(); }
   window.BZ_CART_KEY = (window.BZ_STORE_USER && window.BZ_STORE_USER !== 'Guest')
-    ? bzAccountKey(window.BZ_STORE_USER) : BZ_GUEST_KEY;
-  if (window.BiozoneCart) {
-    BiozoneCart.configure({ user: window.BZ_STORE_USER });
-    BiozoneCart.init({ autoMergeLocalAccount: true });
+    ? bzAccountKey(window.BZ_STORE_USER) : null;
+  // Keeps the header cart badge in sync with the client-side cart
+  // (see /cart's own script for the full read/write logic and the
+  // localStorage key this depends on).
+  // البند 1: تحديث فوري + مستمع storage للمزامنة بين التبويبات
+  // (تصفير السلة بعد طلب ناجح يلتقط بلا reload).
+  function syncHeaderCartBadge() {
+    try {
+      var badge = document.getElementById('cart-count-badge');
+      if (!window.BZ_CART_KEY) {
+        if (badge) badge.textContent = '0';
+        return;
+      }
+      var items = JSON.parse(localStorage.getItem(window.BZ_CART_KEY)) || [];
+      var count = items.reduce(function (sum, it) { return sum + (it.quantity || 0); }, 0);
+      if (badge) badge.textContent = count;
+    } catch (e) {}
   }
+  syncHeaderCartBadge();
+  window.addEventListener('storage', function (e) {
+    if (!e || !window.BZ_CART_KEY) return;
+    if (e.key === window.BZ_CART_KEY) syncHeaderCartBadge();
+  });
 </script>
+{% include "biozone_web/templates/includes/store_notifications.html" %}

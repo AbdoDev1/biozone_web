@@ -27,7 +27,7 @@
 <div class="relative min-h-[300px]" style="height: 336px;">
 <!-- Login Form -->
 <form class="flex flex-col gap-md transition-opacity duration-300 absolute inset-0 w-full" id="form-login">
-<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="login-error"></p>
+<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="login-error" role="alert" aria-live="assertive" aria-atomic="true"></p>
 <div class="space-y-xs">
 <label class="font-label-md text-label-md text-on-surface" for="login-email">البريد الإلكتروني</label>
 <div class="relative">
@@ -52,7 +52,7 @@
     </label>
     <button id="forgot-btn" class="font-label-md text-label-md text-primary hover:underline disabled:opacity-60" onclick="handleForgotPassword()" type="button">نسيت كلمة المرور؟</button>
 </div>
-<p class="hidden text-sm text-on-surface-variant bg-surface-variant/40 rounded-lg px-md py-sm" id="forgot-message"></p>
+<p class="hidden text-sm text-on-surface-variant bg-surface-variant/40 rounded-lg px-md py-sm" id="forgot-message" role="status" aria-live="polite"></p>
 <button id="login-submit-btn" class="w-full bg-primary hover:bg-surface-tint text-on-primary font-title-md text-title-md py-[14px] rounded-lg mt-sm transition-colors shadow-sm hover:shadow-md active:scale-[0.98] disabled:opacity-60" type="submit">
                     تسجيل الدخول
                 </button>
@@ -62,7 +62,7 @@
 </form>
 <!-- Signup Form -->
 <form class="flex flex-col gap-md opacity-0 pointer-events-none transition-opacity duration-300 absolute inset-0 w-full" id="form-signup">
-<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="signup-error"></p>
+<p class="hidden text-sm text-error bg-error-container/40 rounded-lg px-md py-sm" id="signup-error" role="alert" aria-live="assertive" aria-atomic="true"></p>
 <div class="space-y-xs">
 <label class="font-label-md text-label-md text-on-surface" for="signup-name">الاسم الكامل</label>
 <div class="relative">
@@ -114,6 +114,11 @@
             const loginTab = document.getElementById('tab-login');
             const signupTab = document.getElementById('tab-signup');
             const container = loginForm.parentElement;
+
+            // Stale errors from the other form must not follow the user.
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('signup-error').classList.add('hidden');
+            document.getElementById('forgot-message').classList.add('hidden');
 
             if (tab === 'login') {
                 loginTab.classList.replace('tab-inactive', 'tab-active');
@@ -217,23 +222,71 @@
                 showMessage('forgot-message', result.message + ' إذا لم تجد الرسالة، تفقد ملف السبام.');
                 startForgotCooldown(btn);
             } catch (err) {
-                showError('login-error', 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
+                showError('login-error', authFailureMessage(err)
+                    || 'تعذر إرسال رابط إعادة التعيين، يرجى المحاولة مرة أخرى');
                 btn.disabled = false;
             }
         }
 
+        const LOGIN_CREDENTIALS_MESSAGE = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        const NETWORK_MESSAGE = 'تعذر الاتصال بالخدمة. تحقق من اتصالك بالإنترنت ثم حاول مجددًا.';
+        const SERVICE_BUSY_MESSAGE = 'الخدمة مشغولة مؤقتًا، يرجى المحاولة بعد لحظات.';
+
+        function retryAfterText(value) {
+            const seconds = Number(value);
+            if (!isFinite(seconds) || seconds <= 0) return '';
+            if (seconds < 60) return Math.ceil(seconds) + ' ثانية';
+            if (seconds < 3600) return Math.ceil(seconds / 60) + ' دقيقة';
+            return Math.ceil(seconds / 3600) + ' ساعة';
+        }
+
+        // Only the codes this API defines for auth flows may shape the text.
+        // The raw server message (if any) is never rendered: for login it is
+        // uniform by design, and for signup a duplicate-email message would
+        // confirm whether an address exists (account enumeration).
+        function authFailureMessage(err) {
+            const status = err && err.status;
+            const data = (err && err.data) || {};
+            const message = (data.message && typeof data.message === 'object') ? data.message : {};
+            const code = typeof message.error_code === 'string' ? message.error_code : '';
+            const wait = retryAfterText(message.retry_after);
+
+            if (!status) return NETWORK_MESSAGE;
+            if (status === 429) {
+                if (code === 'LOGIN_BUSY') {
+                    return 'الخدمة مشغولة مؤقتًا' + (wait ? '، حاول مجددًا بعد ' + wait : '، حاول بعد لحظات');
+                }
+                return 'تم تجاوز عدد المحاولات المسموح بها'
+                    + (wait ? '، حاول مجددًا بعد ' + wait : '، حاول لاحقًا');
+            }
+            if (status === 503) return SERVICE_BUSY_MESSAGE;
+            if (status >= 500) return 'تعذر إكمال العملية حاليًا. حاول بعد قليل.';
+            return '';
+        }
+
         async function callApi(method, payload) {
-            const res = await fetch(`/api/method/biozone_web.api.${method}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
+            let res;
+            try {
+                res = await fetch(`/api/method/biozone_web.api.${method}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                const netErr = new Error('network-failed');
+                netErr.status = 0;
+                throw netErr;
+            }
+            let data = {};
+            try { data = await res.json(); } catch (e) { data = {}; }
             if (!res.ok) {
                 // لا تعرض أي نص خام من الخادم (exception / _server_messages
-                // قد تكشف أسماء دوال ومسارات داخلية) — خطأ داخلي ثابت فقط،
-                // وكل مسار يعرض رسالته العامة الخاصة بسياقه.
-                throw new Error('login-api-failed');
+                // قد تكشف أسماء دوال ومسارات داخلية) — كل مسار يقرر نصه من
+                // allowlist أكواد الحالة/الأخطاء فقط.
+                const apiErr = new Error('login-api-failed');
+                apiErr.status = res.status;
+                apiErr.data = data;
+                throw apiErr;
             }
             return data.message;
         }
@@ -241,37 +294,88 @@
         document.getElementById('form-login').addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('login-error').classList.add('hidden');
+            const emailEl = document.getElementById('login-email');
+            const pwdEl = document.getElementById('login-password');
+            const email = emailEl.value.trim();
+            const pwd = pwdEl.value;
+
+            if (!email) {
+                showError('login-error', 'يرجى إدخال البريد الإلكتروني.');
+                emailEl.focus();
+                return;
+            }
+            if (!pwd) {
+                showError('login-error', 'يرجى إدخال كلمة المرور.');
+                pwdEl.focus();
+                return;
+            }
+
             const loginBtn = document.getElementById('login-submit-btn');
             loginBtn.disabled = true;
             try {
                 const result = await callApi('biozone_login', {
-                    usr: document.getElementById('login-email').value,
-                    pwd: document.getElementById('login-password').value,
+                    usr: email,
+                    pwd: pwd,
                     remember_me: document.getElementById('login-remember').checked ? 1 : 0
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
                 loginBtn.disabled = false;
-                showError('login-error', 'البريد الإلكتروني أو كلمة المرور غير صحيحة');
+                // Wrong credentials stay uniform (no account enumeration);
+                // 429/503/network keep their real meaning instead.
+                showError('login-error', authFailureMessage(err) || LOGIN_CREDENTIALS_MESSAGE);
             }
         });
 
         document.getElementById('form-signup').addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('signup-error').classList.add('hidden');
+            const nameEl = document.getElementById('signup-name');
+            const emailEl = document.getElementById('signup-email');
+            const phoneEl = document.getElementById('signup-phone');
+            const pwdEl = document.getElementById('signup-password');
+            const fullName = nameEl.value.trim();
+            const email = emailEl.value.trim();
+            const phone = phoneEl.value.trim();
+            const pwd = pwdEl.value;
+
+            if (!fullName) {
+                showError('signup-error', 'يرجى إدخال الاسم الكامل.');
+                nameEl.focus();
+                return;
+            }
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showError('signup-error', 'يرجى إدخال بريد إلكتروني صحيح.');
+                emailEl.focus();
+                return;
+            }
+            if (!pwd) {
+                showError('signup-error', 'يرجى إدخال كلمة المرور.');
+                pwdEl.focus();
+                return;
+            }
+            if (pwd.length < 8) {
+                showError('signup-error', 'كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+                pwdEl.focus();
+                return;
+            }
+
             const signupBtn = document.getElementById('signup-submit-btn');
             signupBtn.disabled = true;
             try {
                 const result = await callApi('biozone_sign_up', {
-                    email: document.getElementById('signup-email').value,
-                    full_name: document.getElementById('signup-name').value,
-                    phone: document.getElementById('signup-phone').value,
-                    pwd: document.getElementById('signup-password').value
+                    email: email,
+                    full_name: fullName,
+                    phone: phone,
+                    pwd: pwd
                 });
                 window.location.href = result.home_page || '/biozone-home';
             } catch (err) {
                 signupBtn.disabled = false;
-                showError('signup-error', 'تعذر إنشاء الحساب، حاول مرة أخرى');
+                // Never surface "email already registered": the API text is
+                // not rendered and the fallback stays non-enumerating.
+                showError('signup-error', authFailureMessage(err)
+                    || 'تعذر إنشاء الحساب بهذه البيانات. تحقق من صحة البريد وكلمة المرور، أو سجّل الدخول إذا كان لديك حساب بالفعل.');
             }
         });
     </script>

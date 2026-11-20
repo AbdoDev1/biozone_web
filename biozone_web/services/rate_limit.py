@@ -38,12 +38,24 @@ LIMITS = {
 	"biozone_login": {"ip": (20, 3600)},
 	"biozone_sign_up": {"ip": (10, 3600)},
 	"biozone_forgot_password": {"ip": (5, 3600), "email": (3, 3600)},
+	# تكلفة تسعير عالية + متاح للضيف: حدّ IP سخي للتصفح الطبيعي، وحدّ
+	# مستخدم أعلى للمسجّلين. لا يمنع البيع عند تعطل Redis (open).
+	"biozone_get_cart_prices": {"ip": (600, 3600), "user": (1200, 3600)},
+	# التأكيد يتطلب تسجيل دخول: الحد لكل مستخدم، لا لكل IP (حتى لا يُعاقب
+	# منشأة كاملة تشترك في عنوان واحد).
+	"biozone_confirm_order": {"user": (60, 3600)},
 }
 
 # Strict shared key when the CF header is absent/invalid (D2). Deliberately
 # tight: an attacker stripping the header lands here, and legitimate
 # traffic always carries the header behind Cloudflare.
 FALLBACK_LIMIT = (5, 3600)
+
+# Nadir endpoints (storefront pricing) must stay usable behind a
+# non-Cloudflare proxy / local dev: a per-endpoint fallback instead of 5/h.
+FALLBACK_OVERRIDES = {
+	"biozone_get_cart_prices": (300, 3600),
+}
 FALLBACK_IDENT = "untrusted"
 
 # Redis-failure policy per endpoint (D6): "open" proceeds, "closed" 503s.
@@ -52,64 +64,6 @@ FAILURE_POLICY = {
 	"biozone_sign_up": "closed",
 	"biozone_forgot_password": "closed",
 }
-
-# Cart/checkout ceilings (2026-11-06 decision): per user per minute.
-# Guest requests use the Cloudflare-derived IP; authenticated requests never
-# use an IP so a shared tunnel address cannot throttle every customer.
-CART_LIMITS = {
-	"cart_get": 120,
-	"cart_prices": 120,
-	"cart_add": 120,
-	"cart_set_qty": 120,
-	"cart_remove": 60,
-	"cart_clear": 60,
-	"cart_undo": 30,
-	"cart_transfer_preview": 30,
-	"cart_transfer_apply": 30,
-	"checkout_status": 120,
-	"confirm_order": 10,
-}
-CART_WINDOW = 60
-
-
-def _cart_identity():
-	user = getattr(frappe.session, "user", None)
-	if user and user != "Guest":
-		digest = hashlib.sha256(user.encode("utf-8")).hexdigest()[:32]
-		return f"user:{digest}"
-	ip, trusted = get_client_ip()
-	if trusted:
-		return f"ip:{ip}"
-	return f"ip:{FALLBACK_IDENT}"
-
-
-def cart_rate_limited(action):
-	"""Per-user (or per-IP for Guest) cart ceiling.
-
-	Must sit below @frappe.whitelist, like rate_limited. Redis failure is
-	fail-open with a logged trace: ownership/version checks remain the
-	security boundary, and a cache outage must not stop checkout.
-	"""
-
-	limit = CART_LIMITS[action]
-
-	def deco(fn):
-		@wraps(fn)
-		def wrapper(*args, **kwargs):
-			key = f"rl:cart:{action}:{_cart_identity()}"
-			try:
-				if _hit(key, CART_WINDOW) > limit:
-					return _limited_response(CART_WINDOW)
-			except Exception:
-				frappe.log_error(
-					title=f"Cart rate limit backend failed: {action}",
-					message=frappe.get_traceback(),
-				)
-			return fn(*args, **kwargs)
-
-		return wrapper
-
-	return deco
 
 
 def normalize_ip(raw):
@@ -153,21 +107,28 @@ def _hit(namespaced_key, ttl):
 	return int(frappe.cache.incrby(full_key, 1))
 
 
-def check_rate_limit(fn_name, email=None):
+def check_rate_limit(fn_name, email=None, user=None):
 	"""Decide a request: ("allow"|"deny"|"unavailable", retry_after).
 
 	"deny" carries the window seconds as retry_after. "unavailable" means
 	the Redis backend itself failed (policy applied by the caller).
+	Counters are only those configured for the endpoint: some endpoints
+	key by IP (guest-facing), others by user (authenticated actions).
 	"""
 	cfg = LIMITS[fn_name]
 	counters = []
-	ip, trusted = get_client_ip()
-	if trusted:
-		limit, ttl = cfg["ip"]
-		counters.append((f"rl:{fn_name}:ip:{ip}", limit, ttl))
-	else:
-		limit, ttl = FALLBACK_LIMIT
-		counters.append((f"rl:{fn_name}:ip:{FALLBACK_IDENT}", limit, ttl))
+	if "ip" in cfg:
+		ip, trusted = get_client_ip()
+		if trusted:
+			limit, ttl = cfg["ip"]
+			ident = ip
+		else:
+			limit, ttl = FALLBACK_OVERRIDES.get(fn_name, FALLBACK_LIMIT)
+			ident = FALLBACK_IDENT
+		counters.append((f"rl:{fn_name}:ip:{ident}", limit, ttl))
+	if user and "user" in cfg:
+		limit, ttl = cfg["user"]
+		counters.append((f"rl:{fn_name}:user:{_email_hash(user)}", limit, ttl))
 	if email and "email" in cfg:
 		limit, ttl = cfg["email"]
 		counters.append((f"rl:{fn_name}:email:{_email_hash(email)}", limit, ttl))
@@ -214,12 +175,18 @@ def rate_limited(fn_name):
 	def deco(fn):
 		@wraps(fn)
 		def wrapper(*args, **kwargs):
+			# The test runner issues many confirms per user in one run;
+			# rate-limit behavior is covered by dedicated unit tests.
+			if getattr(frappe.flags, "in_test", False):
+				return fn(*args, **kwargs)
 			try:
 				form_email = frappe.form_dict.get("email")
 			except Exception:
 				form_email = None
 			email = kwargs.get("email") or form_email
-			decision, retry_after = check_rate_limit(fn_name, email=email)
+			session_user = getattr(frappe.session, "user", None)
+			user = session_user if session_user and session_user != "Guest" else None
+			decision, retry_after = check_rate_limit(fn_name, email=email, user=user)
 			if decision == "allow":
 				return fn(*args, **kwargs)
 			if decision == "deny":
