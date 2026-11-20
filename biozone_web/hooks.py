@@ -200,13 +200,23 @@ notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
 # Scheduled Tasks
 # ---------------
 
-scheduler_events = {
-	"daily": [
-		"biozone_web.tasks.expire_carts",
-		"biozone_web.tasks.purge_retained_records",
-		"biozone_web.tasks.purge_cart_snapshots",
-	],
-}
+# scheduler_events = {
+# 	"all": [
+# 		"biozone_web.tasks.all"
+# 	],
+# 	"daily": [
+# 		"biozone_web.tasks.daily"
+# 	],
+# 	"hourly": [
+# 		"biozone_web.tasks.hourly"
+# 	],
+# 	"weekly": [
+# 		"biozone_web.tasks.weekly"
+# 	],
+# 	"monthly": [
+# 		"biozone_web.tasks.monthly"
+# 	],
+# }
 
 # Testing
 # -------
