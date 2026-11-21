@@ -145,7 +145,7 @@
 {% endif %}
 <div class="cell-truncate truncate" title="{{ it.item_name|e }}">{{ it.item_name|e }}</div>
 </div>
-<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes, "display_override": it.display_override, "conversion": it.conversion, "image": it.image, "thumbnail": it.thumbnail}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-2xs shrink-0" title="تعديل" aria-label="تعديل الصنف {{ it.item_name|e }}" type="button">
+<button onclick='openItemPanel({{ {"item_code": it.item_code, "item_name": it.item_name, "item_group": it.item_group, "brand": it.brand, "stock_uom": it.stock_uom, "price": it.price, "disabled": it.disabled, "barcodes": it.barcodes, "display_override": it.display_override, "conversion": it.conversion, "image": it.image, "thumbnail": it.thumbnail}|tojson }})' class="w-8 h-8 rounded-lg inline-flex items-center justify-center bg-white border border-borderSubtle text-slate-600 hover:text-primary hover:border-primary transition-all shadow-sm shrink-0" title="تعديل" aria-label="تعديل الصنف {{ it.item_name|e }}" type="button">
 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
@@ -206,7 +206,7 @@
 {% else %}
 <span class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-400 bg-white opacity-50 cursor-not-allowed">السابق</span>
 {% endif %}
-<span class="w-8 h-8 rounded-lg bg-primary text-white font-bold transition-all shadow-2xs flex items-center justify-center">{{ page|e }}</span>
+<span class="w-8 h-8 rounded-lg bg-primary text-white font-bold transition-all shadow-sm flex items-center justify-center">{{ page|e }}</span>
 {% if has_next %}
 <a href="/staff/items?page={{ next_page|e }}{{ qs|e }}" class="px-3 py-1.5 rounded-lg border border-borderSubtle text-slate-700 bg-white hover:bg-slate-50 hover:text-darkNavy transition-colors">التالي</a>
 {% else %}

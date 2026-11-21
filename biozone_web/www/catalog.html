@@ -7,6 +7,14 @@
 <link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
 <link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">
 <style>
+  /* فئات بطاقة القائمة (list) — بدائل محلية لـ w-36/px-7/sm:justify-end
+     غير المولّدة في CSS المبني (بدون أي تعديل على app.*.css). */
+  .bz-list-media { width: 9rem; }
+  .bz-list-add { padding-left: 1.75rem; padding-right: 1.75rem; }
+  @media (min-width: 640px) {
+    .bz-list-price { justify-content: flex-end; }
+  }
+
   body { font-family: 'Tajawal', sans-serif; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

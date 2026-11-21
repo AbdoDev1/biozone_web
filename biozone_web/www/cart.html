@@ -40,6 +40,13 @@
   .cart-search-empty { padding: 24px 8px; text-align: center; font-size: 0.875rem; color: #49454f; }
   /* التنقّل بين الصفحات يعيد القارئ إلى أول الأصناف تحت الهيدر الثابت. */
   #cart-items-toolbar, #cart-items-list { scroll-margin-top: 88px; }
+  /* صناديق التحذير في مودال النقل: الفئتان bg-error/5 وborder-error/40
+     غير مولّدتين في CSS المبني — قاعدة محلية بالمعرّف بدل تعديل الملف. */
+  #guest-merge-excluded,
+  #guest-merge-load-error {
+    border-color: rgba(186, 26, 26, 0.4);
+    background-color: rgba(186, 26, 26, 0.05);
+  }
   /* مودال نقل سلة الزائر: سقف ارتفاع فعلي — الفئة max-h-[90vh] غير مولّدة
      في CSS المبني، فبدونها كان المحتوى يتجاوز الشاشة عند كثرة الأصناف. */
   #guest-merge-modal > div {
@@ -180,14 +187,14 @@
   </div>
   <!-- مودال نقل سلة الزائر: معاينة + موافقة صريحة -->
   <div class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 p-4" id="guest-merge-modal" role="dialog" aria-modal="true" aria-labelledby="guest-merge-title">
-    <div class="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-surface-container-lowest p-5 shadow-2xl">
+    <div class="w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-surface-container-lowest p-5 shadow-2xl">
       <div>
         <h3 class="text-lg font-extrabold text-on-surface" id="guest-merge-title">نقل سلة الزائر إلى حسابك</h3>
         <p class="mt-1 text-sm leading-6 text-on-surface-variant">
           هذه معاينة لما سيتغيّر. الأسعار والوحدات والتوفر محدّثة الآن من الخادم، وأنت تقرر كل سطر قبل النقل. سلة الحساب لا تتغيّر قبل موافقتك.
         </p>
       </div>
-      <div class="hidden rounded-lg border border-error/40 bg-error/5 p-3 text-sm leading-6 text-error" id="guest-merge-load-error" role="alert"></div>
+      <div class="hidden rounded-lg border p-3 text-sm leading-6 text-error" id="guest-merge-load-error" role="alert"></div>
       <div class="space-y-3" id="guest-merge-rows"></div>
       <div class="hidden rounded-lg border border-outline-variant/60 bg-surface-container p-3 text-sm leading-6 text-on-surface" id="guest-merge-excluded"></div>
       <div class="text-sm font-semibold leading-6 text-on-surface" id="guest-merge-limits"></div>
