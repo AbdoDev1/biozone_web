@@ -36,6 +36,14 @@ def _api_fail(error_code: str, message: str, *, item_code=None, extra=None):
 def _api_conflict(error_code: str, message: str, *, item_code=None, extra=None):
 	"""تعارض طلب/تسعير متوقع: 409 + request_id بعد rollback صريح."""
 	frappe.db.rollback()
+	if error_code == "PRICE_CHANGED":
+		# عدّاد تشغيلي: كم عميلًا رفضناه بسبب تغيّر سعر (يُقرأ مع hit/miss).
+		try:
+			from biozone_web.services import pricing_cache
+
+			pricing_cache.note_price_changed()
+		except Exception:
+			pass
 	frappe.local.response["http_status_code"] = 409
 	payload = {
 		"ok": False,
@@ -534,7 +542,7 @@ def biozone_confirm_order(items, checkout_token=None, quote_fingerprint=None, ca
 				return _api_conflict(
 					"PRICE_CHANGED",
 					_(
-						"تغيّر السعر أو الوحدة منذ مراجعة السلة — حدّث الأسعار ثم أعد المحاولة"
+						"تغيّر السعر أو الوحدة منذ مراجعة السلة — راجع السلة وحدّث الأسعار ثم أعد المحاولة"
 					),
 					extra={"quote_fingerprint": checkout_quote["fingerprint"]},
 				)
@@ -909,7 +917,7 @@ def biozone_confirm_order(items, checkout_token=None, quote_fingerprint=None, ca
 						return _api_conflict(
 							"PRICE_CHANGED",
 							_(
-								"تغيّر السعر أو الوحدة قبل إتمام الطلب — حدّث الأسعار ثم أعد المحاولة"
+								"تغيّر السعر أو الوحدة قبل إتمام الطلب — راجع السلة وحدّث الأسعار ثم أعد المحاولة"
 							),
 							extra={"quote_fingerprint": checkout_quote["fingerprint"]},
 						)

@@ -984,6 +984,59 @@ def _effective_unit_price(price_list_rate, discount_amount, discount_percentage)
 	return frappe.utils.flt(price_list_rate - discount_amount, 2)
 
 
+def _run_pricing_engine(codes, base_map, meta_map, customer, customer_group, company, currency):
+	"""محرك ERPNext لقائمة أكواد (batch واحد) — بلا كاش وبلا كتابة."""
+	from erpnext.accounts.doctype.pricing_rule.pricing_rule import apply_pricing_rule
+
+	previous_user = frappe.session.user
+	frappe.session.user = "Administrator"
+	try:
+		engine_out = apply_pricing_rule(
+			{
+				"doctype": "Sales Order",
+				"transaction_type": "selling",
+				"selling_price_list": PUBLIC_PRICE_LIST,
+				"price_list": PUBLIC_PRICE_LIST,
+				"company": company,
+				"currency": currency,
+				"transaction_date": frappe.utils.today(),
+				"ignore_pricing_rule": 0,
+				"customer": customer,
+				"customer_group": customer_group,
+				"items": [
+					{
+						"doctype": "Sales Order Item",
+						"item_code": code,
+						"item_group": (meta_map.get(code) or {}).get("item_group"),
+						"qty": 1,
+						"stock_qty": 1,
+						"uom": (meta_map.get(code) or {}).get("stock_uom"),
+						"price_list_rate": base_map[code],
+					}
+					for code in codes
+				],
+			}
+		)
+	finally:
+		frappe.session.user = previous_user
+
+	out = {}
+	for code, row in zip(codes, engine_out):
+		base = base_map[code]
+		price_list_rate = frappe.utils.flt(row.get("price_list_rate")) or base
+		discount_percentage = frappe.utils.flt(row.get("discount_percentage"))
+		out[code] = {
+			"price": _effective_unit_price(
+				price_list_rate,
+				row.get("discount_amount"),
+				discount_percentage,
+			),
+			"base_price": base,
+			"discount_percentage": discount_percentage,
+		}
+	return out
+
+
 def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 	"""السعر النهائي (بعد خصم الفئة) لمجموعة أصناف، دفعة واحدة عبر محرك
 	ERPNext الحقيقي — نفس المحرك الذي يسعّر صفوف Sales Order.
@@ -1053,59 +1106,39 @@ def get_effective_item_prices(item_codes, customer=None, customer_group=None):
 	company = get_default_company()
 	currency = frappe.db.get_value("Company", company, "default_currency")
 
-	from erpnext.accounts.doctype.pricing_rule.pricing_rule import apply_pricing_rule
+	# كاش تسعير قصير العمر (معطّل افتراضيًا): يقلّل N+1 في محرك القواعد.
+	# لا يُستخدم في تسعير الطلب النهائي — التأكيد يعيد التسعير ويقارن.
+	from biozone_web.services import pricing_cache
 
-	# pricing-guest-compat: narrow Administrator impersonation window around
-	# the engine call only. ERPNext >= 16.36 gates apply_pricing_rule behind
-	# Sales Order permission, but guests browse public prices (16.33 had no
-	# gate). Direct session assignment — never frappe.set_user here, it
-	# rewrites sid too. Restored in finally whatever happens. No writes,
-	# no commit, no order creation inside: the engine path is read-only.
-	previous_user = frappe.session.user
-	frappe.session.user = "Administrator"
-	try:
-		engine_out = apply_pricing_rule(
-			{
-				"doctype": "Sales Order",
-				"transaction_type": "selling",
-				"selling_price_list": PUBLIC_PRICE_LIST,
-				"price_list": PUBLIC_PRICE_LIST,
-				"company": company,
-				"currency": currency,
-				"transaction_date": frappe.utils.today(),
-				"ignore_pricing_rule": 0,
-				"customer": customer,
-				"customer_group": customer_group,
-				"items": [
-					{
-						"doctype": "Sales Order Item",
-						"item_code": code,
-						"item_group": (meta_map.get(code) or {}).get("item_group"),
-						"qty": 1,
-						"stock_qty": 1,
-						"uom": (meta_map.get(code) or {}).get("stock_uom"),
-						"price_list_rate": base_map[code],
-					}
-					for code in pricable
-				],
-			}
+	ctx = pricing_cache.context(company, currency, PUBLIC_PRICE_LIST, customer, customer_group)
+	resolved = {}
+	misses = []
+	for code in pricable:
+		stock_uom = (meta_map.get(code) or {}).get("stock_uom")
+		cached = pricing_cache.lookup(code, base_map[code], stock_uom, ctx)
+		if cached is not None:
+			resolved[code] = cached
+		else:
+			misses.append(code)
+
+	if misses:
+		engine = _run_pricing_engine(
+			misses, base_map, meta_map, customer, customer_group, company, currency
 		)
-	finally:
-		frappe.session.user = previous_user
+		for code, value in engine.items():
+			resolved[code] = value
+			pricing_cache.store(
+				code,
+				base_map[code],
+				(meta_map.get(code) or {}).get("stock_uom"),
+				ctx,
+				value,
+			)
 
-	for code, row in zip(pricable, engine_out):
-		base = base_map[code]
-		price_list_rate = frappe.utils.flt(row.get("price_list_rate")) or base
-		discount_percentage = frappe.utils.flt(row.get("discount_percentage"))
-		result[code] = {
-			"price": _effective_unit_price(
-				price_list_rate,
-				row.get("discount_amount"),
-				discount_percentage,
-			),
-			"base_price": base,
-			"discount_percentage": discount_percentage,
-		}
+	pricing_cache.record_batch(len(pricable) - len(misses), len(misses))
+
+	for code in pricable:
+		result[code] = resolved[code]
 
 	return result
 

@@ -203,6 +203,36 @@ notification_skip_email_types = list(_BZ_NOTIFICATION_TYPES)
 # 	}
 # }
 
+# كاش التسعير (biozone_web/services/pricing_cache.py): إبطال فوري لأي
+# تغيير تسعيري. بدونها يبقى السقف هو TTL (60s) فقط.
+doc_events = {
+	"Item Price": {
+		"after_insert": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_update": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_trash": "biozone_web.services.pricing_cache.on_price_doc_change",
+	},
+	"Pricing Rule": {
+		"after_insert": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_update": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_trash": "biozone_web.services.pricing_cache.on_price_doc_change",
+	},
+	"Customer Group": {
+		"on_update": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_trash": "biozone_web.services.pricing_cache.on_price_doc_change",
+	},
+	"Price List": {
+		"on_update": "biozone_web.services.pricing_cache.on_price_doc_change",
+		"on_trash": "biozone_web.services.pricing_cache.on_price_doc_change",
+	},
+	"Item": {
+		"on_update": "biozone_web.services.pricing_cache.on_item_change",
+		"on_trash": "biozone_web.services.pricing_cache.on_item_change",
+	},
+	"Company": {
+		"on_update": "biozone_web.services.pricing_cache.on_company_change",
+	},
+}
+
 # Scheduled Tasks
 # ---------------
 
