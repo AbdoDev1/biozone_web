@@ -22,6 +22,11 @@
    max-w-container-max (1280px) — كلها توكنات يجب أن تُعرَّف في الصفحة
    المضيفة (راجع فحص تعريف التوكنات في قواعد البناء). #}
 <style>
+  /* فئات لا يولّدها الـCSS المبني (pl-20/left-10) — قاعدة محلية بدل تعديل
+     الملف المولَّد: حشو يسار يمنع النص من الدخول تحت أيقونة المسح، ومكان
+     ثابت لزر «مسح البحث» بعيدًا عن الأيقونة. */
+  .bz-search-input { padding-left: 4.75rem; }
+  .bz-search-clear { left: 2.75rem; }
   html { overflow-y: scroll; }
   @supports (scrollbar-gutter: stable) {
     html { overflow-y: auto; scrollbar-gutter: stable; }
@@ -46,12 +51,15 @@
       {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category|e }}">{% endif %}
       {% if selected_brand %}<input type="hidden" name="brand" value="{{ selected_brand|e }}">{% endif %}
       <div class="relative flex-grow">
-        <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full pl-12 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% else %}class="w-full pl-4 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% endif %} enterkeyhint="search" name="q" placeholder="ابحث عن منتج، صنف، أو براند..." type="text" value="{{ search_term or '' }}">
+        <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full bz-search-input pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% else %}class="w-full bz-search-input pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"{% endif %} enterkeyhint="search" name="q" placeholder="ابحث عن منتج، صنف، أو براند... أو امسح باركود" type="text" value="{{ (search_term or '')|e }}">
         <button type="submit" aria-label="بحث" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary">
           <span class="material-symbols-outlined text-lg">search</span>
         </button>
+        <button type="button" aria-label="مسح باركود أو QR" title="مسح باركود أو QR" data-bz-scan="1" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-primary">
+          <span class="material-symbols-outlined text-[20px]">barcode_scanner</span>
+        </button>
         {% if search_term %}
-        <a aria-label="مسح البحث" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
+        <a aria-label="مسح البحث" class="absolute bz-search-clear top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
         {% endif %}
       </div>
     </form>
@@ -95,12 +103,15 @@
   {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category|e }}">{% endif %}
   {% if selected_brand %}<input type="hidden" name="brand" value="{{ selected_brand|e }}">{% endif %}
   <div class="relative flex-grow">
-    <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full pl-12 pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% else %}class="w-full pl-4 pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% endif %} enterkeyhint="search" placeholder="ابحث عن منتج، صنف، أو براند..." type="text" name="q" value="{{ search_term or '' }}">
+    <input aria-label="بحث في المتجر" autocomplete="off" {% if search_term %}class="w-full bz-search-input pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% else %}class="w-full bz-search-input pr-10 py-2.5 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl outline-none"{% endif %} enterkeyhint="search" placeholder="ابحث عن منتج، صنف، أو براند... أو امسح باركود" type="text" name="q" value="{{ (search_term or '')|e }}">
     <button type="submit" aria-label="بحث" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
       <span class="material-symbols-outlined text-lg">search</span>
     </button>
+    <button type="button" aria-label="مسح باركود أو QR" title="مسح باركود أو QR" data-bz-scan="1" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-slate-400">
+      <span class="material-symbols-outlined text-[20px]">barcode_scanner</span>
+    </button>
     {% if search_term %}
-    <a aria-label="مسح البحث" class="absolute left-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
+    <a aria-label="مسح البحث" class="absolute bz-search-clear top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant" href="/catalog{% if selected_category or selected_brand %}?{% if selected_category %}category={{ selected_category|urlencode }}{% endif %}{% if selected_category and selected_brand %}&{% endif %}{% if selected_brand %}brand={{ selected_brand|urlencode }}{% endif %}{% endif %}"><span class="material-symbols-outlined text-[18px]">close</span></a>
     {% endif %}
   </div>
 </form>
@@ -140,4 +151,5 @@
     if (e.key === window.BZ_CART_KEY) syncHeaderCartBadge();
   });
 </script>
+<script src="/assets/biozone_web/js/store_scan.js?v=20261121-2"></script>
 {% include "biozone_web/templates/includes/store_notifications.html" %}
