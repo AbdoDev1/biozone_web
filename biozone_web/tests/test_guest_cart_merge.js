@@ -484,6 +484,23 @@ function mergeOnce(storage, buildItems) {
     );
     assert.strictEqual(read(storage, ACCOUNT).length, 0);
   }
+  // (7b) تقسيم الصفحات: 5 صفوف لكل صفحة بلا فقدان صفوف
+  {
+    const rows = Array.from({ length: 12 }, (_, i) => ({ item_code: 'P' + i }));
+    const p1 = merge.paginate(rows, 1, merge.MERGE_PREVIEW_LIMIT);
+    const p3 = merge.paginate(rows, 3, merge.MERGE_PREVIEW_LIMIT);
+    const p9 = merge.paginate(rows, 9, merge.MERGE_PREVIEW_LIMIT);
+    assert.strictEqual(p1.pageCount, 3);
+    assert.strictEqual(p1.items.length, 5);
+    assert.strictEqual(p3.items.length, 2);
+    assert.strictEqual(p9.page, 3, 'الصفحة تُقيَّد بالحد الأقصى');
+    assert.deepStrictEqual(
+      p1.items.concat(merge.paginate(rows, 2, 5).items, p3.items).map((r) => r.item_code),
+      rows.map((r) => r.item_code),
+      'لا صف مفقود ولا مكرر عبر الصفحات'
+    );
+  }
+
   // (8) fail-closed: بلا Web Locks / بلا قفل → لا كتابة ولا مسح
   {
     const storage = accountStorage(
@@ -518,6 +535,8 @@ function mergeOnce(storage, buildItems) {
     assert.strictEqual(off.buttonDisabled, true);
     assert.match(off.message, /لا يدعم قفل التبويبات الآمن/);
     assert.match(off.message, /سلة الزائر محفوظة كما هي/);
+
+    assert.strictEqual(merge.MERGE_PREVIEW_LIMIT, 5, 'المودال يعرض 5 صفوف كحد أقصى');
 
     const on = merge.mergeUiState({ locks: { request: () => {} } });
     assert.strictEqual(on.available, true);

@@ -103,6 +103,16 @@ class TestCartPage(unittest.TestCase):
 		self.assertIn("data-persist", self.page)
 		self.assertIn("clearNotice({ fromStorage: true })", self.page)
 
+	def test_merge_preview_is_paginated_not_dumped(self):
+		self.assertIn("MERGE_PREVIEW_LIMIT", self.js)
+		self.assertIn("paginate", self.js)
+		self.assertIn("mergeState.page", self.page)
+		self.assertIn("صفحة ' + paged.page + ' من ' + paged.pageCount", self.page)
+		self.assertNotIn("mergeState.showAll", self.page)
+		# سقف ارتفاع فعلي للمودال (الفئة max-h-[90vh] غير مولّدة في CSS المبني)
+		self.assertIn("#guest-merge-modal > div", self.page)
+		self.assertIn("max-height: 90vh", self.page)
+
 	def test_line_cap_blocks_instead_of_truncating(self):
 		self.assertIn("mergeState.plan.block", self.page)
 		self.assertIn("لن يُحذف شيء تلقائيًا", self.page)

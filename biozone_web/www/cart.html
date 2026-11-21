@@ -40,6 +40,14 @@
   .cart-search-empty { padding: 24px 8px; text-align: center; font-size: 0.875rem; color: #49454f; }
   /* التنقّل بين الصفحات يعيد القارئ إلى أول الأصناف تحت الهيدر الثابت. */
   #cart-items-toolbar, #cart-items-list { scroll-margin-top: 88px; }
+  /* مودال نقل سلة الزائر: سقف ارتفاع فعلي — الفئة max-h-[90vh] غير مولّدة
+     في CSS المبني، فبدونها كان المحتوى يتجاوز الشاشة عند كثرة الأصناف. */
+  #guest-merge-modal > div {
+    max-height: 90vh;
+    max-height: 90dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
   /* أيقونة دوّارة لحالة التحميل على زر التأكيد. */
   .bz-spin { animation: bz-spin 0.9s linear infinite; }
   @keyframes bz-spin { to { transform: rotate(360deg); } }
@@ -233,7 +241,7 @@
 </template>
 
 <script src="/assets/biozone_web/js/cart_checkout_guard.js"></script>
-<script src="/assets/biozone_web/js/guest_cart_merge.js?v=20261120-7"></script>
+<script src="/assets/biozone_web/js/guest_cart_merge.js?v=20261121-3"></script>
 <script>
 (function () {
   const CSRF_TOKEN = {{ csrf_token|tojson }};
@@ -1357,7 +1365,24 @@
     var list = mergeEl('guest-merge-rows');
     if (!list || !mergeState) return;
     list.innerHTML = '';
-    mergeState.plan.rows.forEach(function (row) {
+
+    // العرض: صفوف «تحتاج قرار» (تعارض وحدة البيع) أولًا، ثم الباقي،
+    // ومقسّم صفحات صغيرة — لا نرسم السلة كلها في الـDOM مهما كبرت.
+    var allRows = mergeState.plan.rows || [];
+    var ordered = [];
+    var rest = [];
+    allRows.forEach(function (row) {
+      (row.kind === 'uom' ? ordered : rest).push(row);
+    });
+    ordered = ordered.concat(rest);
+
+    var size = (window.BzGuestCart && window.BzGuestCart.MERGE_PREVIEW_LIMIT) || 5;
+    var paged = window.BzGuestCart.paginate
+      ? window.BzGuestCart.paginate(ordered, mergeState.page || 1, size)
+      : { page: 1, pageCount: 1, items: ordered.slice(0, size), total: ordered.length };
+    mergeState.page = paged.page;
+
+    paged.items.forEach(function (row) {
       var box = makeEl('div', 'rounded-lg border border-outline-variant/60 p-3');
       var head = makeEl('div', 'flex flex-wrap items-start justify-between gap-2');
       var title = makeEl('p', 'text-sm font-bold text-on-surface',
@@ -1427,6 +1452,46 @@
 
       list.appendChild(box);
     });
+
+    // شريط الصفحات (5 صفوف/صفحة) — يحل محل «عرض الكل» فلا يكبر الـDOM.
+    if (ordered.length > size) {
+      var bar = makeEl('div', 'flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-container px-3 py-2');
+      bar.appendChild(makeEl('p', 'text-xs font-semibold leading-6 text-on-surface-variant',
+        'صفحة ' + paged.page + ' من ' + paged.pageCount + ' · عرض ' + paged.items.length + ' من ' + ordered.length + ' صنفًا'));
+      var nav = makeEl('div', 'flex items-center gap-2');
+      var prev = makeEl('button',
+        'rounded-full border border-outline-variant px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/5 disabled:opacity-40',
+        'السابق');
+      prev.type = 'button';
+      prev.disabled = paged.page <= 1;
+      prev.addEventListener('click', function () {
+        if (mergeState.page <= 1) return;
+        mergeState.page -= 1;
+        renderMergeRows();
+        scrollMergeRowsTop();
+      });
+      var next = makeEl('button',
+        'rounded-full border border-outline-variant px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-primary/5 disabled:opacity-40',
+        'التالي');
+      next.type = 'button';
+      next.disabled = paged.page >= paged.pageCount;
+      next.addEventListener('click', function () {
+        if (mergeState.page >= paged.pageCount) return;
+        mergeState.page += 1;
+        renderMergeRows();
+        scrollMergeRowsTop();
+      });
+      nav.appendChild(prev);
+      nav.appendChild(next);
+      bar.appendChild(nav);
+      list.appendChild(bar);
+    }
+  }
+
+  function scrollMergeRowsTop() {
+    var modal = mergeEl('guest-merge-modal');
+    var card = modal && modal.firstElementChild;
+    if (card) card.scrollTop = 0;
   }
 
   function renderMergeExcluded() {
@@ -1496,9 +1561,10 @@
         + '. احذف ' + mergeState.plan.block.overflow
         + ' صنفًا من سلة حسابك ثم أعد المحاولة — لن يُحذف شيء تلقائيًا.';
     } else if (!applied.ok) {
+      var names = applied.unresolved.map(function (row) { return row.item_name || row.item_code; });
       limits.textContent = applied.error === 'unresolved'
-        ? 'اختر وحدة البيع لكل سطر متعارض: '
-          + applied.unresolved.map(function (row) { return row.item_name || row.item_code; }).join('، ')
+        ? 'اختر وحدة البيع لكل سطر متعارض: ' + names.slice(0, 3).join('، ')
+          + (names.length > 3 ? ' و' + (names.length - 3) + ' أخرى (استخدم التنقّل بين الصفحات)' : '')
         : 'تعذّر تجهيز النقل. حدّث الصفحة ثم حاول مجددًا.';
     } else {
       var total = window.BzGuestCart.totalOf(applied.items);
@@ -1558,17 +1624,15 @@
     setMergeLoading('جارٍ تحديث الأسعار والتحقق من التوفر من الخادم...');
 
     try {
-      var guestMeta = await fetchPriceMeta(guestRaw.map(function (line) {
+      // نداء تسعير واحد للسلة والزائر معًا (بدل نداءين): الأسعار للكود
+      // نفسه متطابقة، وعدد النداءات لا يتأثر بعدد الأصناف.
+      var accountRaw = loadCart();
+      var combined = guestRaw.concat(accountRaw);
+      var meta = await fetchPriceMeta(combined.map(function (line) {
         return { item_code: line.item_code, quantity: line.quantity, uom: line.uom || '' };
       }));
-      var accountRaw = loadCart();
-      var accountMeta = accountRaw.length
-        ? await fetchPriceMeta(accountRaw.map(function (line) {
-            return { item_code: line.item_code, quantity: line.quantity, uom: line.uom || '' };
-          }))
-        : { prices: {}, min_limit: null, min_applies: false };
-      var guestPriced = window.BzGuestCart.priceLines(guestRaw, guestMeta.prices || {});
-      var accountPriced = window.BzGuestCart.priceLines(accountRaw, accountMeta.prices || {});
+      var guestPriced = window.BzGuestCart.priceLines(guestRaw, meta.prices || {});
+      var accountPriced = window.BzGuestCart.priceLines(accountRaw, meta.prices || {});
       // سلة الحساب نفسها غير موثوقة: إن لم تُسعّر بالكامل لا نبني نتيجة
       // تُسقط أسطرًا. المستخدم يحدّث الصفحة (التسعير التلقائي يعالجها).
       if (accountPriced.unavailable.length || accountPriced.invalid.length) {
@@ -1586,7 +1650,8 @@
         }),
         accountItems: accountPriced.lines,
         decisions: {},
-        meta: accountMeta && accountMeta.prices ? accountMeta : guestMeta,
+        page: 1,
+        meta: meta,
         // لقطة الهوية لحظة فتح المعاينة: تُقارن داخل القفل قبل الكتابة.
         expected: {
           guest: window.BzGuestCart.signature(guestRaw),

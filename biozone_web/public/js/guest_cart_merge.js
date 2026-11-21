@@ -21,6 +21,9 @@
   // بلا دمج ثانٍ (idempotent)، أو يُهمَل إن لم تحدث الكتابة.
   var INTENT_KEY = 'biozone_cart_guest_merge_intent';
   var MAX_LINES = 200;
+  // في مودال النقل نعرض أول 5 صفوف فقط (تكسر الشاشة عند العدد الكبير)؛
+  // صفوف تعارض وحدة البيع تُعرض دائمًا لأنها تحتاج قرارًا صريحًا.
+  var MERGE_PREVIEW_LIMIT = 5;
   var GUEST_STATE_PREFIXES = [
     'biozone_checkout_pending:',
     'biozone_cart_instance:',
@@ -265,6 +268,22 @@
     return Promise.resolve().then(function () {
       return lock(run);
     });
+  }
+
+  // سلة مقسّمة داخل مودال النقل: صفحات صغيرة بدل رسم كل الصفوف (DOM ثابت).
+  function paginate(items, page, pageSize) {
+    var list = items || [];
+    var size = Math.max(1, Number(pageSize) || MERGE_PREVIEW_LIMIT);
+    var pageCount = Math.max(1, Math.ceil(list.length / size));
+    var current = Math.min(Math.max(1, Number(page) || 1), pageCount);
+    var start = (current - 1) * size;
+    return {
+      page: current,
+      pageCount: pageCount,
+      size: size,
+      total: list.length,
+      items: list.slice(start, start + size)
+    };
   }
 
   function toQty(value) {    var qty = Number(value);
@@ -528,6 +547,7 @@
     OWNER_KEY: OWNER_KEY,
     INTENT_KEY: INTENT_KEY,
     MAX_LINES: MAX_LINES,
+    MERGE_PREVIEW_LIMIT: MERGE_PREVIEW_LIMIT,
     accountKey: accountKey,
     hasWebLocks: hasWebLocks,
     mergeUiState: mergeUiState,
@@ -544,6 +564,7 @@
     priceLines: priceLines,
     buildPlan: buildPlan,
     applyPlan: applyPlan,
+    paginate: paginate,
     totalOf: totalOf,
     summarize: summarize
   };
