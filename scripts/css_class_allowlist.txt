@@ -1,0 +1,36 @@
+# فئات تُستخدم كخطافات JavaScript فقط (querySelector / event wiring)
+# وليست وحدات تصميم — لا تحتاج تعريفًا في CSS. أي فئة هنا يجب أن تحمل سببًا.
+# التنسيق: <class>   # السبب
+
+# --- سلة المتجر (www/cart.html + cart_helpers.js) ---
+cart-item-image          # خطاف JS لتبديل صورة السطر
+cart-item-name           # خطاف JS لعرض اسم الصنف
+cart-item-category       # خطاف JS لعرض فئة الصنف
+cart-item-unit-price     # خطاف JS لعرض سعر الوحدة
+cart-item-qty            # خطاف JS لقراءة/كتابة الكمية
+cart-item-subtotal       # خطاف JS لحساب إجمالي السطر
+cart-item-increment      # خطاف JS لزر الزيادة
+cart-item-decrement      # خطاف JS لزر الإنقاص
+cart-item-remove         # خطاف JS لزر الحذف
+cart-page-prev           # خطاف JS لترقيم صفحات السلة
+cart-page-next           # خطاف JS لترقيم صفحات السلة
+cart-page-status-label   # خطاف JS لعرض «صفحة X من Y»
+
+# --- بطاقة المنتج (templates/includes/product_card.html) ---
+catalog-product-card     # خطاف JS لبطاقة المنتج (التنسيق بالفئات المساندة)
+catalog-product-group    # خطاف JS لعرض فئة الصنف
+catalog-product-brand    # خطاف JS لعرض البراند
+catalog-discount-badge   # خطاف JS لشارة الخصم
+catalog-card-cart        # خطاف JS لحاوية زر السلة داخل البطاقة
+catalog-increment        # خطاف JS لزر الزيادة
+catalog-decrement        # خطاف JS لزر الإنقاص
+catalog-qty              # خطاف JS لقراءة الكمية
+catalog-price-base       # خطاف JS لعرض السعر قبل الخصم
+
+# --- الستاف ---
+col-name                 # خطاف JS لأعمدة جدول الأصناف
+col-order                # خطاف JS لأعمدة جدول الطلبات
+ret-qty                  # خطاف JS لكمية المرتجع
+stock-warning-text       # خطاف JS لنص تحذير المخزون
+main-content-wrapper     # غلاف تخطيط يستخدمه staff_shell (يُنسَّق بالفئات المساندة)
+filter-toggle-icon       # خطاف JS لسهم زر الفلتر
