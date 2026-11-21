@@ -11,18 +11,34 @@
 <link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">
 <style>
   body { font-family: 'Tajawal', sans-serif; }
-  .brand-marquee { position: relative; overflow: hidden; direction: ltr; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); }
-  .brand-marquee-track { display: flex; width: max-content; transition: transform .55s ease; will-change: transform; }
+  /* شريط البراندات: لوب مستمر (rAF) + سحب وأزرار. الحاوية ltr للحركة فقط،
+     والبطاقات rtl لتبقى النصوص العربية في اتجاهها. */
+  .brand-marquee { position: relative; direction: ltr; touch-action: pan-y; cursor: grab; }
+  /* القناع على غلاف المحتوى فقط — الأزرار خارجه فلا تبهت ولا تُقصّ */
+  .brand-marquee-mask { overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%); }
+  .brand-marquee.is-dragging { cursor: grabbing; user-select: none; }
+  .brand-marquee-track { display: flex; width: max-content; will-change: transform; }
   .brand-marquee-group { display: flex; flex: none; gap: 16px; padding-right: 16px; }
   .brand-marquee-card { flex: 0 0 150px; width: 150px; direction: rtl; box-sizing: border-box; }
-  .brand-marquee--few .brand-marquee-group { min-width: 100vw; justify-content: space-around; }
-  .brand-marquee--single .brand-marquee-track { transition: none; width: auto; justify-content: center; }
+  .brand-marquee--single .brand-marquee-track { width: auto; justify-content: center; }
   .brand-marquee--single .brand-marquee-group { min-width: 0; padding-right: 0; justify-content: center; }
   .brand-marquee--single .brand-marquee-group[aria-hidden="true"] { display: none; }
+  .brand-marquee--single .brand-marquee-nav { display: none; }
+  .brand-marquee-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+    width: 2.5rem; height: 2.5rem; border-radius: 9999px; background: #fff;
+    border: 1px solid rgba(11, 28, 48, 0.18); box-shadow: 0 2px 10px rgba(11, 28, 48, 0.22);
+    color: #00685f; display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
+  .brand-marquee-nav:hover { transform: translateY(-50%) scale(1.06); box-shadow: 0 4px 14px rgba(11, 28, 48, 0.26); }
+  .brand-marquee-nav .material-symbols-outlined { font-size: 1.5rem; }
+  .brand-marquee-nav:hover { background: #f8fafc; }
+  .brand-marquee-nav:focus-visible { outline: 2px solid #00685f; outline-offset: 2px; }
+  .brand-marquee-nav--next { left: 0.5rem; }
+  .brand-marquee-nav--prev { right: 0.5rem; }
   @media (prefers-reduced-motion: reduce) {
-    .brand-marquee { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
-    .brand-marquee-track { transition: none; }
-    .brand-marquee-group[aria-hidden="true"] { display: none; }
+    .brand-marquee { -webkit-mask-image: none; mask-image: none; }
   }
 </style>
 </head>
@@ -78,7 +94,8 @@
         <span class="material-symbols-outlined text-[18px]">chevron_left</span>
       </a>
     </div>
-    <div id="brand-marquee" class="brand-marquee{% if top_brands|length == 1 %} brand-marquee--single{% elif top_brands|length < 4 %} brand-marquee--few{% endif %}" aria-label="العلامات التجارية">
+    <div id="brand-marquee" class="brand-marquee{% if top_brands|length == 1 %} brand-marquee--single{% endif %}" aria-label="العلامات التجارية">
+      <div class="brand-marquee-mask">
       <div id="brand-marquee-track" class="brand-marquee-track">
         {% for copy in [false, true] %}
         <div class="brand-marquee-group"{% if copy %} aria-hidden="true"{% endif %}>
@@ -97,65 +114,232 @@
         </div>
         {% endfor %}
       </div>
+      </div>
+      <button type="button" class="brand-marquee-nav brand-marquee-nav--next" data-bz-marquee-next aria-label="التالي">
+        <span aria-hidden="true" class="material-symbols-outlined">chevron_left</span>
+      </button>
+      <button type="button" class="brand-marquee-nav brand-marquee-nav--prev" data-bz-marquee-prev aria-label="السابق">
+        <span aria-hidden="true" class="material-symbols-outlined">chevron_right</span>
+      </button>
     </div>
     <script>
       (function () {
         var root = document.getElementById('brand-marquee');
         if (!root) return;
         var track = document.getElementById('brand-marquee-track');
-        var groups = Array.prototype.slice.call(root.querySelectorAll('.brand-marquee-group'));
-        var cards = Array.prototype.slice.call(groups[0].querySelectorAll('.brand-marquee-card'));
-        var total = cards.length;
-        if (groups.length < 2 || total < 2) return;
+        if (!track) return;
         var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-        if (reduce.matches) return;
-        var offsets = [];
+        var SPEED = 30;              // px/s يسارًا
+        var NUDGE_PX = 166;          // 150px بطاقة + 16px فجوة
+        var NUDGE_MS = 250;
+        var DRAG_THRESHOLD = 8;      // px قبل اعتبار الحركة سحبًا
+        var CLICK_GUARD_MS = 350;
+
+        var groups = [];
         var groupWidth = 0;
-        var index = 0;
-        var timer = null;
-        var paused = false;
+        var offset = 0;              // translateX = -(offset + nudgeValue)
+        var nudgeValue = 0, nudgeTo = 0, nudgeStart = 0, nudgeActive = false;
+        var rafId = 0, running = false, lastTs = 0;
+        var dragging = false, pointerId = null, dragStartX = 0, dragStartOffset = 0;
+        var dragMoved = 0, lastX = 0, lastT = 0, velocity = 0;
+        var hoverPaused = false, inView = true;
+        var suppressClick = false, suppressTimer = 0;
+
+        function isSingle() { return root.classList.contains('brand-marquee--single'); }
+        function mod(n) { return groupWidth ? ((n % groupWidth) + groupWidth) % groupWidth : 0; }
+        function collect() { groups = Array.prototype.slice.call(root.querySelectorAll('.brand-marquee-group')); }
+
+        // نسخ كافية لتغطية الشاشة + مجموعة: (ceil(W/G)+1) على الأقل
+        function ensureCopies() {
+          if (!groupWidth) return;
+          var need = Math.max(2, Math.ceil(root.clientWidth / groupWidth) + 1);
+          while (root.querySelectorAll('.brand-marquee-group').length > need) {
+            var last = track.lastElementChild;
+            if (!last || last === groups[0]) break;
+            track.removeChild(last);
+          }
+          collect();
+          var base = groups[0];
+          while (root.querySelectorAll('.brand-marquee-group').length < need) {
+            var clone = base.cloneNode(true);
+            clone.setAttribute('aria-hidden', 'true');
+            Array.prototype.forEach.call(clone.querySelectorAll('a'), function (a) {
+              a.setAttribute('tabindex', '-1');
+            });
+            track.appendChild(clone);
+          }
+          collect();
+        }
+
         function measure() {
+          if (isSingle()) return false;
+          root.classList.remove('brand-marquee--few'); // لا تمدد أثناء اللوب
+          collect();
+          if (groups.length < 2) return false;
           groupWidth = groups[1].offsetLeft - groups[0].offsetLeft;
-          var base = cards[0].offsetLeft;
-          offsets = cards.map(function (card) { return card.offsetLeft - base; });
+          if (!groupWidth || groupWidth < 10) return false;
+          ensureCopies();
+          offset = mod(offset);
+          return true;
         }
-        function setX(x, animate) {
-          track.style.transition = animate ? 'transform .55s ease' : 'none';
-          track.style.transform = 'translateX(-' + x + 'px)';
+
+        function render() {
+          track.style.transform = 'translateX(' + (-(offset + nudgeValue)).toFixed(2) + 'px)';
         }
-        function reset() {
-          index = 0;
-          setX(0, false);
+
+        function tick(now) {
+          if (!running) return;
+          var dt = lastTs ? Math.min(0.05, (now - lastTs) / 1000) : 0;
+          lastTs = now;
+
+          if (nudgeActive) {
+            var t = Math.min(1, (now - nudgeStart) / NUDGE_MS);
+            var eased = 1 - Math.pow(1 - t, 3);
+            nudgeValue = nudgeTo * eased;
+            if (t >= 1) {
+              offset = mod(offset + nudgeTo);
+              nudgeValue = 0;
+              nudgeActive = false;
+            }
+          }
+
+          if (!dragging && !hoverPaused) {
+            offset = mod(offset + SPEED * dt);
+            if (Math.abs(velocity) > 5 && !reduce.matches) {
+              offset = mod(offset - velocity * dt);
+              velocity *= Math.pow(0.02, dt); // قصور ذاتي يخبو سريعًا
+            } else {
+              velocity = 0;
+            }
+          }
+          render();
+          rafId = requestAnimationFrame(tick);
         }
-        function advance() {
-          if (index < total - 1) {
-            index += 1;
-            setX(offsets[index], true);
-          } else {
-            setX(groupWidth, true);
-            setTimeout(reset, 600);
+
+        function shouldRun() {
+          return !isSingle() && !document.hidden && inView && !reduce.matches;
+        }
+        function sync() {
+          var run = shouldRun();
+          if (run && !running) {
+            running = true;
+            lastTs = 0;
+            rafId = requestAnimationFrame(tick);
+          } else if (!run && running) {
+            running = false;
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = 0;
           }
         }
-        function stop() { if (timer) { clearInterval(timer); timer = null; } }
-        function start() {
-          stop();
-          if (paused) return;
-          timer = setInterval(advance, 4000);
+
+        function nudge(delta) {
+          if (isSingle()) return;
+          if (reduce.matches) {           // حركة معطلة: إزاحة فورية
+            offset = mod(offset + delta);
+            render();
+            return;
+          }
+          if (nudgeActive) { offset = mod(offset + nudgeValue); nudgeActive = false; nudgeValue = 0; }
+          nudgeTo = delta;
+          nudgeStart = performance.now();
+          nudgeActive = true;
+          sync();
         }
-        function pause() { paused = true; stop(); }
-        function resume() { paused = false; start(); }
-        root.addEventListener('mouseenter', pause);
-        root.addEventListener('mouseleave', resume);
-        root.addEventListener('focusin', pause);
-        root.addEventListener('focusout', function (event) {
-          if (!root.contains(event.relatedTarget)) resume();
+
+        function onDown(e) {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          if (e.target && e.target.closest && e.target.closest('.brand-marquee-nav')) return;
+          dragging = true;
+          pointerId = e.pointerId;
+          dragStartX = e.clientX;
+          dragStartOffset = offset;
+          dragMoved = 0;
+          lastX = e.clientX;
+          lastT = performance.now();
+          velocity = 0;
+          root.classList.add('is-dragging');
+          try { root.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+
+        function onMove(e) {
+          if (!dragging || e.pointerId !== pointerId) return;
+          var dx = e.clientX - dragStartX;
+          if (Math.abs(dx) > dragMoved) dragMoved = Math.abs(dx);
+          offset = mod(dragStartOffset - dx);
+          var now = performance.now();
+          var dts = Math.max(1, now - lastT) / 1000;
+          velocity = (e.clientX - lastX) / dts;
+          lastX = e.clientX;
+          lastT = now;
+          render();
+          if (dragMoved > DRAG_THRESHOLD && e.cancelable) e.preventDefault();
+        }
+
+        function endDrag(e) {
+          if (!dragging) return;
+          dragging = false;
+          root.classList.remove('is-dragging');
+          try { root.releasePointerCapture(pointerId); } catch (err) {}
+          if (dragMoved >= DRAG_THRESHOLD) {
+            suppressClick = true;
+            clearTimeout(suppressTimer);
+            suppressTimer = setTimeout(function () { suppressClick = false; }, CLICK_GUARD_MS);
+          } else {
+            velocity = 0;
+          }
+          pointerId = null;
+        }
+
+        // لا تفتح رابط البطاقة بعد سحب فعلي (عتبة 8px)
+        root.addEventListener('click', function (e) {
+          if (suppressClick) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+
+        root.addEventListener('pointerdown', onDown);
+        root.addEventListener('pointermove', onMove);
+        root.addEventListener('pointerup', endDrag);
+        root.addEventListener('pointercancel', endDrag);
+
+        var nextBtn = root.querySelector('[data-bz-marquee-next]');
+        var prevBtn = root.querySelector('[data-bz-marquee-prev]');
+        [nextBtn, prevBtn].forEach(function (b) {
+          if (b) b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
         });
+        if (nextBtn) nextBtn.addEventListener('click', function () { nudge(NUDGE_PX); });
+        if (prevBtn) prevBtn.addEventListener('click', function () { nudge(-NUDGE_PX); });
+
+        // الإيقاف المؤقت: على الشريط (track) فقط — الأزرار خارجه فلا توقف اللوب
+        track.addEventListener('mouseenter', function () { hoverPaused = true; });
+        track.addEventListener('mouseleave', function () { hoverPaused = false; });
+        track.addEventListener('focusin', function () { hoverPaused = true; });
+        track.addEventListener('focusout', function (e) {
+          if (!track.contains(e.relatedTarget)) hoverPaused = false;
+        });
+
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) { inView = en.isIntersecting; });
+            sync();
+          }).observe(root);
+        }
+        document.addEventListener('visibilitychange', sync);
+        reduce.addEventListener('change', sync);
+
+        var resizeTimer = 0;
         window.addEventListener('resize', function () {
-          measure();
-          reset();
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(function () { measure(); render(); sync(); }, 150);
         });
+
         measure();
-        start();
+        render();
+        sync();
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(function () { measure(); render(); sync(); });
+        }
       })();
     </script>
   </section>
