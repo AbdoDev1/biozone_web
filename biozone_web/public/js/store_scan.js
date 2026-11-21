@@ -1,9 +1,16 @@
-// Biozone store barcode/QR scan — local only, no build needed.
-// Fills catalog search input[name=q] then submits GET /catalog preserving filters.
+// Biozone barcode/QR scan — one script for the store, cart and staff pages.
+// Binds every button[data-bz-scan] to the nearest sensible text field:
+//   1) data-bz-scan-target="#id" (explicit), else
+//   2) the closest form's input[name=q] / input[type=search|text], else
+//   3) the first text/search input in the button's parent row.
+// A successful scan writes the value, fires input/change, then submits the
+// form (GET search) or sends Enter (live filters such as the cart and the
+// staff barcode box). No new vendor file; html5-qrcode comes from frappe.
 (function () {
   "use strict";
   var MAX_LEN = 128;
   var FRAPPE_QR = "/assets/frappe/node_modules/html5-qrcode/html5-qrcode.min.js";
+  var CHIP_CSS_ID = "bz-scan-chip-css";
 
   function normalizeScanText(raw) {
     var t = String(raw == null ? "" : raw).trim();
@@ -24,6 +31,23 @@
     return t;
   }
 
+  // شكل الزر الموحّد لصفحات لا تعرّف .bz-scan-btn (المتجر/السلة/الستاف).
+  function ensureChipCss() {
+    if (document.getElementById(CHIP_CSS_ID)) return;
+    var st = document.createElement("style");
+    st.id = CHIP_CSS_ID;
+    st.textContent =
+      ".bz-scan-chip{display:inline-flex;align-items:center;justify-content:center;" +
+      "width:2.25rem;height:2.25rem;border-radius:9999px;flex-shrink:0;" +
+      "border:1px solid rgba(0,104,95,.22);background:rgba(0,104,95,.08);color:#00685f;" +
+      "cursor:pointer;transition:background .15s ease,box-shadow .15s ease,transform .1s ease}" +
+      ".bz-scan-chip:hover{background:rgba(0,104,95,.16);box-shadow:0 1px 5px rgba(0,104,95,.22)}" +
+      ".bz-scan-chip:active{transform:scale(.95)}" +
+      ".bz-scan-chip:focus-visible{outline:2px solid #00685f;outline-offset:2px}" +
+      ".bz-scan-chip .material-symbols-outlined{font-size:1.25rem;line-height:1}";
+    document.head.appendChild(st);
+  }
+
   function loadScriptOnce(src) {
     return new Promise(function (resolve, reject) {
       if (document.querySelector('script[data-bz-src="' + src + '"]')) return resolve(true);
@@ -37,7 +61,9 @@
     });
   }
 
-  function ensureOverlay(form, input) {
+  var currentInput = null;
+
+  function ensureOverlay() {
     var ov = document.getElementById("bz-scan-overlay");
     if (ov) return ov;
     ov = document.createElement("div");
@@ -61,7 +87,7 @@
     ov.querySelector("[data-bz-stop]").addEventListener("click", function () { stopAll(ov); });
     ov.querySelector("[data-bz-manual]").addEventListener("click", function () {
       stopAll(ov);
-      try { input.focus(); } catch (e) {}
+      try { if (currentInput) currentInput.focus(); } catch (e) {}
     });
     ov.addEventListener("click", function (e) { if (e.target === ov) stopAll(ov); });
     return ov;
@@ -91,26 +117,58 @@
     } catch (e) {}
   }
 
-  function submitScan(form, input, raw) {
+  // اكتب القيمة ثم: نموذج ⇒ إرسال GET، وإلا ⇒ Enter (مرشّحات حيّة/باركود ستاف).
+  function applyScan(input, raw) {
     var t = normalizeScanText(raw);
-    if (!t) return;
+    if (!t || !input) return;
     input.value = t;
-    try {
-      if (form.requestSubmit) form.requestSubmit();
-      else form.submit();
-    } catch (e) {
-      form.submit();
+    try { input.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) {}
+    try { input.dispatchEvent(new Event("change", { bubbles: true })); } catch (e) {}
+
+    var form = input.form;
+    if (form) {
+      setTimeout(function () {
+        try {
+          if (form.requestSubmit) form.requestSubmit();
+          else form.submit();
+        } catch (e) {
+          try { form.submit(); } catch (e2) {}
+        }
+      }, 0);
+      return;
     }
+    // صفحة بلا نموذج (السلة / باركود التجهيز / مرشّح حيّ)
+    var keyInit = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
+    try { input.dispatchEvent(new KeyboardEvent("keydown", keyInit)); } catch (e) {}
+    try { input.dispatchEvent(new KeyboardEvent("keyup", keyInit)); } catch (e) {}
   }
 
-  async function startFor(form, input) {
-    var ov = ensureOverlay(form, input);
+  function resolveTarget(btn) {
+    var sel = btn.getAttribute("data-bz-scan-target");
+    if (sel) {
+      try { var el = document.querySelector(sel); if (el) return el; } catch (e) {}
+    }
+    var form = btn.closest("form");
+    if (form) {
+      var inForm = form.querySelector('input[name="q"], input[type="search"], input[type="text"]');
+      if (inForm) return inForm;
+    }
+    var scope = btn.parentElement;
+    if (scope) {
+      var near = scope.querySelector('input[type="text"], input[type="search"]');
+      if (near) return near;
+    }
+    return null;
+  }
+
+  async function startFor(input) {
+    currentInput = input;
+    var ov = ensureOverlay();
     var msg = ov.querySelector("[data-bz-msg]");
     var video = ov.querySelector("[data-bz-video]");
-    ov.style.display = "flex";
-    if (msg) msg.textContent = "جارٍ فتح الكاميرا…";
     stopAll(ov);
     ov.style.display = "flex";
+    if (msg) msg.textContent = "جارٍ فتح الكاميرا…";
 
     // Path 1: native BarcodeDetector (Chrome/Android).
     try {
@@ -130,7 +188,7 @@
               clearInterval(activeDetectorTimer);
               activeDetectorTimer = null;
               stopAll(ov);
-              submitScan(form, input, raw);
+              applyScan(input, raw);
             }
           } catch (e) {}
         }, 400);
@@ -153,7 +211,7 @@
           try { h.stop(); } catch (e2) {}
           try { box.remove(); } catch (e3) {}
           stopAll(ov);
-          submitScan(form, input, decoded);
+          applyScan(input, decoded);
         }, function () {});
         return;
       }
@@ -163,16 +221,15 @@
   }
 
   function bind() {
-    document.querySelectorAll('form[action="/catalog"] button[data-bz-scan]').forEach(function (btn) {
+    ensureChipCss();
+    document.querySelectorAll("[data-bz-scan]").forEach(function (btn) {
       if (btn.getAttribute("data-bz-bound") === "1") return;
       btn.setAttribute("data-bz-bound", "1");
-      btn.addEventListener("click", function () {
-        var form = btn.closest("form");
-        if (!form) return;
-        var input = form.querySelector('input[name="q"]');
+      btn.addEventListener("click", function (ev) {
+        if (ev) ev.preventDefault();
+        var input = resolveTarget(btn);
         if (!input) return;
-        // Keyboard-wedge scanners just type + Enter; camera path below.
-        startFor(form, input);
+        startFor(input);
       });
     });
   }

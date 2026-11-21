@@ -196,9 +196,26 @@
       setBadge(n);
     }).catch(function () {}).then(function () { refreshBusy = false; });
   }
+  // اللوحة 320px وتُفتح من زر قد يقترب من حافة الشاشة على الموبايل:
+  // نُزيحها أفقيًا لتبقى داخل نافذة العرض (كانت تُقصّ ~57px عند 390px).
+  function clampPanel() {
+    panel.style.left = "";
+    var rect = panel.getBoundingClientRect();
+    if (!rect.width) return;
+    var margin = 8;
+    var current = parseFloat(getComputedStyle(panel).left) || 0;
+    var overflowRight = rect.right - (window.innerWidth - margin);
+    var overflowLeft = margin - rect.left;
+    if (overflowRight > 0) {
+      panel.style.left = (current - overflowRight) + "px";
+    } else if (overflowLeft > 0) {
+      panel.style.left = (current + overflowLeft) + "px";
+    }
+  }
   function openPanel() {
     post("notif_list", { limit: 10 }).then(function (r) { render(r.items || []); }).catch(function () {});
     panel.classList.remove("hidden");
+    clampPanel();
     btn.setAttribute("aria-expanded", "true");
   }
   window.bzBellToggle = function (ev) {
@@ -218,6 +235,7 @@
     if (ev.key === "Escape") { panel.classList.add("hidden"); btn.setAttribute("aria-expanded", "false"); }
   });
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { refresh(); sbRefresh(); } });
+  window.addEventListener("resize", function () { if (!panel.classList.contains("hidden")) clampPanel(); });
   if (MODE === "staff") {
     // Staff sound: always on, no mute control. The tone is generated
     // (no file). The browser unlocks audio on the first interaction, so

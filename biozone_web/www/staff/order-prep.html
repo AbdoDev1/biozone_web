@@ -102,6 +102,7 @@ body.is-resizing * { cursor: col-resize !important; }
 <input autocomplete="off" autofocus id="barcodeInput" dir="ltr" onkeydown="if(event.key==='Enter')processEnteredBarcode()" placeholder="وجّه الماسح الضوئي نحو المنتج ثم اضغط إدخال..." type="text"
 class="w-full pr-11 pl-4 py-3 bg-surface-subtle border-2 border-primary/30 rounded-lg text-sm font-mono font-bold focus:border-primary focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all">
 </div>
+<button type="button" class="bz-scan-chip" data-bz-scan data-bz-scan-target="#barcodeInput" aria-label="مسح باركود أو QR" title="مسح باركود أو QR"><span aria-hidden="true" class="material-symbols-outlined">barcode_scanner</span></button>
 <button onclick="processEnteredBarcode()" type="button" class="px-5 py-3 bg-primary hover:bg-primary-accent text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all whitespace-nowrap"><span class="material-symbols-outlined text-[18px]">check_circle</span>تأكيد الباركود</button>
 </div>
 <p class="text-[11px] text-navy-text/50 mt-2">مسحة واحدة ناجحة تؤكد الصنف بأكمله بغض النظر عن الكمية المطلوبة.</p>

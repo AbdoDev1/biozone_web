@@ -1,0 +1,22 @@
+{# زر المسح الموحّد (المتجر/السلة/الستاف). يُضمَّن مرة واحدة في كل شل.
+   نفس القواعد موجودة كاحتياط داخل store_scan.js إن نُسي الضمّ. #}
+<style>
+  .bz-scan-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+    border: 1px solid rgba(0, 104, 95, 0.22);
+    background: rgba(0, 104, 95, 0.08);
+    color: #00685f;
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  }
+  .bz-scan-chip:hover { background: rgba(0, 104, 95, 0.16); box-shadow: 0 1px 5px rgba(0, 104, 95, 0.22); }
+  .bz-scan-chip:active { transform: scale(0.95); }
+  .bz-scan-chip:focus-visible { outline: 2px solid #00685f; outline-offset: 2px; }
+  .bz-scan-chip .material-symbols-outlined { font-size: 1.25rem; line-height: 1; }
+</style>

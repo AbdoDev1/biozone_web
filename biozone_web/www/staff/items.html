@@ -55,8 +55,9 @@
 <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </svg>
 </span>
-<input name="q" value="{{ search_term or '' }}" class="w-full bg-white border border-borderSubtle text-sm rounded-xl pr-10 pl-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ابحث بالاسم أو الكود أو الباركود..." type="text"/>
+<input id="staff-items-q" name="q" value="{{ search_term or '' }}" class="w-full bg-white border border-borderSubtle text-sm rounded-xl pr-10 pl-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400 font-medium" placeholder="ابحث بالاسم أو الكود أو الباركود..." type="text"/>
 </div>
+<button type="button" class="bz-scan-chip" data-bz-scan data-bz-scan-target="#staff-items-q" aria-label="مسح باركود أو QR" title="مسح باركود أو QR"><span aria-hidden="true" class="material-symbols-outlined">barcode_scanner</span></button>
 <!-- Category Filter Dropdown -->
 <div class="relative">
 <select name="group" onchange="this.form.submit()" class="appearance-none bg-white border border-borderSubtle text-sm text-slate-700 font-medium rounded-xl pr-4 pl-9 py-2.5 hover:border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer">

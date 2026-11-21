@@ -104,6 +104,7 @@
       <div id="cart-items-toolbar" style="display:none">
         <div class="cart-toolbar-row">
           <input id="cart-items-search" type="search" autocomplete="off" placeholder="ابحث في أصناف السلة بالاسم أو الكود..." aria-label="ابحث في أصناف السلة">
+          <button type="button" class="bz-scan-chip" data-bz-scan data-bz-scan-target="#cart-items-search" aria-label="مسح باركود أو QR" title="مسح باركود أو QR"><span aria-hidden="true" class="material-symbols-outlined">barcode_scanner</span></button>
           <span class="cart-page-status" id="cart-items-count"></span>
         </div>
         <div class="cart-toolbar-row" id="cart-pager" style="display:none">
@@ -135,14 +136,9 @@
           <span class="text-xl font-extrabold text-primary" id="summary-total">٠٫٠٠ ج.م</span>
         </div>
         <div class="hidden mt-3 rounded-lg bg-surface-container px-3 py-2 text-xs font-semibold leading-6 text-on-surface-variant" id="cart-min-order-note" role="status" aria-live="polite"></div>
-        {% if is_guest %}
-        <div class="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-6 text-on-surface" id="guest-cart-note">
-          أنت تتسوق كزائر: الأسعار المعروضة أسعار الجمهور. سجّل الدخول لاحتساب أسعار فئتك، ولنقل هذه السلة إلى حسابك بموافقتك.
-        </div>
-        {% endif %}
-        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled data-guest-label="تسجيل الدخول لإتمام الطلب">
-          <span class="material-symbols-outlined text-xl">{% if is_guest %}login{% else %}check_circle{% endif %}</span>
-          {% if is_guest %}تسجيل الدخول لإتمام الطلب{% else %}تأكيد الطلب{% endif %}
+        <button class="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 text-base font-bold text-on-primary shadow-sm transition-colors hover:bg-primary-container disabled:opacity-60" id="confirm-order-btn" type="button" disabled data-guest-label="تسجيل الدخول">
+          <span class="material-symbols-outlined text-xl">{% if is_guest %}person{% else %}check_circle{% endif %}</span>
+          {% if is_guest %}تسجيل الدخول{% else %}تأكيد الطلب{% endif %}
         </button>
         {% if free_shipping_threshold %}
         <p class="mt-3 flex items-start justify-center gap-2 text-center text-sm sm:text-base font-semibold leading-relaxed text-on-surface-variant">
@@ -335,7 +331,7 @@
     var content = window.BzCartCheckout.confirmButtonContent(phase);
     // الزائر لا يؤكد طلبًا: الزر يتحول إلى مدخل تسجيل الدخول مع العودة للسلة.
     if (IS_GUEST && phase === 'idle') {
-      content = { text: btn.getAttribute('data-guest-label') || 'تسجيل الدخول لإتمام الطلب', icon: 'login', busy: false };
+      content = { text: btn.getAttribute('data-guest-label') || 'تسجيل الدخول', icon: 'person', busy: false };
     }
     btn.innerHTML = '';
     var icon = document.createElement('span');

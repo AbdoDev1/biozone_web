@@ -79,6 +79,7 @@
 <span class="material-symbols-outlined absolute right-3.5 top-1/2 -translate-y-1/2 text-navy-text/40 pointer-events-none text-xl">search</span>
 <input class="w-full pl-4 pr-11 py-2.5 bg-surface text-navy-text text-sm rounded-xl border border-surface-container focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-navy-text/40 font-medium" id="customer-search-input" name="q" placeholder="بحث بالاسم أو كود العميل..." type="search" value="{{ search_term or '' }}">
 </div>
+<button type="button" class="bz-scan-chip" data-bz-scan data-bz-scan-target="#customer-search-input" aria-label="مسح باركود أو QR" title="مسح باركود أو QR"><span aria-hidden="true" class="material-symbols-outlined">barcode_scanner</span></button>
 <div class="flex items-center gap-2 bg-surface px-3 py-1.5 rounded-xl border border-surface-container shrink-0">
 <label class="text-xs font-bold text-navy-text/60 shrink-0" for="category-filter-select">الفئة:</label>
 <select class="bg-transparent border-0 text-xs sm:text-sm font-bold text-navy-text focus:ring-0 cursor-pointer py-1 pr-1 pl-6" id="category-filter-select" name="group" onchange="this.form.submit()">

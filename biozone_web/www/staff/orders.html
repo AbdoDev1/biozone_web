@@ -90,8 +90,9 @@
 <input type="hidden" name="state" value="{{ filters.state|e }}">
 <div class="relative flex-1">
 <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-navy-text/40"><span class="material-symbols-outlined text-[20px]">search</span></div>
-<input name="q" value="{{ filters.q|e }}" class="w-full pl-4 pr-12 py-2.5 bg-surface rounded-xl text-sm text-navy-text focus:outline-none focus:ring-1 focus:ring-primary border border-surface-subtle placeholder:text-navy-text/40" placeholder="ابحث برقم الطلب أو اسم العميل أو الباركود..." type="text">
+<input id="staff-orders-q" name="q" value="{{ filters.q|e }}" class="w-full pl-4 pr-12 py-2.5 bg-surface rounded-xl text-sm text-navy-text focus:outline-none focus:ring-1 focus:ring-primary border border-surface-subtle placeholder:text-navy-text/40" placeholder="ابحث برقم الطلب أو اسم العميل أو الباركود..." type="text">
 </div>
+<button type="button" class="bz-scan-chip" data-bz-scan data-bz-scan-target="#staff-orders-q" aria-label="مسح باركود أو QR" title="مسح باركود أو QR"><span aria-hidden="true" class="material-symbols-outlined">barcode_scanner</span></button>
 <button type="button" id="filterToggleBtn" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface-subtle hover:bg-surface-container text-navy-text transition-all text-sm font-bold">
 <span class="material-symbols-outlined text-[18px] text-primary">tune</span>
 <span>الفلاتر</span>
