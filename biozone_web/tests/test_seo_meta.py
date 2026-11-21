@@ -167,6 +167,23 @@ class TestUpdateWebsiteContext(unittest.TestCase):
 		self.assertEqual(context.seo.canonical, "https://biozone.pro/")
 		self.assertFalse(context.seo.robots)
 
+	def test_hook_drops_canonical_for_real_404(self):
+		context = frappe._dict(path="item", item=None, http_status_code=404)
+		seo.update_website_context(context)
+		self.assertEqual(context.seo.title, "Biozone - الصنف غير متاح")
+		self.assertEqual(context.seo.canonical, "")
+
+	def test_hook_keeps_canonical_for_200_item(self):
+		context = frappe._dict(
+			path="item",
+			item={"item_code": "BZ-X", "item_name": "صنف"},
+			http_status_code=200,
+		)
+		seo.update_website_context(context)
+		self.assertEqual(
+			context.seo.canonical, "https://biozone.pro/item?code=BZ-X"
+		)
+
 	def test_hook_skips_unknown_path(self):
 		context = frappe._dict(path="unknown-route")
 		seo.update_website_context(context)
@@ -296,7 +313,14 @@ class TestItemPageRendered(unittest.TestCase):
 		cls.CODE_CANARY = "BZ-SEO-T-%s-CANARY" % cls.RUN_ID
 		cls.CODE_XSS = "BZ-SEO-T-%s-XSS" % cls.RUN_ID
 		cls.CODE_AR = "BZ-SEO-T-%s-AR" % cls.RUN_ID
-		cls.codes = (cls.CODE_CANARY, cls.CODE_XSS, cls.CODE_AR)
+		cls.CODE_DISABLED = "BZ-SEO-T-%s-DISABLED" % cls.RUN_ID
+		cls.CODE_UNKNOWN = "BZ-SEO-T-%s-UNKNOWN" % cls.RUN_ID
+		cls.codes = (
+			cls.CODE_CANARY,
+			cls.CODE_XSS,
+			cls.CODE_AR,
+			cls.CODE_DISABLED,
+		)
 		cls.created = []
 		cls._cleanup_done = False
 		# قبل أول كتابة: أي فشل لاحق في setUpClass أو الاختبارات يمر هنا.
@@ -312,6 +336,9 @@ class TestItemPageRendered(unittest.TestCase):
 			cls._assert_same_database()
 			cls._make_item(cls.CODE_XSS, cls.HOSTILE)
 			cls._make_item(cls.CODE_AR, cls.ARABIC)
+			cls._make_disabled_item(
+				cls.CODE_DISABLED, "SEO disabled %s" % cls.RUN_ID
+			)
 		except Exception:
 			cls._cleanup()
 			raise
@@ -378,6 +405,25 @@ class TestItemPageRendered(unittest.TestCase):
 		frappe.db.commit()
 
 	@classmethod
+	def _make_disabled_item(cls, code, name):
+		# الصنف المعطّل لا يحتاج سعرًا: الاستعلام في item.py يفلتره قبل
+		# التسعير. يُتتبع ويُحذف مثل بقية سجلات التشغيل.
+		cls.created.append(("Item", code))
+		item = frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": code,
+				"item_name": name,
+				"item_group": cls.group,
+				"stock_uom": cls.uom,
+				"is_stock_item": 0,
+				"disabled": 1,
+			}
+		).insert(ignore_permissions=True)
+		cls.created[-1] = ("Item", item.name)
+		frappe.db.commit()
+
+	@classmethod
 	def _assert_same_database(cls):
 		html = cls._fetch(cls.CODE_CANARY)
 		if html is None:
@@ -393,15 +439,26 @@ class TestItemPageRendered(unittest.TestCase):
 			)
 
 	@classmethod
-	def _fetch(cls, code, extra=""):
-		url = cls.BASE + "/item?code=%s%s" % (quote(code, safe=""), extra)
+	def _request(cls, url):
 		try:
 			with cls._open(url, timeout=15) as resp:
-				if resp.status != 200:
-					return None
-				return resp.read().decode("utf-8", "replace")
+				return resp.status, resp.read().decode("utf-8", "replace")
+		except cls._urllib.HTTPError as exc:
+			# 404 ليس استثناءً شبكيًا: body هو قالب item.html المخصص.
+			return exc.code, exc.read().decode("utf-8", "replace")
 		except Exception:
-			return None
+			return None, None
+
+	@classmethod
+	def _fetch_page(cls, path, extra=""):
+		return cls._request(cls.BASE + path + extra)
+
+	@classmethod
+	def _fetch(cls, code, extra=""):
+		status, html = cls._fetch_page(
+			"/item?code=%s" % quote(code, safe=""), extra
+		)
+		return html if status == 200 else None
 
 	@classmethod
 	def _cleanup(cls):
@@ -480,6 +537,47 @@ class TestItemPageRendered(unittest.TestCase):
 	def test_arabic_title_is_intact(self):
 		html = self._fetch(self.CODE_AR)
 		self.assertIn(self.ARABIC, html)
+
+	def test_missing_blank_and_unknown_codes_are_real_404(self):
+		paths = (
+			"/item",
+			"/item?code=",
+			"/item?code=%20%20",
+			"/item?code=" + quote(self.CODE_UNKNOWN, safe=""),
+		)
+		for path in paths:
+			with self.subTest(path=path):
+				status, html = self._fetch_page(path)
+				self.assertEqual(status, 404, path)
+				self.assertIn("الصنف غير متاح", html or "")
+				self.assertNotIn("Traceback", html or "")
+				self.assertNotIn('rel="canonical"', html or "")
+				self.assertNotIn('property="og:url"', html or "")
+
+	def test_disabled_item_is_404(self):
+		status, html = self._fetch_page(
+			"/item?code=" + quote(self.CODE_DISABLED, safe="")
+		)
+		self.assertEqual(status, 404)
+		self.assertIn("الصنف غير متاح", html or "")
+		self.assertNotIn("Traceback", html or "")
+		self.assertNotIn('rel="canonical"', html or "")
+		self.assertNotIn('property="og:url"', html or "")
+
+	def test_valid_item_stays_200_with_seo(self):
+		code = quote(self.CODE_AR, safe="")
+		status, html = self._fetch_page("/item?code=" + code)
+		self.assertEqual(status, 200)
+		self.assertIn(self.ARABIC, html or "")
+		self.assertIn(
+			'rel="canonical" href="%s/item?code=%s"' % (self.BASE, code),
+			html or "",
+		)
+		self.assertIn(
+			'property="og:url" content="%s/item?code=%s"' % (self.BASE, code),
+			html or "",
+		)
+		self.assertNotIn('name="robots" content="noindex', html or "")
 
 	def test_each_item_has_its_own_canonical_and_no_extra_params(self):
 		for code in (self.CODE_XSS, self.CODE_AR):

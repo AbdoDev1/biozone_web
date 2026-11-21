@@ -201,4 +201,8 @@ def update_website_context(context):
 		noindex=meta.get("noindex", False),
 		og_type=meta.get("og_type", "website"),
 	)
+	# 404 حقيقي: لا canonical ولا og:url يشير إلى /item. القالب يحذف
+	# الوسمين تلقائيًا عندما تكون القيمة فاضية.
+	if context.get("http_status_code") == 404:
+		context.seo.canonical = ""
 	return None

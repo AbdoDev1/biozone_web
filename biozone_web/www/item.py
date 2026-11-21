@@ -22,6 +22,9 @@ def get_context(context):
     context.similar_items = []
 
     if not code:
+        # 404 حقيقي للحالات الواضحة فقط، مع نفس قالب item.html.
+        # فرع not enriched أدناه لم يُحسم بعد (بند منفصل).
+        context.http_status_code = 404
         return context
 
     rows = frappe.get_all(
@@ -31,10 +34,14 @@ def get_context(context):
         limit_page_length=1,
     )
     if not rows:
+        # مجهول أو معطّل: 404 بنفس واجهة "الصنف غير متاح".
+        context.http_status_code = 404
         return context
 
     enriched = enrich_store_items(rows)
     if not enriched:
+        # لا نعتبرها وحدها دليل 404: قد يكون إعداد عرض/استثناء داخلي.
+        # يُترك كما هو حتى يُحسم التمييز في بند منفصل.
         return context
     context.item = enriched[0]
 
