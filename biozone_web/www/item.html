@@ -2,8 +2,7 @@
 <head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
-<title>Biozone - {{ item.item_name if item else "الصنف غير متاح" }}</title>
-<meta name="description" content="{% if item %}اطلب {{ item.item_name|e }} من Biozone مع توصيل سريع وأسعار تنافسية.{% else %}تعرف على المستلزمات الطبية والعناية من Biozone.{% endif %}">
+{% include "templates/includes/seo_meta.html" %}
 <link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
 <link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
 <link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">

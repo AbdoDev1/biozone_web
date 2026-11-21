@@ -98,6 +98,12 @@ website_route_rules = [
 	{"from_route": "/account/returns/<credit_name>", "to_route": "account/return-detail"},
 ]
 
+# SEO meta for the standalone www pages: they do not extend base.html, so
+# Frappe's MetaTags pipeline never reaches them. The hook attaches
+# context.seo and templates/includes/seo_meta.html renders it. Page titles,
+# descriptions and noindex rules live in biozone_web.services.seo (one map).
+update_website_context = ["biozone_web.services.seo.update_website_context"]
+
 # automatically load and sync documents of this doctype from downstream apps
 # importable_doctypes = [doctype_1]
 

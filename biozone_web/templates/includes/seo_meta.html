@@ -1,0 +1,33 @@
+{#- Shared SEO head block for the standalone www pages.
+    Data comes from context.seo (biozone_web.services.seo.update_website_context).
+    Keep this file as the only place that writes title/description/og tags so
+    a page can never ship with a duplicated or half-populated head.
+-#}
+{%- set seo = seo or {} -%}
+{%- set site_name = seo.get("site_name") or "Biozone" -%}
+{%- set page_title = seo.get("title") or site_name -%}
+{%- set page_description = seo.get("description") or "" -%}
+<title>{{ page_title }}</title>
+{%- if page_description %}
+<meta name="description" content="{{ page_description | e }}">
+{%- endif %}
+{%- if seo.get("robots") %}
+<meta name="robots" content="{{ seo.get('robots') }}">
+{%- endif %}
+<meta property="og:site_name" content="{{ site_name | e }}">
+<meta property="og:type" content="{{ seo.get('og_type') or 'website' }}">
+<meta property="og:title" content="{{ page_title | e }}">
+{%- if page_description %}
+<meta property="og:description" content="{{ page_description | e }}">
+{%- endif %}
+{%- if seo.get("image") %}
+<meta property="og:image" content="{{ seo.get('image') | e }}">
+{%- endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if seo.get('image') else 'summary' }}">
+<meta name="twitter:title" content="{{ page_title | e }}">
+{%- if page_description %}
+<meta name="twitter:description" content="{{ page_description | e }}">
+{%- endif %}
+{%- if seo.get("canonical") %}
+<link rel="canonical" href="{{ seo.get('canonical') | e }}">
+{%- endif %}
