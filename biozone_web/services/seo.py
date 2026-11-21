@@ -15,6 +15,8 @@ page's ``get_context`` (so ``context.item`` / ``context.print_kind`` are
 already available) and *before* rendering.
 """
 
+from urllib.parse import quote
+
 import frappe
 from frappe.utils import get_url
 
@@ -66,6 +68,7 @@ def store_title(page_title, site_name=None, site_first=True):
 def build_seo(
 	route,
 	*,
+	canonical=None,
 	title=None,
 	description=None,
 	image=None,
@@ -73,14 +76,24 @@ def build_seo(
 	og_type="website",
 	site_name=None,
 ):
-	"""Build the ``context.seo`` dict consumed by the shared partial."""
-	site = (site_name or get_site_name()).strip() or DEFAULT_SITE_NAME
-	page_title = (title or "").strip() or site
+	"""Build the ``context.seo`` dict consumed by the shared partial.
+
+	``canonical`` overrides the route-derived URL when a page needs extra
+	identity (e.g. /item?code=...). Only that canonical is emitted — never a
+	copy of the request's other query parameters.
+
+	Title/description are coerced with ``str()`` on purpose: a Markup value
+	would pass through Jinja's ``|e`` unchanged (already "safe"), so the
+	partial could be escaped by-passed. Plain strings escape normally.
+	"""
+	site = str(site_name or get_site_name()).strip() or DEFAULT_SITE_NAME
+	page_title = str(title or "").strip() or site
+	canonical_path = canonical or (route if str(route).startswith("/") else "/" + str(route))
 	seo = frappe._dict(
 		site_name=site,
 		title=page_title,
-		description=(description or "").strip(),
-		canonical=get_url(route if str(route).startswith("/") else "/" + str(route)),
+		description=str(description or "").strip(),
+		canonical=get_url(canonical_path),
 		og_type=og_type,
 		robots="noindex, nofollow" if noindex else "",
 	)
@@ -112,16 +125,22 @@ def get_page_meta(path, context=None):
 	if path == "item":
 		item = context.get("item") or {}
 		item_name = (item.get("item_name") or "").strip()
+		item_code = (item.get("item_code") or "").strip()
+		# canonical يعرّف الصنف بكوده فقط (URL-encoded) — لا تُنسخ بقية
+		# معاملات الطلب، وكل الأصناف لا تتقاسم canonical واحدًا.
+		canonical = "/item?code=" + quote(item_code, safe="") if item_code else None
 		if item_name:
 			return {
 				"title": store_title(item_name, site),
 				"description": (
 					f"اطلب {item_name} من {site} مع توصيل سريع وأسعار تنافسية."
 				),
+				"canonical": canonical,
 			}
 		return {
 			"title": store_title(ITEM_FALLBACK_TITLE, site),
 			"description": ITEM_FALLBACK_DESCRIPTION,
+			"canonical": canonical,
 		}
 
 	# Noindexed functional / private pages.
@@ -175,6 +194,7 @@ def update_website_context(context):
 
 	context.seo = build_seo(
 		"/" + path if path else "/",
+		canonical=meta.get("canonical"),
 		title=meta.get("title"),
 		description=meta.get("description"),
 		image=meta.get("image"),

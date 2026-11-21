@@ -7,7 +7,7 @@
 {%- set site_name = seo.get("site_name") or "Biozone" -%}
 {%- set page_title = seo.get("title") or site_name -%}
 {%- set page_description = seo.get("description") or "" -%}
-<title>{{ page_title }}</title>
+<title>{{ page_title | string | e }}</title>
 {%- if page_description %}
 <meta name="description" content="{{ page_description | e }}">
 {%- endif %}
@@ -16,6 +16,9 @@
 {%- endif %}
 <meta property="og:site_name" content="{{ site_name | e }}">
 <meta property="og:type" content="{{ seo.get('og_type') or 'website' }}">
+{%- if seo.get("canonical") %}
+<meta property="og:url" content="{{ seo.get('canonical') | e }}">
+{%- endif %}
 <meta property="og:title" content="{{ page_title | e }}">
 {%- if page_description %}
 <meta property="og:description" content="{{ page_description | e }}">
