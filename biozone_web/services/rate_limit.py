@@ -47,6 +47,13 @@ LIMITS = {
 	# التأكيد يتطلب تسجيل دخول: الحد لكل مستخدم، لا لكل IP (حتى لا يُعاقب
 	# منشأة كاملة تشترك في عنوان واحد).
 	"biozone_confirm_order": {"user": (60, 3600)},
+	# مساعد الستاف: الرفع والرسالة تكلّف مزوّد نموذج خارجيًا — حدّ مستخدم.
+	"biozone_staff_assistant_upload": {"user": (20, 3600)},
+	"biozone_staff_assistant": {"user": (120, 3600)},
+	# الاستقصاء: مفتاح user بحد سخي — لا ip (وإلا 429 أثناء التقدم).
+	"biozone_staff_assistant_status": {"user": (600, 3600)},
+	# إعدادات المساعد (مدير فقط).
+	"biozone_staff_assistant_settings": {"user": (60, 3600)},
 }
 
 # Strict shared key when the CF header is absent/invalid (D2). Deliberately
@@ -58,6 +65,11 @@ FALLBACK_LIMIT = (5, 3600)
 # non-Cloudflare proxy / local dev: a per-endpoint fallback instead of 5/h.
 FALLBACK_OVERRIDES = {
 	"biozone_get_cart_prices": (300, 3600),
+	# مساعد الستاف: التطوير المحلي بلا Cloudflare — نفس المنطق.
+	"biozone_staff_assistant_upload": (20, 3600),
+	"biozone_staff_assistant": (120, 3600),
+	"biozone_staff_assistant_status": (600, 3600),
+	"biozone_staff_assistant_settings": (60, 3600),
 }
 FALLBACK_IDENT = "untrusted"
 
@@ -66,6 +78,12 @@ FAILURE_POLICY = {
 	"biozone_login": "open",
 	"biozone_sign_up": "closed",
 	"biozone_forgot_password": "closed",
+	# المساعد يكلّف رصيد نموذج — لا يمر مفتوحًا عند فشل Redis.
+	"biozone_staff_assistant_upload": "closed",
+	"biozone_staff_assistant": "closed",
+	"biozone_staff_assistant_status": "open",
+	# إعدادات المساعد: رحلة مدير نادرة — لا تُحجب عند تعطل Redis.
+	"biozone_staff_assistant_settings": "open",
 }
 
 

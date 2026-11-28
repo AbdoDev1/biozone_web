@@ -1,3 +1,5 @@
+import base64
+
 import frappe
 from frappe import _
 
@@ -256,6 +258,7 @@ def biozone_forgot_password(email: str):
 			"يُرجى التحقق من صندوق الوارد."
 		)
 	}
+
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
@@ -3326,3 +3329,118 @@ def staff_get_delivery_context(order_name: str, sales_invoice: str | None = None
 		"print_time": frappe.utils.now_datetime().strftime("%H:%M - %d/%m/%Y"),
 		"company": si.company,
 	}
+
+
+# ---------------------------------------------------------------------------
+# مساعد الستاف — رفع شيت + رسالة + حالة (كلها POST، بلا allow_guest)
+# ---------------------------------------------------------------------------
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_upload")
+def staff_assistant_upload():
+	"""رفع شيت من الشات = موافقة على الاستيراد (قرار المالك)."""
+	from biozone_web.services import sheet_agent, sheet_import
+	from biozone_web.services.assistant import assert_can_use_assistant
+
+	assert_can_use_assistant()
+
+	upload = (frappe.request.files or {}).get("file")
+	if upload is None:
+		return {"ok": False, "error": _("ارفع الشيت أولًا")}
+	filename = (getattr(upload, "filename", "") or "sheet.xlsx").strip()
+	content = upload.read() or b""
+	if sheet_agent.enabled():
+		return sheet_agent.start(content, filename)
+	return sheet_import.start(content, filename)
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant")
+def staff_assistant_message(message=None, run_name=None, history=None, session=None, model=None):
+	"""رسالة الموظف → رد المساعد بعد تنفيذ أدواته المحدودة."""
+	from biozone_web.services import assistant
+
+	assistant.assert_can_use_assistant()
+	if isinstance(history, str):
+		try:
+			history = frappe.parse_json(history)
+		except ValueError:
+			history = []
+	try:
+		return assistant.reply(message, history=history, run_name=run_name, session=session, model=model)
+	except assistant.AssistantError as exc:
+		return {
+			"ok": False,
+			"error": exc.message,
+			"error_code": exc.code,
+			"request_id": get_request_id(),
+		}
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_status")
+def staff_assistant_status(run_name=None):
+	"""استقصاء حالة التشغيل — مفتاح user بحد سخي (لا ip)."""
+	from biozone_web.services import assistant, sheet_import
+
+	assistant.assert_can_use_assistant()
+	if not run_name or not assistant.RUN_NAME_RE.match(str(run_name)):
+		return {"ok": False, "error": _("تشغيل غير معروف")}
+	if not assistant._owned_run(run_name):
+		return {"ok": False, "error": _("تشغيل غير معروف")}
+	return sheet_import.status(run_name)
+
+
+# ---------------------------------------------------------------------------
+# إعدادات المساعد (مدير فقط) — قراءة/حفظ/اختبار
+# ---------------------------------------------------------------------------
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_settings")
+def staff_assistant_settings():
+	from biozone_web.services import assistant
+
+	assistant.assert_can_manage()
+	return assistant.get_settings()
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_settings")
+def staff_assistant_settings_save(providers=None, enabled=1, backend=None, model=None, agent=None, fallback=None):
+	from biozone_web.services import assistant
+
+	assistant.assert_can_manage()
+	if isinstance(providers, str):
+		try:
+			providers = frappe.parse_json(providers)
+		except ValueError:
+			providers = []
+	try:
+		return assistant.save_settings(
+			providers, enabled, backend=backend, model=model, agent=agent, fallback=fallback
+		)
+	except assistant.AssistantError as exc:
+		return {"ok": False, "error": exc.message, "error_code": exc.code}
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_settings")
+def staff_assistant_models():
+	from biozone_web.services import assistant
+
+	assistant.assert_can_manage()
+	return assistant.list_models()
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limited("biozone_staff_assistant_settings")
+def staff_assistant_settings_test(index=0):
+	from biozone_web.services import assistant
+
+	assistant.assert_can_manage()
+	try:
+		return assistant.test_provider(index)
+	except assistant.AssistantError as exc:
+		return {"ok": False, "error": exc.message, "error_code": exc.code}
