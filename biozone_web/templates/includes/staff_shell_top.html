@@ -76,6 +76,17 @@ try {
 <span class="material-symbols-outlined text-[22px]">inventory_2</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">الأصناف</span>
 </a>
+{% if assistant_allowed %}
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'assistant' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/assistant" title="المساعد">
+<svg aria-hidden="true" width="22" height="22" style="width:22px;height:22px;flex:0 0 auto" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.9 8.9 0 0 1-3.9-.9L3 21l1.9-5.6a8.4 8.4 0 0 1-.9-3.9A8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z"/><path d="M8.5 11.5h.01M12.5 11.5h.01M16.5 11.5h.01"/></svg>
+<span class="text-sm lg:max-xl:hidden sidebar-label">BIO-Ai</span>
+</a>
+{% elif assistant_manage_allowed %}
+<a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'assistant' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/assistant-settings" title="إعدادات المساعد">
+<svg aria-hidden="true" width="22" height="22" style="width:22px;height:22px;flex:0 0 auto" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+<span class="text-sm lg:max-xl:hidden sidebar-label">إعدادات المساعد</span>
+</a>
+{% endif %}
 <a class="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors lg:max-xl:justify-center lg:max-xl:px-0 {% if active_page == 'stock' %}bg-primary/10 text-primary font-bold{% else %}text-navy-text/70 hover:text-navy-text hover:bg-surface-subtle{% endif %}" href="/staff/stock" title="حركة المخزون">
 <span class="material-symbols-outlined text-[22px]">sync_alt</span>
 <span class="text-sm lg:max-xl:hidden sidebar-label">حركة المخزون</span>

@@ -57,6 +57,7 @@ BASE_COLUMNS = [
 	("uom", "الوحدة"),
 	("factor", "عدد الوحدات في الكبرى"),
 	("item_group", "القسم"),
+	("brand", "البراند"),
 ]
 BASE_KEY_BY_HEADER = {label: key for key, label in BASE_COLUMNS}
 DISCOUNT_PREFIX = "خصم:"
@@ -331,6 +332,11 @@ def _read_csv_rows(content):
 def parse_upload_bytes(content, filename):
 	"""Parse uploaded bytes. Returns dict with headers/rows/meta or raises
 	ValueError with an Arabic message. No DB access."""
+	# The HTTP upload hands over raw `bytes`, but the background re-read uses
+	# `File.get_content()`, which decodes any non-OLE payload to `str`. Both
+	# readers below want bytes, so normalise here once (CSV + XLSX).
+	if isinstance(content, str):
+		content = content.encode("utf-8")
 	name = (filename or "").lower()
 	if name.endswith(".xlsx"):
 		headers, data, meta = _read_xlsx_rows(content)
@@ -425,6 +431,24 @@ def _resolve_item_key(barcode, code):
 	return (by_barcode or by_code), None
 
 
+def _brand_lookup_map():
+	"""خريطة {الاسم الصغير: الاسم المعياري} لكل البراندات — استعلام واحد بدل N+1."""
+	names = frappe.get_all("Brand", pluck="name") or []
+	return {str(n).strip().lower(): n for n in names if n and str(n).strip()}
+
+
+def _resolve_brand_name(raw, brand_map=None):
+	"""Return canonical Brand name for `raw`, or raise ValidationError."""
+	brand = (raw or "").strip()
+	if not brand:
+		return ""
+	lookup = brand_map if brand_map is not None else _brand_lookup_map()
+	canonical = lookup.get(brand.lower())
+	if not canonical:
+		raise frappe.ValidationError(_("البراند غير موجود: {0}").format(brand))
+	return canonical
+
+
 def validate_rows(raw_rows, key_by_index, active_groups):
 	"""Full read-only validation of every row.
 
@@ -433,6 +457,7 @@ def validate_rows(raw_rows, key_by_index, active_groups):
 	Blank in ANY column = leave unchanged (decision 5).
 	"""
 	active_set = {g.name for g in active_groups}
+	brand_map = _brand_lookup_map()
 	staged = []
 	for idx, cells in enumerate(raw_rows):
 		n = idx + 2  # header is row 1
@@ -483,6 +508,13 @@ def validate_rows(raw_rows, key_by_index, active_groups):
 		if group:
 			if not frappe.db.exists("Item Group", {"name": group, "is_group": 0}):
 				row["errors"].append(_("القسم غير موجود أو ليس قسمًا فرعيًا: {0}").format(group))
+		brand = (values.get("brand") or "").strip()
+		if brand:
+			canonical_brand = brand_map.get(brand.lower())
+			if not canonical_brand:
+				row["errors"].append(_("البراند غير موجود: {0}").format(brand))
+			else:
+				values["brand"] = canonical_brand
 		uom = (values.get("uom") or "").strip()
 		if uom and not frappe.db.exists("UOM", uom):
 			row["errors"].append(_("الوحدة غير معرّفة: {0}").format(uom))
@@ -754,7 +786,7 @@ def _import_upsert_conversion(doc, large, factor_raw, min_raw):
 	return True
 
 
-def _process_staged_row(row, warehouse, run_name):
+def _process_staged_row(row, warehouse, run_name, brand_map=None):
 	"""Create/update one staged row. Returns (item_outcome, pricing_outcomes).
 
 	Raises on unexpected errors; validation errors are pre-caught at staging
@@ -769,6 +801,7 @@ def _process_staged_row(row, warehouse, run_name):
 	name = (values.get("name") or "").strip()
 	group = (values.get("item_group") or "").strip()
 	uom = (values.get("uom") or "").strip()
+	canonical_brand = _resolve_brand_name(values.get("brand"), brand_map)
 	if target:
 		if not frappe.db.exists("Item", target):
 			raise frappe.ValidationError(_("الصنف {0} لم يعد موجودًا").format(target))
@@ -779,6 +812,9 @@ def _process_staged_row(row, warehouse, run_name):
 			if not frappe.db.exists("Item Group", {"name": group, "is_group": 0}):
 				raise frappe.ValidationError(_("القسم غير موجود: {0}").format(group))
 			doc.item_group = group
+		if canonical_brand:
+			# Sheet-wins: a filled brand cell overwrites the item's brand.
+			doc.brand = canonical_brand
 		if uom and uom != doc.stock_uom:
 			if not frappe.db.exists("UOM", uom):
 				raise frappe.ValidationError(_("الوحدة غير معرّفة: {0}").format(uom))
@@ -805,7 +841,7 @@ def _process_staged_row(row, warehouse, run_name):
 					)
 				doc.append("barcodes", {"barcode": barcode})
 		# Phase-2: conversion only (large + count); min defaults to 1 —
-		# brand/flag/extras/status are staff-screen concerns, not sheets.
+		# flag/extras/status are staff-screen concerns, not sheets.
 		_import_upsert_conversion(
 			doc,
 			values.get("large_uom", ""),
@@ -847,6 +883,7 @@ def _process_staged_row(row, warehouse, run_name):
 				"item_group": group,
 				"stock_uom": uom or "Nos",
 				"is_stock_item": 1,
+				"brand": canonical_brand or None,
 				"barcodes": [{"barcode": bc} for bc in new_barcodes],
 				"uoms": conv_rows,
 			}
@@ -1259,6 +1296,7 @@ def run_import_job(run_name):
 			raise frappe.ValidationError(_("لا توجد صفوف مرحّلة لهذا التشغيل"))
 		items_out, pricing_out, errors = [], [], []
 		created = updated = failed = 0
+		brand_map = _brand_lookup_map()
 		for i, row in enumerate(staged):
 			if row.get("errors"):
 				failed += 1
@@ -1274,7 +1312,7 @@ def run_import_job(run_name):
 			frappe.db.savepoint(sp)
 			try:
 				item_outcome, pricing_outcomes = _process_staged_row(
-					row, warehouse, run_name
+					row, warehouse, run_name, brand_map=brand_map
 				)
 				frappe.db.release_savepoint(sp)
 				items_out.append(item_outcome)
@@ -1413,7 +1451,7 @@ def staff_export_items():
 	groups = _active_customer_groups()
 	items = frappe.get_all(
 		"Item",
-		fields=["item_code", "item_name", "item_group", "stock_uom"],
+		fields=["item_code", "item_name", "item_group", "brand", "stock_uom"],
 		order_by="item_name asc",
 	)
 	codes = [i.item_code for i in items]
@@ -1495,6 +1533,7 @@ def staff_export_items():
 			it.stock_uom or "",
 			"" if factor == "" else ("%g" % frappe.utils.flt(factor)),
 			it.item_group or "",
+			it.brand or "",
 			";".join(
 				"{}={}".format(c["uom"], "%g" % frappe.utils.flt(c["conversion_factor"]))
 				for c in convs

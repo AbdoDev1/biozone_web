@@ -43,6 +43,8 @@ STAFF_TITLES = {
 	"staff/order-delivery": "بيوزون | تسليم الطلب والفاتورة",
 	"staff/pricing": "بيوزون | التسعير",
 	"staff/stock": "بيوزون | حركة المخزون",
+	"staff/assistant": "BIO-Ai | المساعد",
+	"staff/assistant-settings": "BIO-Ai | إعدادات المساعد",
 	"staff/picking": "ورقة تجهيز مخزن - بيوزون",
 }
 

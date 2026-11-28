@@ -1,0 +1,413 @@
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+{% include "templates/includes/seo_meta.html" %}
+<link rel="icon" type="image/svg+xml" href="/assets/biozone_web/images/biozone-favicon.svg">
+<link rel="stylesheet" href="/assets/biozone_web/css/app.08922a12.css">
+<link rel="stylesheet" href="/assets/biozone_web/css/fonts.css">
+<style>
+  /* تنسيقات مستقلة عن حزمة Tailwind المجمّعة — لا تعتمد على أي class غير مبني. */
+  body { font-family: 'Tajawal', sans-serif; background-color: #f8f9ff; color: #0b1c30; -webkit-font-smoothing: antialiased; }
+  .assistant-main { max-width: 860px; margin: 0 auto; padding: 24px 16px 32px; }
+  .assistant-title { font-size: 24px; font-weight: 700; margin: 0; }
+  .assistant-sub { font-size: 13px; color: #6b7a90; margin: 4px 0 0; }
+  .chat-card { background: #fff; border: 1px solid #e6e9f2; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(11, 28, 48, .04); }
+  .chat-scroll { height: 52vh; min-height: 320px; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+  .msg-bot { align-self: flex-start; background: #fff; border: 1px solid #e6e9f2; border-top-right-radius: 6px; }
+  .msg-user { align-self: flex-end; background: #0b5cff; color: #fff; border-top-left-radius: 6px; }
+  .chat-progress { display: none; padding: 8px 16px; font-size: 12px; color: #6b7a90; border-top: 1px solid #e6e9f2; background: #f8f9ff; }
+  .chat-composer { display: flex; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid #e6e9f2; }
+  .icon-btn { width: 40px; height: 40px; flex: 0 0 40px; border: 1px solid #e6e9f2; border-radius: 12px; background: #fff; color: #6b7a90; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .icon-btn:hover { color: #0b5cff; background: #f8f9ff; }
+  .icon-btn:disabled { opacity: .5; cursor: default; }
+  .chat-input { flex: 1; height: 40px; padding: 0 12px; border: 1px solid #e6e9f2; border-radius: 12px; font-size: 14px; font-family: inherit; color: inherit; background: #fff; }
+  .chat-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(11, 92, 255, .25); border-color: #0b5cff; }
+  .send-btn { height: 40px; padding: 0 20px; border: none; border-radius: 12px; background: #0b5cff; color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .send-btn:disabled { opacity: .5; cursor: default; }
+  .chat-error { display: none; margin-top: 12px; font-size: 13px; color: #d92d20; }
+  .chat-note { margin-top: 12px; font-size: 12px; color: #8a97a8; }
+  .settings-link { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid #cfd8e6; border-radius: 10px; background: #fff; color: #1b3a63; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .settings-link:hover { color: #0b5cff; border-color: #0b5cff; background: #f5f8ff; }
+</style>
+</head>
+<body>
+{% include "biozone_web/templates/includes/staff_shell_top.html" %}
+
+<main class="assistant-main">
+  <div style="margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+    <div>
+      <h1 class="assistant-title">BIO-Ai</h1>
+      <p class="assistant-sub">ارفع شيت الأصناف — سيجهزه الوكيل ويرفعه تلقائياً.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="new-chat-btn" type="button" class="settings-link" title="شات جديد" style="cursor:pointer">+ شات جديد</button>
+      {% if can_manage_assistant %}
+      <a href="/staff/assistant-settings" class="settings-link" title="إعدادات المساعد">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span>الإعدادات</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="chat-card">
+    <div id="chat-scroll" class="chat-scroll">
+      <div class="msg msg-bot">أهلاً. ارفع شيت الأصناف 📎 أو اسألني عن آخر استيراد.</div>
+    </div>
+
+    <div id="progress" class="chat-progress" style="position:relative;overflow:hidden">
+      <div id="progress-bar" style="position:absolute;top:0;left:0;height:3px;width:0%;background:#0b5cff;transition:width 0.4s ease;display:none"></div>
+      <span id="progress-text"></span>
+    </div>
+
+    <div class="chat-composer" style="justify-content:center">
+      <input id="file-input" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+      <button id="file-btn" class="send-btn" type="button" title="رفع شيت" style="width:100%;max-width:320px;display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05 12.3 20.2a5.5 5.5 0 0 1-7.8-7.8l9.2-9.15a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.15a1.85 1.85 0 0 1-2.6-2.6l8.5-8.5"/></svg>
+        <span>ارفع الشيت</span>
+      </button>
+      <input id="message-input" type="hidden">
+      <button id="send-btn" type="button" style="display:none">إرسال</button>
+    </div>
+  </div>
+
+  <p id="chat-error" class="chat-error"></p>
+  <p class="chat-note">الخيار الوحيد حالياً: رفع شيت → تجهيز بالسكربت → رفع تلقائي. اختيار الموديل من الإعدادات (بصلاحية) وينطبق على كل شات جديد.</p>
+</main>
+
+{% include "biozone_web/templates/includes/staff_shell_bottom.html" %}
+
+<script>
+(function () {
+  var CSRF = {{ csrf_token | tojson }};
+  var ENABLED = {{ assistant_enabled | tojson }};
+  var scroll = document.getElementById('chat-scroll');
+  var input = document.getElementById('message-input');
+  var sendBtn = document.getElementById('send-btn');
+  var fileBtn = document.getElementById('file-btn');
+  var fileInput = document.getElementById('file-input');
+  var progress = document.getElementById('progress');
+  var errorEl = document.getElementById('chat-error');
+  var history = [];
+  var runName = localStorage.getItem('biozone_assistant_runName') || null;
+  var pollTimer = null;
+  var busy = false;
+  var sessionId = sessionStorage.getItem('biozone_assistant_session') || '';
+  var newChatBtn = document.getElementById('new-chat-btn');
+  var lastStage = '';
+  function genSessionId() { return 'ses_' + Math.random().toString(36).substr(2,12) + Date.now().toString(36); }
+  if (!sessionId) { sessionId = genSessionId(); sessionStorage.setItem('biozone_assistant_session', sessionId); }
+  // استعادة المحادثة المحفوظة لنفس الجلسة
+  var savedHistory = localStorage.getItem('biozone_chat_' + sessionId);
+  if (savedHistory) {
+    try {
+      var parsed = JSON.parse(savedHistory);
+      if (Array.isArray(parsed) && parsed.length) {
+        history = parsed;
+        scroll.innerHTML = '';
+        history.forEach(function(item){
+          var d = document.createElement('div');
+          d.className = 'msg ' + (item.role === 'user' ? 'msg-user' : 'msg-bot');
+          d.textContent = item.content;
+          scroll.appendChild(d);
+        });
+        scroll.scrollTop = scroll.scrollHeight;
+      }
+    } catch(e) {}
+  }
+  function saveHistory() {
+    try { localStorage.setItem('biozone_chat_' + sessionId, JSON.stringify(history.slice(-40))); } catch(e) {}
+    if (runName) localStorage.setItem('biozone_assistant_runName', runName);
+  }
+  newChatBtn.addEventListener('click', function(){
+    // فتح شات جديد في نافذة جديدة
+    window.open(window.location.pathname + '?new=1', '_blank');
+  });
+  // إذا ?new=1 افتح جلسة جديدة فوراً
+  if (window.location.search.indexOf('new=1') !== -1) {
+    sessionId = genSessionId();
+    sessionStorage.setItem('biozone_assistant_session', sessionId);
+    history = [];
+    lastStage = '';
+    localStorage.removeItem('biozone_chat_' + sessionId);
+    localStorage.removeItem('biozone_assistant_runName');
+    runName = null;
+    scroll.innerHTML = '<div class="msg msg-bot">شات جديد — ارفع الشيت ليجهزه الوكيل ويرفعه.</div>';
+    history.push({role:'assistant', content:'شات جديد — ارفع الشيت ليجهزه الوكيل ويرفعه.'});
+    saveHistory();
+    // نظف الـ URL
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  // إذا كان هناك run قيد التنفيذ سابقاً استأنف المتابعة فوراً
+  if (runName) {
+    var savedProgress = localStorage.getItem('biozone_assistant_progress') || 'جاري المتابعة…';
+    setProgress(savedProgress, 12);
+    setBusy(true);
+    startPolling();
+  }
+
+  function showError(text) {
+    errorEl.textContent = text || '';
+    errorEl.style.display = text ? 'block' : 'none';
+  }
+
+  function bubble(role, text) {
+    var div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'msg-user' : 'msg-bot');
+    div.textContent = text;
+    scroll.appendChild(div);
+    scroll.scrollTop = scroll.scrollHeight;
+    return div;
+  }
+
+  function setBusy(value) {
+    busy = value;
+    // sendBtn مخفي أصلاً، لكن نحافظ عليه
+    if (sendBtn) sendBtn.disabled = value;
+    fileBtn.disabled = value;
+    fileBtn.style.opacity = value ? '0.6' : '1';
+    fileBtn.style.cursor = value ? 'not-allowed' : 'pointer';
+  }
+
+  var progressBar = document.getElementById('progress-bar');
+  var progressText = document.getElementById('progress-text');
+  function setProgress(text, pct) {
+    progressText.textContent = text || '';
+    progress.style.display = text ? 'block' : 'none';
+    if (text) {
+      try { localStorage.setItem('biozone_assistant_progress', text); } catch(e) {}
+    } else {
+      try { localStorage.removeItem('biozone_assistant_progress'); } catch(e) {}
+    }
+    if (pct !== undefined) {
+      progressBar.style.display = 'block';
+      progressBar.style.width = pct + '%';
+    } else if (!text) {
+      progressBar.style.display = 'none';
+      progressBar.style.width = '0%';
+    }
+  }
+
+  function post(method, body, isForm) {
+    var headers = { 'X-Frappe-CSRF-Token': CSRF };
+    var payload = body;
+    if (!isForm) {
+      headers['Content-Type'] = 'application/json';
+      payload = JSON.stringify(body);
+    }
+    return fetch('/api/method/' + method, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: headers,
+      body: payload
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error((data && (data.message || data.exc_type)) || ('HTTP ' + r.status));
+        return data.message;
+      });
+    });
+  }
+
+  function ask(message) {
+    setBusy(true);
+    showError('');
+    return post('biozone_web.api.staff_assistant_message', {
+      message: message,
+      run_name: runName || '',
+      history: JSON.stringify(history.slice(-8)),
+      session: sessionId
+    }).then(function (res) {
+      if (!res || res.ok === false) {
+        showError((res && res.error) || 'تعذر الرد الآن');
+        return null;
+      }
+      history.push({ role: 'user', content: message });
+      history.push({ role: 'assistant', content: res.reply });
+      bubble('bot', res.reply);
+      saveHistory();
+      if (res.session_id) { sessionId = res.session_id; sessionStorage.setItem('biozone_assistant_session', sessionId); }
+      return res;
+    }).catch(function (err) {
+      showError(err.message || 'تعذر الاتصال');
+    }).then(function () {
+      setBusy(false);
+    });
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  function sendStage(key, msg) {
+    if (lastStage === key) return;
+    lastStage = key;
+    bubble('bot', msg);
+    history.push({role:'assistant', content: msg}); saveHistory();
+  }
+  function isLimitError(txt) {
+    txt = (txt||'').toLowerCase();
+    return txt.indexOf('حصة') !== -1 || txt.indexOf('limit') !== -1 || txt.indexOf('free') !== -1 || txt.indexOf('موضيل') !== -1;
+  }
+  function renderStatus(st) {
+    if (!st) return;
+    if (st.done) {
+      stopPolling();
+      localStorage.removeItem('biozone_assistant_runName');
+      localStorage.removeItem('biozone_assistant_progress');
+      setBusy(false);
+      if (st.status !== 'Completed' && st.status !== 'Partial') {
+        setProgress('', 0);
+        var err = st.error || 'خطأ غير معروف';
+        if (isLimitError(err) || isLimitError(st.warnings)) {
+          var limitMsg = '⚠️ انتهت حصة النموذج — غيّر الموديل من الإعدادات ثم أعد رفع الشيت.';
+          bubble('bot', limitMsg);
+          history.push({role:'assistant', content: limitMsg}); saveHistory();
+        } else {
+          var msg = 'تعطل الاستيراد: ' + err;
+          if (st.warnings) msg += ' (' + st.warnings + ')';
+          bubble('bot', msg);
+          history.push({role:'assistant', content: msg}); saveHistory();
+        }
+        lastStage = '';
+        return;
+      }
+      setProgress('اكتملت العملية ✓', 100);
+      setTimeout(function(){ setProgress('', 0); }, 4000);
+      var doneMsg = '✅ انتهت العملية بنجاح\n'
+        + '• صفوف الشيت: ' + (st.total || ((st.to_create||0)+(st.to_update||0))) + '\n'
+        + '• جديد: ' + (st.created||0) + '\n'
+        + '• محدّث: ' + (st.updated||0) + '\n'
+        + '• فشل: ' + (st.failed||0) + '\n'
+        + '• الحالة: ' + (st.status === 'Partial' ? 'اكتمل جزئياً' : 'مكتمل') + '\n'
+        + 'تقرير المخزون: /staff/stock';
+      if (st.warnings) doneMsg += '\nملاحظات: ' + st.warnings;
+      bubble('bot', doneMsg);
+      history.push({role:'assistant', content: doneMsg}); saveHistory();
+      lastStage = '';
+      return;
+    }
+    var total = st.total || (st.to_create || 0) + (st.to_update || 0);
+    var done = (st.created || 0) + (st.updated || 0) + (st.failed || 0);
+    var pct = total ? Math.min(90, Math.round(done / total * 85) + 10) : 15;
+    var stage = st.status || '';
+    var label = '';
+    var stageKey = '';
+    var stageMsg = '';
+    if (stage === 'Validating') {
+      label = 'جاري تجهيز الشيت بالوكيل…';
+      stageKey = 'v';
+      stageMsg = 'المرحلة 1/3 — جاري تجهيز الشيت (مطابقة الأصناف وإسناد الأكواد والأقسام)…';
+    } else if (stage === 'Preview' || stage === 'Queued') {
+      label = 'جاري التحقق من البيانات…';
+      stageKey = 'p';
+      stageMsg = 'المرحلة 2/3 — تم تجهيز الشيت، جاري التحقق من الصفوف…';
+    } else if (stage === 'Running') {
+      label = 'جاري الاستيراد…';
+      stageKey = 'r';
+      stageMsg = 'المرحلة 3/3 — بدأ الاستيراد الفعلي في النظام…';
+    } else if (stage === 'Uploaded') {
+      label = 'في الانتظار — سيبدأ التجهيز…';
+      stageKey = 'u';
+      stageMsg = 'المرحلة 0 — الشيت في قائمة الانتظار، سيبدأ التجهيز فوراً…';
+    } else {
+      label = 'جاري العمل…';
+      stageKey = 'x';
+      stageMsg = 'جاري العمل…';
+    }
+    if (total || done) {
+      setProgress(label + ' ' + done + '/' + total, pct);
+    } else {
+      setProgress(label, pct);
+    }
+    if (stageMsg) sendStage(stageKey, stageMsg);
+    if (isLimitError(st.error) || isLimitError(st.warnings)) {
+      sendStage('limit', '⚠️ تنبيه: حصة النموذج على وشك الانتهاء — قد يتوقف قريباً');
+    }
+  }
+
+  var pollFails = 0;
+  function poll() {
+    if (!runName) return;
+    post('biozone_web.api.staff_assistant_status', { run_name: runName }).then(function (st) {
+      if (st && st.ok !== false) {
+        pollFails = 0;
+        renderStatus(st);
+      } else {
+        pollFails++;
+        if (pollFails === 4) setProgress('تعذر قراءة الحالة مؤقتاً — نواصل المحاولة…', 20);
+      }
+    }).catch(function () {
+      pollFails++;
+      if (pollFails === 4) setProgress('تعذر الاتصال مؤقتاً — نواصل المحاولة…', 20);
+    });
+  }
+
+  function startPolling() {
+    stopPolling();
+    setBusy(true);
+    setProgress('بدأ عمل الوكيل — جاري تجهيز الشيت…', 8);
+    poll();
+    pollTimer = setInterval(poll, 3000);
+  }
+
+  function upload(file) {
+    if (!file) return;
+    if (busy) { showError('الوكيل يعمل حالياً — انتظر حتى ينتهي'); return; }
+    setBusy(true);
+    showError('');
+    var form = new FormData();
+    form.append('file', file);
+    post('biozone_web.api.staff_assistant_upload', form, true).then(function (res) {
+      if (!res || res.ok === false) {
+        if (res && res.need_rerun_confirm) {
+          var dupMsg = 'الشيت ده اترفع قبل كده واستورد بنجاح. ارفعه تاني لو عايز تعيد الاستيراد.';
+          bubble('bot', dupMsg);
+          history.push({role:'assistant', content: dupMsg}); saveHistory();
+          setBusy(false);
+          return;
+        }
+        showError((res && res.error) || 'تعذر رفع الشيت');
+        setBusy(false);
+        return;
+      }
+      runName = res.run_name;
+      localStorage.setItem('biozone_assistant_runName', runName);
+      lastStage = '';
+      bubble('user', '📎 ' + file.name);
+      history.push({role:'user', content:'📎 ' + file.name}); saveHistory();
+      bubble('bot', 'تم الرفع — بدأ الوكيل في التجهيز…');
+      history.push({role:'assistant', content:'تم الرفع — بدأ الوكيل في التجهيز…'}); saveHistory();
+      startPolling();
+    }).catch(function (err) {
+      showError(err.message || 'تعذر رفع الشيت');
+      setBusy(false);
+    });
+  }
+
+  sendBtn.addEventListener('click', function () {
+    var text = (input.value || '').trim();
+    if (!text || busy) return;
+    input.value = '';
+    bubble('user', text);
+    ask(text);
+  });
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+  });
+
+  fileBtn.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    upload(file);
+  });
+
+  if (!ENABLED) {
+    showError('المساعد غير مفعّل بعد على هذا الموقع.');
+    setBusy(true);
+  }
+})();
+</script>
+</body></html>

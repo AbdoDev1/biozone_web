@@ -348,6 +348,30 @@ def get_csrf_token_safe() -> str:
 		return ""
 
 
+def has_assistant_access(user=None):
+	"""هل يملك الموظف دورًا يسمح باستخدام الشات؟ (يُستخدم لإظهار الرابط)."""
+	from biozone_web.services.assistant import ASSISTANT_ROLES
+
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if user == "Guest":
+		return False
+	return not set(ASSISTANT_ROLES).isdisjoint(frappe.get_roles(user))
+
+
+def has_assistant_manage_access(user=None):
+	"""هل يملك الموظف دورًا يسمح بإدارة المساعد ومفتاحه؟"""
+	from biozone_web.services.assistant import MANAGE_ROLES
+
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if user == "Guest":
+		return False
+	return not set(MANAGE_ROLES).isdisjoint(frappe.get_roles(user))
+
+
 def get_header_context():
 	"""Shared header state for any www page that includes site_header.html.
 	Call this from the page's get_context() and merge the result in, e.g.:
@@ -377,6 +401,8 @@ def get_header_context():
 	notif_unread_count = 0
 	sb_new_orders = 0
 	sb_unreviewed = 0
+	assistant_allowed = False
+	assistant_manage_allowed = False
 	if is_logged_in:
 		info = frappe.db.get_value("User", user,
 		                           ["full_name", "user_type", "enabled"],
@@ -393,9 +419,13 @@ def get_header_context():
 			if info.user_type == "System User" and info.enabled:
 				sb_new_orders = _count_preparing_orders()
 				sb_unreviewed = _count_unreviewed_customers()
+				assistant_allowed = has_assistant_access(user)
+				assistant_manage_allowed = has_assistant_manage_access(user)
 
 	return {
 		"is_logged_in": is_logged_in,
+		"assistant_allowed": assistant_allowed,
+		"assistant_manage_allowed": assistant_manage_allowed,
 		"user_full_name": user_full_name,
 		"store_user": user if is_logged_in else "Guest",
 		"csrf_token": get_csrf_token_safe(),
